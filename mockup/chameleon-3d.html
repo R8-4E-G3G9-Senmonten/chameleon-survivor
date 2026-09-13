@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>カメレオンナイト ― モックアップ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000;
+               font-family: "Hiragino Sans", "Yu Gothic", sans-serif; }
+  canvas { display:block; }
+  #hud { position:fixed; top:0; left:0; padding:10px 14px; color:#dfffe0; max-width:56%;
+         text-shadow:0 1px 3px #000; pointer-events:none; z-index:5; }
+  #hud h1 { font-size:14px; margin:0 0 3px; letter-spacing:0.5px; opacity:0.9; }
+  #hud .row { font-size:11.5px; opacity:0.82; line-height:1.5; }
+  #lives { margin-top:4px; font-size:16px; letter-spacing:2px; }
+  #topRight { position:fixed; top:10px; right:12px; text-align:right; color:#dfffe0;
+              text-shadow:0 1px 3px #000; font-size:12px; z-index:5; pointer-events:none; }
+  #topRight .badge { display:inline-block; padding:3px 10px; border-radius:12px; font-weight:bold; margin-top:4px; }
+  .badge.hidden { background:rgba(60,160,90,0.85); color:#fff; }
+  .badge.exposed { background:rgba(190,70,50,0.9); color:#fff; }
+  #firefly-count { margin-top:4px; color:#ffe38a; }
+  #timer { margin-top:4px; color:#bcd; font-variant-numeric: tabular-nums; }
+  #suspicionWrap { margin-top:6px; width:130px; height:8px; background:rgba(255,255,255,0.15);
+                   border-radius:4px; overflow:hidden; margin-left:auto; }
+  #suspicionBar { height:100%; width:0%; background:linear-gradient(90deg,#ffdd55,#ff4433); transition:width 0.1s linear; }
+  #minimapWrap { position:fixed; bottom:14px; right:14px; z-index:5; }
+  #minimap { width:150px; height:150px; border-radius:50%; background:rgba(5,10,8,0.65);
+             border:2px solid rgba(200,255,210,0.35); display:block; }
+  #overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+             flex-direction:column; background:rgba(0,0,0,0.82); color:#fff; z-index:10; text-align:center; }
+  #overlay h2 { font-size:38px; margin:0 0 10px; }
+  #overlay .stats { font-size:14px; opacity:0.85; margin:0 0 20px; line-height:1.8; }
+  #overlay button { font-size:15px; padding:10px 26px; border-radius:8px; border:none;
+                     background:#3a8a4a; color:#fff; cursor:pointer; }
+  #overlay button:hover { background:#469a56; }
+  #overlay.fail h2 { color:#ff8f7a; }
+  #overlay.success h2 { color:#9dffb0; }
+  #hint { position:fixed; bottom:14px; left:0; right:180px; text-align:center; color:#cdeccd;
+          font-size:11.5px; opacity:0.7; text-shadow:0 1px 3px #000; z-index:5; pointer-events:none; }
+  #vignette { position:fixed; inset:0; pointer-events:none; z-index:4;
+              box-shadow: inset 0 0 0 0 rgba(255,40,20,0); transition: box-shadow 0.15s linear; }
+  #startOverlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+                  flex-direction:column; background:rgba(0,0,0,0.88); color:#fff; z-index:20; text-align:center; padding:20px; }
+  #startOverlay h1 { font-size:26px; margin:0 0 14px; color:#9dffb0; }
+  #startOverlay .desc { font-size:13px; line-height:2; opacity:0.85; max-width:440px; margin:0 0 22px; text-align:left; }
+  #startOverlay button { font-size:16px; padding:12px 34px; border-radius:8px; border:none;
+                          background:#3a8a4a; color:#fff; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="startOverlay">
+  <h1>🦎 カメレオンナイト ― モックアップ</h1>
+  <div class="desc">
+    移動: WASD / 矢印キー<br>
+    灯り(協力プレイヤーの代わり): マウス移動<br>
+    ホタルを舌で捕まえる: 近づいて E キー(一時的に周囲が光り、そこがチェックポイントになる)<br><br>
+    止まると周囲の色に擬態できます。移動中は目立ち、捕食者に気づかれやすくなります。<br>
+    見つかっても即失敗ではなく「発見ゲージ」が満タンになるまでは猶予があります。ゲージが溜まる前に隠れれば逃げ切れます。<br>
+    ライフは3つ。捕まっても最後に取ったホタルの場所から再開できます。
+  </div>
+  <button id="startBtn">はじめる</button>
+</div>
+
+<div id="hud">
+  <h1>🦎 カメレオンナイト ― モックアップ (3D / HTML)</h1>
+  <div class="row">移動: WASD/矢印　灯り: マウス　ホタル捕獲: E(近づいて)</div>
+  <div id="lives">🦎🦎🦎</div>
+</div>
+<div id="topRight">
+  <div class="badge hidden" id="stateBadge">移動中</div>
+  <div id="suspicionWrap"><div id="suspicionBar"></div></div>
+  <div id="firefly-count">🪲 ホタル: 0</div>
+  <div id="timer">00:00</div>
+</div>
+<div id="hint">静止すると周囲の色に擬態します。捕食者は光が当たった場所でしか見えません。ミニマップは警戒中の捕食者だけを映します。</div>
+<div id="vignette"></div>
+
+<div id="minimapWrap"><canvas id="minimap" width="150" height="150"></canvas></div>
+
+<div id="overlay">
+  <h2 id="overlayTitle"></h2>
+  <div class="stats" id="overlayStats"></div>
+  <button onclick="location.reload()">もう一度やり直す (R)</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+// カメレオンナイト 3Dモックアップ v2
+// 企画書の核 + 手触りを上げるための追加要素:
+//  - 移動中は目立ち、静止すると周囲の色に擬態する(木/岩/地面パッチが色見本)
+//  - 協力プレイヤーの「灯り」(このモックアップではマウスでシミュレート)
+//  - 光が当たった場所でしか見えない捕食者。フクロウ型(索敵広いが鈍い)/ヘビ型(索敵狭いが俊敏)
+//  - 即死ではなく「発見ゲージ」制。溜まりきる前に隠れれば逃げ切れる
+//  - ライフ3・ホタルを取った場所がチェックポイントになる(捕まっても振り出しに戻らない)
+//  - ミニマップは警戒中の捕食者だけを表示(索敵に引っかかるまで見えない=ステルス感)
+//  - Web Audioで環境音/警戒音/被発見音/クリアジングルを演出
+// つた/キノコの足場アクションは今回のモックアップでは未実装(要相談)。
+// ---------------------------------------------------------------------------
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x02040a, 0.038);
+scene.background = new THREE.Color(0x02040a);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---- 夜の照明: かなり暗いアンビエント+ムーンライトのみ。捕食者や地形の細部は
+// スポットライト(=協力プレイヤーの灯り)が当たって初めてはっきり見える。
+scene.add(new THREE.AmbientLight(0x223344, 0.22));
+const moon = new THREE.DirectionalLight(0x4a5f8a, 0.22);
+moon.position.set(-10, 20, -6);
+scene.add(moon);
+
+// ---- 地面 ----
+const groundColor = new THREE.Color(0x1a2b18);
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(80, 80),
+  new THREE.MeshStandardMaterial({ color: groundColor, roughness:1 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---- 地形オブジェクト(木/岩/開けた場所の色パッチ): 擬態時の色見本 ----
+const terrainProps = [];
+function addTree(x, z, scale=1) {
+  const g = new THREE.Group();
+  const trunkColor = 0x5a3d22;
+  const leafColor = 0x2f6b2f;
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.25*scale, 0.35*scale, 2.2*scale, 8),
+    new THREE.MeshStandardMaterial({ color: trunkColor, roughness:0.9 })
+  );
+  trunk.position.y = 1.1*scale;
+  trunk.castShadow = true;
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(1.4*scale, 10, 8),
+    new THREE.MeshStandardMaterial({ color: leafColor, roughness:0.85 })
+  );
+  leaves.position.y = 2.6*scale;
+  leaves.castShadow = true;
+  g.add(trunk, leaves);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  terrainProps.push({ mesh:g, color:new THREE.Color(leafColor), radius: 2.2*scale });
+}
+function addRock(x, z, scale=1) {
+  const rockColor = 0x555a5f;
+  const rock = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(0.8*scale, 0),
+    new THREE.MeshStandardMaterial({ color: rockColor, roughness:1, flatShading:true })
+  );
+  rock.position.set(x, 0.5*scale, z);
+  rock.castShadow = true;
+  scene.add(rock);
+  terrainProps.push({ mesh:rock, color:new THREE.Color(rockColor), radius: 1.6*scale });
+}
+// 開けた場所にも逃げ込める色パッチ(土/苔石)を点在させ、木や岩がない場所でも
+// 擬態しながら移動ルートを選べるようにする。
+function addPatch(x, z, color, radius) {
+  const patch = new THREE.Mesh(
+    new THREE.CircleGeometry(radius, 16),
+    new THREE.MeshStandardMaterial({ color, roughness:1 })
+  );
+  patch.rotation.x = -Math.PI/2;
+  patch.position.set(x, 0.02, z);
+  patch.receiveShadow = true;
+  scene.add(patch);
+  terrainProps.push({ mesh: patch, color:new THREE.Color(color), radius: radius*0.9 });
+}
+
+const treeSpots = [[4,-3],[8,2],[-6,4],[-3,-8],[10,-9],[2,10],[-10,-4],[6,9],[-9,9],[13,4],[-13,-2],[0,-14]];
+treeSpots.forEach(([x,z]) => addTree(x, z, 0.9 + Math.random()*0.5));
+const rockSpots = [[2,4],[-4,-2],[7,-5],[-8,-9],[11,7],[-2,8],[4,-12]];
+rockSpots.forEach(([x,z]) => addRock(x, z, 0.8 + Math.random()*0.6));
+const mudPatches = [[-1,1],[6,-1],[-8,-1],[0,7],[14,-6],[-14,8]];
+mudPatches.forEach(([x,z]) => addPatch(x, z, 0x4a3a22, 1.8 + Math.random()*0.6));
+const stonePatches = [[3,-9],[-5,10],[10,3],[-11,-11]];
+stonePatches.forEach(([x,z]) => addPatch(x, z, 0x4a5560, 1.6 + Math.random()*0.5));
+
+// ---- ゴール ----
+const goalPos = new THREE.Vector3(16, 0, -16);
+const goal = new THREE.Group();
+const goalRing = new THREE.Mesh(
+  new THREE.TorusGeometry(1.3, 0.12, 8, 24),
+  new THREE.MeshStandardMaterial({ color:0x9dffb0, emissive:0x2f7a45, emissiveIntensity:1.2 })
+);
+goalRing.rotation.x = Math.PI/2;
+goalRing.position.y = 0.05;
+goal.add(goalRing);
+const goalLight = new THREE.PointLight(0x9dffb0, 1.2, 8);
+goalLight.position.set(0, 1.5, 0);
+goal.add(goalLight);
+goal.position.copy(goalPos);
+scene.add(goal);
+
+// ---- プレイヤー(カメレオン) ----
+const player = new THREE.Group();
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6fae6f, roughness:0.6 });
+const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), bodyMat);
+body.scale.set(1, 0.85, 1.6);
+body.position.y = 0.55;
+body.castShadow = true;
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), bodyMat);
+head.position.set(0, 0.7, 0.75);
+head.castShadow = true;
+const eyeGeo = new THREE.SphereGeometry(0.08, 6, 6);
+const eyeMat = new THREE.MeshStandardMaterial({ color:0xfff2a0, emissive:0x554400, emissiveIntensity:0.4 });
+const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.18, 0.85, 0.95);
+const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.18, 0.85, 0.95);
+const tail = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 8), bodyMat);
+tail.position.set(0, 0.5, -0.95);
+tail.rotation.x = Math.PI/2.6;
+player.add(body, head, eyeL, eyeR, tail);
+const spawnPos = new THREE.Vector3(-14, 0, 14);
+player.position.copy(spawnPos);
+scene.add(player);
+
+// プレイヤー自身がうっすら見える程度の極小の光(真っ暗すぎて自機を見失わないため)
+const selfGlow = new THREE.PointLight(0x2a4a3a, 0.5, 2.2);
+selfGlow.position.set(0, 0.8, 0);
+player.add(selfGlow);
+
+// 一時的な"ホタル明かり"用ポイントライト(初期は消灯)
+const fireflyGlow = new THREE.PointLight(0xffdd88, 0, 4.5);
+fireflyGlow.position.set(0, 0.8, 0);
+player.add(fireflyGlow);
+let fireflyGlowTimer = 0;
+
+// ---- ホタル(拾い集めて一時的な光にする。取った地点はチェックポイントになる) ----
+const fireflies = [];
+function addFirefly(x, z) {
+  const f = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 8, 8),
+    new THREE.MeshStandardMaterial({ color:0xfff2a0, emissive:0xffcc55, emissiveIntensity:2 })
+  );
+  f.position.set(x, 0.9, z);
+  scene.add(f);
+  fireflies.push({ mesh:f, baseY:0.9, phase:Math.random()*Math.PI*2, collected:false });
+}
+[[-8,6],[-2,-4],[5,6],[9,-2],[-11,-8],[13,-10]].forEach(([x,z]) => addFirefly(x,z));
+let fireflyCount = 0;
+
+// ---- 捕食者: フクロウ型(索敵は広いが鈍い) / ヘビ型(索敵は狭いが俊敏) ----
+const PREDATOR_TYPES = {
+  owl:  { patrolSpeed:1.7, alertSpeed:3.3, movingRadius:8.5, hiddenRadius:2.4, buildRate:32, searchTime:3.0, bodyColor:0x8a3b3b },
+  snake:{ patrolSpeed:2.6, alertSpeed:5.4, movingRadius:5.0, hiddenRadius:1.1, buildRate:48, searchTime:1.8, bodyColor:0x445a3a },
+};
+
+class Predator {
+  constructor(type, waypoints) {
+    const cfg = PREDATOR_TYPES[type];
+    Object.assign(this, cfg);
+    this.type = type;
+    this.waypoints = waypoints;
+    this.wpIndex = 0;
+    this.alert = false;
+    this.alertCooldown = 0;
+    this.refractory = 0; // 一度見失った直後は、至近距離にいても再検知しない猶予
+
+    const g = new THREE.Group();
+    const bMat = new THREE.MeshStandardMaterial({ color: cfg.bodyColor, roughness:0.8 });
+    const torso = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.3, 8), bMat);
+    torso.rotation.x = Math.PI;
+    torso.position.y = 0.75;
+    torso.castShadow = true;
+    const eyeGeo = new THREE.SphereGeometry(0.09, 6, 6);
+    this.eyeMat = new THREE.MeshStandardMaterial({ color:0xffe066, emissive:0xffe066, emissiveIntensity:1.4 });
+    const eL = new THREE.Mesh(eyeGeo, this.eyeMat); eL.position.set(-0.15, 1.15, 0.35);
+    const eR = new THREE.Mesh(eyeGeo, this.eyeMat); eR.position.set(0.15, 1.15, 0.35);
+    g.add(torso, eL, eR);
+    g.position.copy(waypoints[0]);
+    scene.add(g);
+    this.mesh = g;
+    this.alertColor = 0xff4433;
+    this.calmColor = 0xffe066;
+  }
+  reset() {
+    this.alert = false;
+    this.alertCooldown = 0;
+  }
+  // 視野角: 向いている方向(mesh.rotation.y)から左右60度、合計120度の中にいる時だけ「見えている」。
+  canSee(playerPos) {
+    const toPlayer = new THREE.Vector3().subVectors(playerPos, this.mesh.position);
+    toPlayer.y = 0;
+    if (toPlayer.lengthSq() < 0.0001) return true; // 真上に重なっている場合は視野判定不要
+    toPlayer.normalize();
+    const forward = new THREE.Vector3(Math.sin(this.mesh.rotation.y), 0, Math.cos(this.mesh.rotation.y));
+    const angle = Math.acos(THREE.MathUtils.clamp(forward.dot(toPlayer), -1, 1));
+    return angle <= Math.PI / 3; // 60度以内(=左右60度、合計120度の視野)
+  }
+  update(dt, playerPos, playerHidden) {
+    const target = this.waypoints[this.wpIndex];
+    const toTarget = new THREE.Vector3().subVectors(target, this.mesh.position);
+    const distToPlayer = this.mesh.position.distanceTo(playerPos);
+    const seesPlayer = this.canSee(playerPos);
+
+    // 露出中(動いている)は、視野に入って近づく限り何度でも索敵し直す=追跡が続く。
+    // 擬態して静止している間は、新規に気づかれるのは視野内かつごく至近距離だけで、
+    // 一度気づかれていても「距離に関係なく」捜索時間が尽きれば必ず見失う
+    // (=止まって隠れれば、隣にいても数秒でやり過ごせる)。
+    if (this.refractory > 0) this.refractory -= dt;
+
+    const wasAlert = this.alert;
+    if (!playerHidden) {
+      if (distToPlayer < this.movingRadius && seesPlayer) {
+        this.alert = true;
+        this.alertCooldown = this.searchTime;
+      } else if (this.alertCooldown > 0) {
+        this.alertCooldown -= dt;
+        if (this.alertCooldown <= 0) this.alert = false;
+      }
+    } else {
+      if (!this.alert && this.refractory <= 0 && distToPlayer < this.hiddenRadius && seesPlayer) {
+        this.alert = true;
+        this.alertCooldown = this.searchTime;
+      } else if (this.alertCooldown > 0) {
+        this.alertCooldown -= dt;
+        if (this.alertCooldown <= 0) { this.alert = false; this.refractory = 1.2; }
+      }
+    }
+    if (!wasAlert && this.alert) onPredatorAlerted();
+
+    this.eyeMat.color.set(this.alert ? this.alertColor : this.calmColor);
+    this.eyeMat.emissive.set(this.alert ? this.alertColor : this.calmColor);
+
+    let moveDir, speed;
+    if (this.alert) {
+      const toPlayer = new THREE.Vector3().subVectors(playerPos, this.mesh.position);
+      // 擬態中の相手には接近しすぎず、少し手前で立ち止まって周囲を探る動きにする
+      // (真上まで詰め寄って往復し、警戒が切れた瞬間また至近距離で再検知する事故を防ぐ)
+      const stopDist = playerHidden ? this.hiddenRadius + 0.5 : 0.4;
+      if (toPlayer.length() > stopDist) {
+        moveDir = toPlayer;
+        speed = this.alertSpeed;
+      } else {
+        moveDir = new THREE.Vector3(0,0,0);
+        speed = 0;
+      }
+    } else {
+      if (toTarget.length() < 0.5) this.wpIndex = (this.wpIndex+1) % this.waypoints.length;
+      moveDir = toTarget;
+      speed = this.patrolSpeed;
+    }
+    moveDir.y = 0;
+    if (moveDir.lengthSq() > 0.0001) {
+      moveDir.normalize();
+      this.mesh.position.addScaledVector(moveDir, speed*dt);
+      const angle = Math.atan2(moveDir.x, moveDir.z);
+      this.mesh.rotation.y = angle;
+    }
+    return distToPlayer;
+  }
+}
+
+const predators = [
+  new Predator('owl',   [new THREE.Vector3(2,0,2), new THREE.Vector3(6,0,-6), new THREE.Vector3(-2,0,-8), new THREE.Vector3(-4,0,3)]),
+  new Predator('snake', [new THREE.Vector3(10,0,8), new THREE.Vector3(12,0,-4), new THREE.Vector3(-6,0,-12), new THREE.Vector3(2,0,10)]),
+  new Predator('snake', [new THREE.Vector3(-10,0,-14), new THREE.Vector3(4,0,-15), new THREE.Vector3(9,0,-9), new THREE.Vector3(-6,0,-9)]),
+];
+
+// ---- マウス操作の"灯り"(協力プレイヤーのスマホの代わり) ----
+const flashlight = new THREE.SpotLight(0xfff2c0, 3.2, 16, Math.PI/6.5, 0.5, 1.4);
+flashlight.castShadow = true;
+scene.add(flashlight);
+scene.add(flashlight.target);
+
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2(0,0);
+const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+let lightTarget = new THREE.Vector3();
+
+window.addEventListener('mousemove', (e) => {
+  mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// ---- 入力 ----
+const keys = {};
+window.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === 'r' && gameOver) location.reload();
+});
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+// ---------------------------------------------------------------------------
+// サウンド(Web Audio, 外部ファイル無し。初回クリック/キー入力でアンロック)
+// ---------------------------------------------------------------------------
+let actx = null;
+function unlockAudio() {
+  if (actx) return;
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  startAmbient();
+}
+function tone(freq, duration, type='sine', gain=0.12, delay=0, freqEnd=null) {
+  if (!actx) return;
+  const t0 = actx.currentTime + delay;
+  const osc = actx.createOscillator();
+  const g = actx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, t0 + duration);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(g).connect(actx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.05);
+}
+function startAmbient() {
+  const o1 = actx.createOscillator(), o2 = actx.createOscillator();
+  const g = actx.createGain();
+  const lp = actx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 220;
+  o1.type = 'sine'; o1.frequency.value = 55;
+  o2.type = 'sine'; o2.frequency.value = 58.5;
+  g.gain.value = 0.028;
+  o1.connect(lp); o2.connect(lp); lp.connect(g).connect(actx.destination);
+  o1.start(); o2.start();
+}
+function playFootstep() { tone(90 + Math.random()*20, 0.06, 'triangle', 0.05); }
+function playAlertStinger() { tone(320, 0.28, 'sawtooth', 0.09, 0, 780); }
+function playFireflyChime() {
+  tone(660, 0.12, 'sine', 0.09, 0);
+  tone(880, 0.12, 'sine', 0.09, 0.08);
+  tone(1180, 0.16, 'sine', 0.08, 0.16);
+}
+function playCaughtBuzz() { tone(220, 0.35, 'sawtooth', 0.13, 0, 60); }
+function playSuccessJingle() {
+  [523, 659, 784, 1047].forEach((f,i) => tone(f, 0.22, 'sine', 0.1, i*0.13));
+}
+function onPredatorAlerted() { playAlertStinger(); }
+
+// ---- 開始画面 ----
+const startOverlay = document.getElementById('startOverlay');
+document.getElementById('startBtn').addEventListener('click', () => {
+  unlockAudio();
+  startOverlay.style.display = 'none';
+  gameStarted = true;
+});
+window.addEventListener('keydown', () => unlockAudio(), { once:true });
+
+// ---- ゲーム状態 ----
+let gameStarted = false;
+let gameOver = false;
+const velocity = new THREE.Vector3();
+const moveSpeed = 5.2;
+const damping = 8;
+let idleTimer = 0;
+let hidden = false;
+let lives = 3;
+let suspicion = 0; // 0..100 発見ゲージ
+let invulnTimer = 0;
+let checkpoint = spawnPos.clone();
+let catchCount = 0;
+let elapsed = 0;
+let footstepTimer = 0;
+
+const stateBadge = document.getElementById('stateBadge');
+const fireflyCountEl = document.getElementById('firefly-count');
+const overlay = document.getElementById('overlay');
+const livesEl = document.getElementById('lives');
+const suspicionBar = document.getElementById('suspicionBar');
+const timerEl = document.getElementById('timer');
+const vignette = document.getElementById('vignette');
+const hintEl = document.getElementById('hint');
+
+function fmtTime(s) {
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+}
+
+function updateLivesUI() {
+  livesEl.textContent = '🦎'.repeat(Math.max(0,lives)) + '🖤'.repeat(3-Math.max(0,lives));
+}
+
+function showOverlay(kind, title) {
+  overlay.className = kind;
+  overlay.style.display = 'flex';
+  document.getElementById('overlayTitle').textContent = title;
+  document.getElementById('overlayStats').innerHTML =
+    'クリアタイム: ' + fmtTime(elapsed) + '<br>' +
+    '見つかった回数: ' + catchCount + '<br>' +
+    '🪲 集めたホタル: ' + fireflyCount + ' / ' + fireflies.length;
+  gameOver = true;
+  if (kind === 'success') playSuccessJingle();
+}
+
+function loseLife() {
+  catchCount++;
+  lives--;
+  updateLivesUI();
+  playCaughtBuzz();
+  if (lives <= 0) {
+    showOverlay('fail', '捕食者に見つかった…');
+    return;
+  }
+  // チェックポイントへ戻し、少しの間だけ無敵にする(理不尽な連続被弾を防ぐ)
+  player.position.copy(checkpoint);
+  velocity.set(0,0,0);
+  suspicion = 0;
+  invulnTimer = 1.6;
+  predators.forEach(p => p.reset());
+}
+
+function nearestTerrainColor(pos) {
+  let best = null, bestDist = Infinity;
+  for (const p of terrainProps) {
+    const d = pos.distanceTo(p.mesh.position);
+    if (d < p.radius + 1.2 && d < bestDist) { bestDist = d; best = p; }
+  }
+  return best ? best.color : groundColor;
+}
+
+// ---- ミニマップ(警戒中の捕食者だけを映す=索敵に引っかかるまで見えない) ----
+const mmCanvas = document.getElementById('minimap');
+const mmCtx = mmCanvas.getContext('2d');
+const WORLD_HALF = 19;
+function toMap(x, z) {
+  return [75 + (x / WORLD_HALF) * 70, 75 + (z / WORLD_HALF) * 70];
+}
+function drawMinimap() {
+  mmCtx.clearRect(0,0,150,150);
+  mmCtx.save();
+  mmCtx.beginPath(); mmCtx.arc(75,75,74,0,Math.PI*2); mmCtx.clip();
+
+  // 地形(うっすら)
+  mmCtx.globalAlpha = 0.35;
+  terrainProps.forEach(p => {
+    const [x,y] = toMap(p.mesh.position.x, p.mesh.position.z);
+    mmCtx.fillStyle = '#' + p.color.getHexString();
+    mmCtx.beginPath(); mmCtx.arc(x,y,3,0,Math.PI*2); mmCtx.fill();
+  });
+  mmCtx.globalAlpha = 1;
+
+  // ホタル
+  fireflies.forEach(f => {
+    if (f.collected) return;
+    const [x,y] = toMap(f.mesh.position.x, f.mesh.position.z);
+    mmCtx.fillStyle = '#ffe38a';
+    mmCtx.beginPath(); mmCtx.arc(x,y,2.4,0,Math.PI*2); mmCtx.fill();
+  });
+
+  // ゴール
+  const [gx,gy] = toMap(goalPos.x, goalPos.z);
+  mmCtx.fillStyle = '#9dffb0';
+  mmCtx.beginPath(); mmCtx.arc(gx,gy,4,0,Math.PI*2); mmCtx.fill();
+
+  // 警戒中の捕食者のみ表示
+  const pulse = 0.6 + 0.4*Math.sin(performance.now()*0.01);
+  predators.forEach(p => {
+    if (!p.alert) return;
+    const [x,y] = toMap(p.mesh.position.x, p.mesh.position.z);
+    mmCtx.fillStyle = `rgba(255,60,40,${pulse})`;
+    mmCtx.beginPath(); mmCtx.arc(x,y,4,0,Math.PI*2); mmCtx.fill();
+  });
+
+  // プレイヤー(向きつき三角形)
+  const [px,py] = toMap(player.position.x, player.position.z);
+  mmCtx.save();
+  mmCtx.translate(px,py);
+  mmCtx.rotate(player.rotation.y);
+  mmCtx.fillStyle = hidden ? '#7fe08a' : '#eafeea';
+  mmCtx.beginPath();
+  mmCtx.moveTo(0,-6); mmCtx.lineTo(4,5); mmCtx.lineTo(-4,5); mmCtx.closePath();
+  mmCtx.fill();
+  mmCtx.restore();
+
+  mmCtx.restore();
+}
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (gameStarted && !gameOver) update(dt);
+  drawMinimap();
+  renderer.render(scene, camera);
+}
+
+function update(dt) {
+  elapsed += dt;
+  timerEl.textContent = fmtTime(elapsed);
+  if (invulnTimer > 0) invulnTimer -= dt;
+
+  // --- 移動 ---
+  const input = new THREE.Vector3();
+  if (keys['w'] || keys['arrowup']) input.z -= 1;
+  if (keys['s'] || keys['arrowdown']) input.z += 1;
+  if (keys['a'] || keys['arrowleft']) input.x -= 1;
+  if (keys['d'] || keys['arrowright']) input.x += 1;
+  const moving = input.lengthSq() > 0;
+  if (moving) {
+    input.normalize();
+    velocity.x += (input.x*moveSpeed - velocity.x) * Math.min(1, dt*10);
+    velocity.z += (input.z*moveSpeed - velocity.z) * Math.min(1, dt*10);
+    const angle = Math.atan2(input.x, input.z);
+    player.rotation.y += (angle - player.rotation.y) * Math.min(1, dt*10);
+  } else {
+    velocity.multiplyScalar(Math.max(0, 1 - damping*dt));
+  }
+  player.position.addScaledVector(velocity, dt);
+  player.position.x = THREE.MathUtils.clamp(player.position.x, -18, 18);
+  player.position.z = THREE.MathUtils.clamp(player.position.z, -18, 18);
+
+  const isMoving = velocity.length() > 0.35;
+  if (isMoving) idleTimer = 0; else idleTimer += dt;
+  hidden = !isMoving && idleTimer > 0.35;
+
+  if (isMoving) {
+    footstepTimer -= dt;
+    if (footstepTimer <= 0) { playFootstep(); footstepTimer = 0.32; }
+  } else {
+    footstepTimer = 0;
+  }
+
+  // --- 擬態カラー ---
+  const targetColor = hidden ? nearestTerrainColor(player.position) : new THREE.Color(0x8fd88f);
+  bodyMat.color.lerp(targetColor, Math.min(1, dt*(hidden?3:6)));
+
+  stateBadge.textContent = hidden ? '擬態中(静止)' : '移動中(目立つ)';
+  stateBadge.className = 'badge ' + (hidden ? 'hidden' : 'exposed');
+
+  // --- 灯り(マウス位置を地面に投影) ---
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hit = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(groundPlane, hit)) lightTarget.copy(hit);
+  flashlight.position.set(lightTarget.x, 9, lightTarget.z);
+  flashlight.target.position.copy(lightTarget);
+  flashlight.target.updateMatrixWorld();
+
+  // --- ホタル(取ると一時的な光+チェックポイント更新) ---
+  const t = performance.now()*0.001;
+  fireflies.forEach(f => {
+    if (f.collected) return;
+    f.mesh.position.y = f.baseY + Math.sin(t*2 + f.phase)*0.15;
+    if (player.position.distanceTo(f.mesh.position) < 1.6 && (keys['e'])) {
+      f.collected = true;
+      f.mesh.visible = false;
+      fireflyCount++;
+      fireflyCountEl.textContent = '🪲 ホタル: ' + fireflyCount;
+      fireflyGlowTimer = 6;
+      checkpoint.copy(f.mesh.position);
+      playFireflyChime();
+    }
+  });
+  if (fireflyGlowTimer > 0) {
+    fireflyGlowTimer -= dt;
+    fireflyGlow.intensity = 1.6 * Math.min(1, fireflyGlowTimer);
+  } else {
+    fireflyGlow.intensity = 0;
+  }
+
+  // --- 捕食者: 発見ゲージを蓄積。擬態して静止している間は完全に安全
+  // (ゲージも溜まらず、接触してもライフを失わない=すぐ横を素通りされる)。
+  // 危険なのは「動いて目立っている」ときだけ。
+  let maxBuildRate = 0;
+  let closeContact = false;
+  let searchingNearby = false;
+  for (const p of predators) {
+    const dist = p.update(dt, player.position, hidden);
+    if (p.alert && !hidden && invulnTimer <= 0) {
+      const closeness = 1 - Math.min(1, dist / p.movingRadius);
+      maxBuildRate = Math.max(maxBuildRate, p.buildRate * (0.4 + closeness));
+    }
+    if (p.alert && hidden) searchingNearby = true;
+    if (dist < 0.8 && invulnTimer <= 0 && !hidden) closeContact = true;
+  }
+  if (maxBuildRate > 0) {
+    suspicion = Math.min(100, suspicion + maxBuildRate*dt);
+  } else {
+    suspicion = Math.max(0, suspicion - 55*dt);
+  }
+  suspicionBar.style.width = suspicion + '%';
+  vignette.style.boxShadow = 'inset 0 0 ' + (60+suspicion*1.6) + 'px ' + (10+suspicion*0.4) + 'px rgba(255,40,20,' + (suspicion/170) + ')';
+  hintEl.textContent = searchingNearby
+    ? '⚠ 捕食者がすぐ近くを探しています…動かずにやり過ごそう'
+    : '静止すると周囲の色に擬態します。捕食者は光が当たった場所でしか見えません。ミニマップは警戒中の捕食者だけを映します。';
+  hintEl.style.color = searchingNearby ? '#ffd27a' : '#cdeccd';
+
+  if (invulnTimer <= 0 && (suspicion >= 100 || closeContact)) {
+    loseLife();
+  }
+
+  // --- ゴール判定 ---
+  if (player.position.distanceTo(goalPos) < 1.6) {
+    showOverlay('success', 'ジャングル脱出成功！');
+  }
+
+  // --- カメラ追従(見下ろし気味の追従カメラ) ---
+  const camOffset = new THREE.Vector3(0, 7, 7);
+  const desiredCamPos = player.position.clone().add(camOffset);
+  camera.position.lerp(desiredCamPos, Math.min(1, dt*4));
+  camera.lookAt(player.position.x, 0.6, player.position.z);
+}
+
+updateLivesUI();
+animate();
+</script>
+</body>
+</html>
