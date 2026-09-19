@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>カメレオンナイト・迷宮 ― 3Dモックアップ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --panel-bg: rgba(10,18,14,0.62);
+    --panel-border: rgba(170,255,190,0.22);
+    --accent-main: #7be08a;
+    --accent-sub: #7ec4ff;
+    --accent-danger: #ff5f4d;
+    --accent-gold: #ffd873;
+    --text-soft: #d9f2df;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000;
+               font-family: "Hiragino Sans", "Yu Gothic", "Segoe UI", sans-serif; }
+  canvas { display:block; }
+
+  .panel { background:var(--panel-bg); border:1px solid var(--panel-border); border-radius:14px;
+           backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+           box-shadow: 0 6px 24px rgba(0,0,0,0.35); }
+
+  kbd { display:inline-block; padding:1px 7px; border-radius:5px; background:rgba(255,255,255,0.14);
+        border:1px solid rgba(255,255,255,0.28); font-size:11px; font-weight:600; color:#fff;
+        box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+
+  #hud { position:fixed; top:14px; left:14px; padding:12px 16px; color:var(--text-soft);
+         max-width:420px; z-index:5; pointer-events:none; }
+  #hud .title { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; margin:0 0 8px; letter-spacing:0.3px; }
+  #hud .title .dot { width:8px; height:8px; border-radius:50%; background:var(--accent-main); box-shadow:0 0 8px var(--accent-main); }
+  #hud .controls { display:flex; flex-direction:column; gap:5px; font-size:11.5px; opacity:0.92; }
+  #hud .controls .line { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  #hud .controls .tag { font-size:10px; font-weight:700; padding:1px 6px; border-radius:5px; letter-spacing:0.5px; }
+  #hud .tag.main { background:rgba(123,224,138,0.22); color:var(--accent-main); }
+  #hud .tag.sub { background:rgba(126,196,255,0.22); color:var(--accent-sub); }
+  #lives { margin-top:9px; font-size:17px; letter-spacing:3px; }
+
+  #topRight { position:fixed; top:14px; right:14px; padding:10px 14px; text-align:right;
+              color:var(--text-soft); font-size:12px; z-index:5; pointer-events:none; min-width:172px; }
+  .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 11px; border-radius:12px;
+           font-weight:bold; font-size:11.5px; }
+  .badge.hidden { background:rgba(70,180,105,0.85); color:#08210f; }
+  .badge.exposed { background:rgba(220,80,60,0.92); color:#fff; }
+  #timer { margin-top:8px; color:#bcd7c8; font-variant-numeric: tabular-nums; font-size:13px; letter-spacing:0.5px; }
+  #suspicionLabel { margin-top:9px; font-size:10px; opacity:0.75; letter-spacing:0.5px; }
+  #suspicionWrap { margin-top:3px; width:150px; height:9px; background:rgba(255,255,255,0.14);
+                   border-radius:5px; overflow:hidden; margin-left:auto; position:relative; }
+  #suspicionBar { height:100%; width:0%; background:linear-gradient(90deg,#ffdd55,#ff4433);
+                  transition:width 0.1s linear, box-shadow 0.2s; }
+  #suspicionBar.danger { box-shadow: 0 0 10px 2px rgba(255,60,40,0.9); }
+
+  #minimapWrap { position:fixed; bottom:16px; right:16px; z-index:5; padding:9px; }
+  #minimapWrap .mapLabel { font-size:10px; color:var(--text-soft); opacity:0.8; letter-spacing:1px;
+                            margin:0 0 6px 2px; display:flex; justify-content:space-between; }
+  #minimap { width:172px; height:172px; border-radius:10px; background:rgba(4,9,7,0.75);
+             border:1px solid rgba(160,220,255,0.25); display:block; }
+
+  #overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+             flex-direction:column; background:rgba(2,6,4,0.86); color:#fff; z-index:10; text-align:center; }
+  #overlay .card { padding:36px 46px; min-width:320px; }
+  #overlay h2 { font-size:32px; margin:0 0 14px; }
+  #overlay .stats { font-size:13.5px; opacity:0.85; margin:0 0 24px; line-height:1.9; color:var(--text-soft); }
+  #overlay button, #startOverlay button { font-size:15px; padding:11px 30px; border-radius:9px; border:none;
+                     background:linear-gradient(180deg,#4fae63,#3a8a4a); color:#fff; cursor:pointer;
+                     font-weight:600; letter-spacing:0.5px; box-shadow:0 4px 14px rgba(58,138,74,0.45); }
+  #overlay button:hover, #startOverlay button:hover { filter:brightness(1.08); }
+  #overlay.fail h2 { color:var(--accent-danger); }
+  #overlay.success h2 { color:var(--accent-gold); }
+
+  #hint { position:fixed; bottom:16px; left:16px; right:210px; z-index:5; pointer-events:none;
+          padding:9px 14px; color:var(--text-soft); font-size:11.5px; display:flex; align-items:center; gap:8px; }
+  #hint .icon { font-size:14px; }
+
+  #vignette { position:fixed; inset:0; pointer-events:none; z-index:4;
+              box-shadow: inset 0 0 0 0 rgba(255,40,20,0); transition: box-shadow 0.15s linear; }
+
+  #startOverlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+                  background:radial-gradient(ellipse at 50% 20%, #142018 0%, #05100a 60%, #020604 100%);
+                  color:#fff; z-index:20; padding:24px; overflow-y:auto; }
+  #startOverlay .wrap { max-width:760px; width:100%; text-align:center; }
+  #startOverlay h1 { font-size:26px; margin:0 0 6px; color:#eafff0; letter-spacing:0.5px; }
+  #startOverlay .lead { font-size:13px; margin:0 0 26px; color:var(--accent-gold); font-weight:600; opacity:0.9; }
+  #startOverlay .roles { display:flex; gap:16px; margin-bottom:22px; text-align:left; flex-wrap:wrap; }
+  .roleCard { flex:1; min-width:280px; padding:18px 20px; border-radius:14px; background:rgba(255,255,255,0.04); }
+  .roleCard.main { border-left:4px solid var(--accent-main); }
+  .roleCard.sub { border-left:4px solid var(--accent-sub); }
+  .roleCard h3 { margin:0 0 4px; font-size:15px; display:flex; align-items:center; gap:8px; }
+  .roleCard .roleGoal { font-size:11.5px; opacity:0.65; margin:0 0 12px; }
+  .roleCard .desc { font-size:12.5px; line-height:1.85; opacity:0.92; margin:0 0 12px; }
+  .roleCard .keys { display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:11px; opacity:0.85; }
+  #startOverlay .versus { text-align:center; font-size:11px; letter-spacing:2px; color:#ffb0a0; opacity:0.8; margin:2px 0 20px; }
+  #startOverlay .rule { font-size:12px; line-height:1.9; opacity:0.85; color:var(--text-soft); text-align:left;
+                         max-width:600px; margin:0 auto 26px; padding:14px 18px; border-radius:10px; background:rgba(255,255,255,0.03); }
+</style>
+</head>
+<body>
+<div id="startOverlay">
+  <div class="wrap panel" style="padding:34px 38px;">
+    <h1>🦎 カメレオンナイト・迷宮 ― 3Dモックアップ</h1>
+    <div class="lead">展示コンセプト: 圧力マット役 vs スマホ傾き役の非対称バトル</div>
+
+    <div class="roles">
+      <div class="roleCard main">
+        <h3>🟢 メイン役(圧力マット)</h3>
+        <div class="roleGoal">ゴール = 出口の紋章にたどり着く</div>
+        <div class="desc">
+          迷宮の中をカメレオンとして進む。マットを踏み続けると前進するが、動いている間は体の色が目立つ。
+          足を止めると、その場の壁・床の色に擬態して発見されにくくなる。
+        </div>
+        <div class="keys">
+          <kbd>W</kbd>踏み続けて前進　<kbd>A</kbd><kbd>D</kbd>で旋回(圧力マットの代用)
+        </div>
+      </div>
+      <div class="roleCard sub">
+        <h3>🔦 サブ役(スマホの傾き)</h3>
+        <div class="roleGoal">ゴール = メイン役を見つけて追い詰める</div>
+        <div class="desc">
+          迷宮を俯瞰するサーチライト役。<b>メイン役を助けるのではなく、妨害する敵側</b>。
+          ライトをメイン役に重ねて照らし続けると発見ゲージが上昇し、迷宮の番人もその光に引き寄せられて向かってくる。
+        </div>
+        <div class="keys">
+          <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> でサーチライトを移動(スマホ傾きの代用)
+        </div>
+      </div>
+    </div>
+    <div class="versus">MAIN ESCAPES　|　SUB HUNTS</div>
+
+    <div class="rule">
+      発見ゲージが満タンになるとメイン役は1ライフ失う(合計3ライフ)。ゲージが溜まる前に止まって擬態すれば逃げ切れる。<br>
+      迷路には抜け道があるので、鬼(番人)と鉢合わせても迂回して逃げられる。ライフがなくなるか出口に到達するまで対決は続く。
+    </div>
+
+    <button id="startBtn">はじめる (ENTER)</button>
+  </div>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="dot"></span>カメレオンナイト・迷宮 <span style="opacity:0.6;font-weight:400;">/ 統合デモ(1人で両役体験)</span></div>
+  <div class="controls">
+    <div class="line"><span class="tag main">MAIN</span><kbd>W</kbd>押し続けで前進　<kbd>A</kbd><kbd>D</kbd>旋回</div>
+    <div class="line"><span class="tag sub">SUB</span>矢印キー <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> でサーチライトを操作(妨害)</div>
+  </div>
+  <div id="lives">🦎🦎🦎</div>
+</div>
+
+<div id="topRight" class="panel">
+  <div class="badge hidden" id="stateBadge">擬態中</div>
+  <div id="timer">00:00</div>
+  <div id="suspicionLabel">発見ゲージ</div>
+  <div id="suspicionWrap"><div id="suspicionBar"></div></div>
+</div>
+
+<div id="hint" class="panel"><span class="icon">💡</span>止まると壁・床の色に溶け込みます。サーチライトを重ねられ続けると危険。迷路の抜け道で振り切ろう。</div>
+<div id="vignette"></div>
+
+<div id="minimapWrap" class="panel">
+  <div class="mapLabel"><span>MAP</span><span id="mapSubLabel" style="color:#7ec4ff;">サーチライト</span></div>
+  <canvas id="minimap" width="172" height="172"></canvas>
+</div>
+
+<div id="overlay">
+  <div class="card panel">
+    <h2 id="overlayTitle"></h2>
+    <div class="stats" id="overlayStats"></div>
+    <button onclick="location.reload()">もう一度やり直す (R)</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+// カメレオンナイト・迷宮 3Dモックアップ
+//
+// 展示コンセプト: 圧力マット役(メイン) vs スマホ傾き役(サブ)の非対称バトル
+//   メイン役(圧力マット) : マットを踏み続ける=前進/離す=静止して擬態。出口を目指す。
+//     -> ブラウザデモでは W 押しっぱなし = マット踏み続け、離す = 静止。A/D = 旋回
+//   サブ役(スマホの傾き) : 迷宮を俯瞰するサーチライト役。メイン役を"助ける"のではなく"妨害する"敵側。
+//     -> ブラウザデモでは矢印キーでサーチライトを自由に移動(スマホの傾き操作の代用)。
+//        ライトをメイン役に重ね続けると直接発見ゲージが上昇し、番人もその光に引き寄せられる。
+//
+// 当たり判定は「軸ごとに分離した円形コリジョン(スライド式)」で解決し、
+// 斜め移動で壁の角をすり抜けたり、引っかかって完全停止したりしないようにしている。
+// 迷路は完全迷路(一本道)生成後にbraidMaze()で抜け道を追加し、
+// 通路の先で番人と鉢合わせても迂回できるようにしている。
+// ---------------------------------------------------------------------------
+
+const CELL = 4;                 // 迷路1マスの一辺
+let N = 9;                      // 迷路サイズ(N x N)
+const WALL_H = 3.2;
+const PLAYER_RADIUS = 0.42;     // メイン役の当たり判定半径
+const GUARDIAN_RADIUS = 0.45;
+
+let scene, camera, renderer, clock;
+let player, playerLight, searchLightMesh, guardian, guardianEye;
+let mazeGroup, floorTiles = [];
+
+let cellVisited, wallH, wallV; // wallH[y][x]=(x,y)-(x,y+1)間の壁 / wallV[y][x]=(x,y)-(x+1,y)間の壁
+
+let goalCell = {x:0,y:0};
+let path = []; // BFS経路(チェックポイント判定に使用)
+
+let keys = {};
+let lives = 3;
+let started = false;
+let gameOver = false;
+let elapsed = 0;
+let suspicion = 0; // 0..100
+let isCamouflaged = true;
+let stillTimer = 0;
+let lastCheckpoint = {x:0, y:0};
+
+// サーチライト(サブ役)の自由移動座標
+let lightX = 0, lightZ = 0;
+const LIGHT_SPEED = 6.5;
+const LIGHT_RADIUS = 2.3;
+
+const CAMO_PALETTE = [0x2f5233, 0x3a6b3f, 0x4a7a3c, 0x6b5a3a, 0x5a4a35, 0x33513f, 0x455f36];
+
+function init() {
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a120c, 0.03);
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
+
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  document.body.appendChild(renderer.domElement);
+
+  const ambient = new THREE.AmbientLight(0x8ea896, 2.4);
+  scene.add(ambient);
+  const moon = new THREE.DirectionalLight(0xbfd4ff, 1.1);
+  moon.position.set(5, 10, 3);
+  scene.add(moon);
+  const hemi = new THREE.HemisphereLight(0x9fc6a8, 0x101512, 1.2);
+  scene.add(hemi);
+
+  clock = new THREE.Clock();
+
+  buildMaze();
+  buildPlayer();
+  buildGuardian();
+  buildSearchLight();
+
+  window.addEventListener('resize', onResize);
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+    if (e.key === 'Enter' && !started) startGame();
+    if (e.key.toLowerCase()==='r' && gameOver) location.reload();
+  });
+  window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+
+  animate();
+}
+
+function idx(x,y){ return y*N+x; }
+
+function generateMaze() {
+  cellVisited = Array.from({length:N}, () => Array(N).fill(false));
+  wallH = Array.from({length:N}, () => Array(N).fill(true));
+  wallV = Array.from({length:N}, () => Array(N).fill(true));
+
+  const stack = [{x:0,y:0}];
+  cellVisited[0][0] = true;
+  while (stack.length) {
+    const cur = stack[stack.length-1];
+    const dirs = [];
+    if (cur.x+1 < N && !cellVisited[cur.y][cur.x+1]) dirs.push('E');
+    if (cur.x-1 >= 0 && !cellVisited[cur.y][cur.x-1]) dirs.push('W');
+    if (cur.y+1 < N && !cellVisited[cur.y+1][cur.x]) dirs.push('S');
+    if (cur.y-1 >= 0 && !cellVisited[cur.y-1][cur.x]) dirs.push('N');
+    if (!dirs.length) { stack.pop(); continue; }
+    const d = dirs[Math.floor(Math.random()*dirs.length)];
+    let nx = cur.x, ny = cur.y;
+    if (d==='E'){ wallV[cur.y][cur.x]=false; nx++; }
+    if (d==='W'){ nx--; wallV[cur.y][nx]=false; }
+    if (d==='S'){ wallH[cur.y][cur.x]=false; ny++; }
+    if (d==='N'){ ny--; wallH[ny][cur.x]=false; }
+    cellVisited[ny][nx] = true;
+    stack.push({x:nx,y:ny});
+  }
+  goalCell = {x:N-1, y:N-1};
+
+  braidMaze();
+}
+
+// 完全迷路(一本道)のままだと通路の先で番人と鉢合わせたときに詰んでしまうため、
+// 壁を確率で取り払い、迂回できるループ(抜け道)を作る。
+function braidMaze() {
+  const BRAID_CHANCE = 0.32;
+  for (let y=0;y<N;y++) {
+    for (let x=0;x<N;x++) {
+      if (x+1<N && wallV[y][x] && Math.random() < BRAID_CHANCE) wallV[y][x] = false;
+      if (y+1<N && wallH[y][x] && Math.random() < BRAID_CHANCE) wallH[y][x] = false;
+    }
+  }
+}
+
+function bfsPath() {
+  const prev = {};
+  const visited = Array.from({length:N}, () => Array(N).fill(false));
+  const q = [{x:0,y:0}];
+  visited[0][0] = true;
+  while (q.length) {
+    const c = q.shift();
+    if (c.x === goalCell.x && c.y === goalCell.y) break;
+    const neighbors = [];
+    if (!wallV[c.y][c.x] && c.x+1<N) neighbors.push({x:c.x+1,y:c.y});
+    if (c.x-1>=0 && !wallV[c.y][c.x-1]) neighbors.push({x:c.x-1,y:c.y});
+    if (!wallH[c.y][c.x] && c.y+1<N) neighbors.push({x:c.x,y:c.y+1});
+    if (c.y-1>=0 && !wallH[c.y-1][c.x]) neighbors.push({x:c.x,y:c.y-1});
+    for (const n of neighbors) {
+      if (!visited[n.y][n.x]) {
+        visited[n.y][n.x] = true;
+        prev[idx(n.x,n.y)] = c;
+        q.push(n);
+      }
+    }
+  }
+  const result = [];
+  let cur = {x:goalCell.x, y:goalCell.y};
+  while (cur) {
+    result.unshift(cur);
+    cur = prev[idx(cur.x,cur.y)];
+  }
+  path = result;
+}
+
+function cellToWorld(cx, cy) {
+  return new THREE.Vector3((cx - (N-1)/2) * CELL, 0, (cy - (N-1)/2) * CELL);
+}
+
+function buildMaze() {
+  generateMaze();
+  bfsPath();
+
+  mazeGroup = new THREE.Group();
+  scene.add(mazeGroup);
+
+  const floorGeo = new THREE.BoxGeometry(CELL, 0.2, CELL);
+  for (let y=0;y<N;y++) {
+    for (let x=0;x<N;x++) {
+      const color = CAMO_PALETTE[Math.floor(Math.random()*CAMO_PALETTE.length)];
+      const mat = new THREE.MeshStandardMaterial({color, roughness:1});
+      const mesh = new THREE.Mesh(floorGeo, mat);
+      const p = cellToWorld(x,y);
+      mesh.position.set(p.x, -0.1, p.z);
+      mesh.userData = {cx:x, cy:y, baseColor:color};
+      mazeGroup.add(mesh);
+      floorTiles.push(mesh);
+    }
+  }
+
+  const wallMat = new THREE.MeshStandardMaterial({color:0x1c2b1e, roughness:0.9});
+  const wallGeoH = new THREE.BoxGeometry(CELL, WALL_H, 0.3);
+  const wallGeoV = new THREE.BoxGeometry(0.3, WALL_H, CELL);
+
+  for (let y=0;y<N;y++) {
+    for (let x=0;x<N;x++) {
+      const p = cellToWorld(x,y);
+      if (wallH[y][x]) {
+        const w = new THREE.Mesh(wallGeoH, wallMat);
+        w.position.set(p.x, WALL_H/2, p.z + CELL/2);
+        mazeGroup.add(w);
+      }
+      if (wallV[y][x]) {
+        const w = new THREE.Mesh(wallGeoV, wallMat);
+        w.position.set(p.x + CELL/2, WALL_H/2, p.z);
+        mazeGroup.add(w);
+      }
+    }
+  }
+  // 外周(上端・左端)
+  for (let x=0;x<N;x++) {
+    const p = cellToWorld(x,0);
+    const w = new THREE.Mesh(wallGeoH, wallMat);
+    w.position.set(p.x, WALL_H/2, p.z - CELL/2);
+    mazeGroup.add(w);
+  }
+  for (let y=0;y<N;y++) {
+    const p = cellToWorld(0,y);
+    const w = new THREE.Mesh(wallGeoV, wallMat);
+    w.position.set(p.x - CELL/2, WALL_H/2, p.z);
+    mazeGroup.add(w);
+  }
+
+  // ゴールマーカー
+  const goalGeo = new THREE.TorusGeometry(1, 0.15, 12, 24);
+  const goalMat = new THREE.MeshStandardMaterial({color:0xffe38a, emissive:0xffcf5a, emissiveIntensity:1.2});
+  const goalMesh = new THREE.Mesh(goalGeo, goalMat);
+  const gp = cellToWorld(goalCell.x, goalCell.y);
+  goalMesh.position.set(gp.x, 1.2, gp.z);
+  goalMesh.rotation.x = Math.PI/2;
+  mazeGroup.add(goalMesh);
+  const goalLight = new THREE.PointLight(0xffdd88, 1.2, 8);
+  goalLight.position.set(gp.x, 1.5, gp.z);
+  mazeGroup.add(goalLight);
+}
+
+function buildPlayer() {
+  const geo = new THREE.SphereGeometry(0.5, 16, 16);
+  const mat = new THREE.MeshStandardMaterial({color:0x3a6b3f, roughness:0.7});
+  player = new THREE.Mesh(geo, mat);
+  const start = cellToWorld(0,0);
+  player.position.set(start.x, 0.6, start.z);
+  player.userData.yaw = 0;
+  scene.add(player);
+
+  playerLight = new THREE.PointLight(0xffffff, 0.35, 4);
+  player.add(playerLight);
+  playerLight.position.set(0, 1, 0);
+}
+
+function buildGuardian() {
+  const geo = new THREE.ConeGeometry(0.5, 1.2, 8);
+  const mat = new THREE.MeshStandardMaterial({color:0x220808, emissive:0x550000, emissiveIntensity:0.6});
+  guardian = new THREE.Mesh(geo, mat);
+  const gp = cellToWorld(Math.floor(N/2), Math.floor(N/2));
+  guardian.position.set(gp.x, 0.6, gp.z);
+  guardian.userData = {patrolTimer: 0, target: null};
+  scene.add(guardian);
+
+  guardianEye = new THREE.PointLight(0xff3322, 0, 6);
+  guardian.add(guardianEye);
+  guardianEye.position.set(0, 0.3, 0);
+}
+
+function buildSearchLight() {
+  const start = cellToWorld(N-1, 0);
+  lightX = start.x; lightZ = start.z;
+
+  const geo = new THREE.ConeGeometry(LIGHT_RADIUS*0.75, 3, 24, 1, true);
+  const mat = new THREE.MeshBasicMaterial({color:0xff8c5a, transparent:true, opacity:0.22, side:THREE.DoubleSide});
+  searchLightMesh = new THREE.Mesh(geo, mat);
+  searchLightMesh.rotation.x = Math.PI;
+  scene.add(searchLightMesh);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(LIGHT_RADIUS*0.92, LIGHT_RADIUS, 32),
+    new THREE.MeshBasicMaterial({color:0xffb27a, transparent:true, opacity:0.5, side:THREE.DoubleSide})
+  );
+  ring.rotation.x = -Math.PI/2;
+  searchLightMesh.add(ring);
+  ring.position.y = -2.9;
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function startGame() {
+  if (started) return;
+  started = true;
+  document.getElementById('startOverlay').style.display = 'none';
+}
+
+function worldToCell(pos) {
+  const cx = Math.round(pos.x / CELL + (N-1)/2);
+  const cy = Math.round(pos.z / CELL + (N-1)/2);
+  return {x: THREE.MathUtils.clamp(cx,0,N-1), y: THREE.MathUtils.clamp(cy,0,N-1)};
+}
+
+function canMove(fromCell, dx, dy) {
+  const tx = fromCell.x+dx, ty = fromCell.y+dy;
+  if (tx<0||tx>=N||ty<0||ty>=N) return false;
+  if (dx===1) return !wallV[fromCell.y][fromCell.x];
+  if (dx===-1) return !wallV[fromCell.y][tx];
+  if (dy===1) return !wallH[fromCell.y][fromCell.x];
+  if (dy===-1) return !wallH[ty][fromCell.x];
+  return false;
+}
+
+// --- 当たり判定: 軸ごとに分離した円形コリジョン(スライド式) ---------------
+// 斜め移動時に壁の角へめり込んだり、ぶつかった瞬間に完全停止したりしないよう、
+// X軸とZ軸を別々に解決し、片方が壁にブロックされてももう片方は移動を継続できるようにする。
+function resolveAxis(pos, axis, radius) {
+  const cx = THREE.MathUtils.clamp(Math.round(pos.x / CELL + (N-1)/2), 0, N-1);
+  const cy = THREE.MathUtils.clamp(Math.round(pos.z / CELL + (N-1)/2), 0, N-1);
+  const center = cellToWorld(cx, cy);
+  const half = CELL/2;
+  if (axis === 'x') {
+    const local = pos.x - center.x;
+    if (local > half - radius) {
+      if (cx+1>=N || wallV[cy][cx]) pos.x = center.x + (half - radius);
+    } else if (local < -(half - radius)) {
+      if (cx-1<0 || wallV[cy][cx-1]) pos.x = center.x - (half - radius);
+    }
+  } else {
+    const local = pos.z - center.z;
+    if (local > half - radius) {
+      if (cy+1>=N || wallH[cy][cx]) pos.z = center.z + (half - radius);
+    } else if (local < -(half - radius)) {
+      if (cy-1<0 || wallH[cy-1][cx]) pos.z = center.z - (half - radius);
+    }
+  }
+}
+
+function moveWithCollision(position, dx, dz, radius) {
+  const p = position.clone();
+  p.x += dx;
+  resolveAxis(p, 'x', radius);
+  p.z += dz;
+  resolveAxis(p, 'z', radius);
+  return p;
+}
+
+function updatePlayer(dt) {
+  const pressing = !!keys['w'];
+  const turnL = !!keys['a'];
+  const turnR = !!keys['d'];
+
+  if (turnL) player.userData.yaw += dt * 2.4;
+  if (turnR) player.userData.yaw -= dt * 2.4;
+
+  const moveSpeed = 3.4;
+  let moved = false;
+  if (pressing) {
+    const dir = new THREE.Vector3(Math.sin(player.userData.yaw), 0, Math.cos(player.userData.yaw));
+    const before = player.position.clone();
+    const after = moveWithCollision(player.position, dir.x*moveSpeed*dt, dir.z*moveSpeed*dt, PLAYER_RADIUS);
+    player.position.copy(after);
+    moved = after.distanceTo(before) > 0.0015;
+  }
+  player.rotation.y = player.userData.yaw;
+
+  if (moved) {
+    stillTimer = 0;
+    isCamouflaged = false;
+  } else {
+    stillTimer += dt;
+    if (stillTimer > 0.5) isCamouflaged = true;
+  }
+
+  // 三人称カメラ追従
+  const camOffset = new THREE.Vector3(-Math.sin(player.userData.yaw)*4, 3.2, -Math.cos(player.userData.yaw)*4);
+  const desiredCamPos = player.position.clone().add(camOffset);
+  camera.position.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
+  camera.lookAt(player.position.x, player.position.y+0.5, player.position.z);
+
+  // 擬態色: 現在いるマスの床色に同化。動いている間は目立つ色に。
+  const cell = worldToCell(player.position);
+  const tile = floorTiles.find(t => t.userData.cx===cell.x && t.userData.cy===cell.y);
+  const targetColor = new THREE.Color(isCamouflaged && tile ? tile.userData.baseColor : 0xffb347);
+  player.material.color.lerp(targetColor, dt*4);
+}
+
+function updateSearchLight(dt) {
+  // サブ役(スマホの傾き代用=矢印キー)がサーチライトを自由に操作して妨害する
+  let mx = 0, mz = 0;
+  if (keys['arrowup']) mz -= 1;
+  if (keys['arrowdown']) mz += 1;
+  if (keys['arrowleft']) mx -= 1;
+  if (keys['arrowright']) mx += 1;
+  if (mx || mz) {
+    const len = Math.hypot(mx,mz);
+    mx /= len; mz /= len;
+  }
+  const half = (N-1)/2 * CELL + CELL*0.4;
+  lightX = THREE.MathUtils.clamp(lightX + mx*LIGHT_SPEED*dt, -half, half);
+  lightZ = THREE.MathUtils.clamp(lightZ + mz*LIGHT_SPEED*dt, -half, half);
+
+  searchLightMesh.position.set(lightX, 4.6, lightZ);
+  searchLightMesh.lookAt(lightX, 0, lightZ);
+
+  const dist = player.position.distanceTo(new THREE.Vector3(lightX, player.position.y, lightZ));
+  searchLightMesh.userData.playerLit = dist < LIGHT_RADIUS;
+
+  // サーチライトがメイン役を直接照らし続けると、擬態していても発見ゲージが上昇する(妨害)
+  if (searchLightMesh.userData.playerLit) {
+    const rate = isCamouflaged ? 16 : 46;
+    suspicion = Math.min(100, suspicion + dt*rate);
+  }
+
+  const mat = searchLightMesh.children[0] ? null : null;
+  searchLightMesh.material.color.set(searchLightMesh.userData.playerLit ? 0xff5040 : 0xff8c5a);
+}
+
+function updateGuardian(dt) {
+  guardian.userData.patrolTimer -= dt;
+  if (guardian.userData.patrolTimer <= 0) {
+    const cell = worldToCell(guardian.position);
+    const options = [];
+    if (canMove(cell,1,0)) options.push({x:1,y:0});
+    if (canMove(cell,-1,0)) options.push({x:-1,y:0});
+    if (canMove(cell,0,1)) options.push({x:0,y:1});
+    if (canMove(cell,0,-1)) options.push({x:0,y:-1});
+    if (options.length) {
+      const o = options[Math.floor(Math.random()*options.length)];
+      guardian.userData.target = cellToWorld(cell.x+o.x, cell.y+o.y);
+    }
+    guardian.userData.patrolTimer = 1.2 + Math.random()*1.2;
+  }
+
+  // サーチライトが近くを照らすと、番人はその光に引き寄せられる(サブ役の妨害が直接効く)
+  const distLightToGuardian = guardian.position.distanceTo(new THREE.Vector3(lightX, guardian.position.y, lightZ));
+  const drawnBySearchLight = distLightToGuardian < LIGHT_RADIUS*2.2;
+
+  let moveTarget = guardian.userData.target;
+  if (drawnBySearchLight) {
+    moveTarget = new THREE.Vector3(lightX, guardian.position.y, lightZ);
+  }
+
+  if (moveTarget) {
+    const dir = moveTarget.clone().sub(guardian.position);
+    dir.y = 0;
+    if (dir.length() > 0.05) {
+      dir.normalize();
+      const before = guardian.position.clone();
+      const speed = drawnBySearchLight ? 2.8 : 2.0;
+      const after = moveWithCollision(guardian.position, dir.x*speed*dt, dir.z*speed*dt, GUARDIAN_RADIUS);
+      guardian.position.copy(after);
+    }
+  }
+
+  const distToPlayer = guardian.position.distanceTo(player.position);
+  const playerExposed = (!isCamouflaged) || searchLightMesh.userData.playerLit;
+  const inRange = distToPlayer < 5.5;
+
+  if (inRange && playerExposed) {
+    suspicion = Math.min(100, suspicion + dt * 55);
+    guardianEye.intensity = 1.4;
+    guardian.material.emissiveIntensity = 1.2;
+    const dir = player.position.clone().sub(guardian.position); dir.y=0;
+    if (dir.length()>0.05) {
+      const after = moveWithCollision(guardian.position, dir.normalize().x*2.6*dt, dir.z*2.6*dt, GUARDIAN_RADIUS);
+      guardian.position.copy(after);
+    }
+  } else {
+    guardianEye.intensity = THREE.MathUtils.lerp(guardianEye.intensity, 0.15, dt*3);
+    guardian.material.emissiveIntensity = THREE.MathUtils.lerp(guardian.material.emissiveIntensity, 0.4, dt*3);
+  }
+  if (!(searchLightMesh.userData.playerLit)) {
+    suspicion = Math.max(0, suspicion - dt * (inRange && playerExposed ? 0 : 30));
+  }
+
+  if (suspicion >= 100) onCaught();
+}
+
+function onCaught() {
+  lives--;
+  suspicion = 0;
+  document.getElementById('lives').textContent = '🦎'.repeat(Math.max(lives,0)) + '💀'.repeat(3-Math.max(lives,0));
+  flashVignette();
+  const cp = cellToWorld(lastCheckpoint.x, lastCheckpoint.y);
+  player.position.set(cp.x, 0.6, cp.z);
+  if (lives <= 0) {
+    endGame(false);
+  }
+}
+
+function flashVignette() {
+  const v = document.getElementById('vignette');
+  v.style.boxShadow = 'inset 0 0 160px 40px rgba(255,40,20,0.85)';
+  setTimeout(() => { v.style.boxShadow = 'inset 0 0 0 0 rgba(255,40,20,0)'; }, 350);
+}
+
+function checkGoal() {
+  const cell = worldToCell(player.position);
+  if (cell.x === goalCell.x && cell.y === goalCell.y) {
+    endGame(true);
+  }
+  const idxOnPath = path.findIndex(p => p.x===cell.x && p.y===cell.y);
+  if (idxOnPath >= 0) lastCheckpoint = cell;
+}
+
+function endGame(success) {
+  gameOver = true;
+  const overlay = document.getElementById('overlay');
+  overlay.className = success ? 'success' : 'fail';
+  document.getElementById('overlayTitle').textContent = success ? 'クリア！出口にたどり着いた' : '発見された…';
+  document.getElementById('overlayStats').textContent = `タイム: ${formatTime(elapsed)} / 残りライフ: ${Math.max(lives,0)}`;
+  overlay.style.display = 'flex';
+}
+
+function formatTime(t) {
+  const m = Math.floor(t/60).toString().padStart(2,'0');
+  const s = Math.floor(t%60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+
+function drawMinimap() {
+  const canvas = document.getElementById('minimap');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const pad = 8;
+  const scale = (Math.min(W,H)-pad*2) / (N*1.0);
+
+  ctx.save();
+  ctx.translate(pad, pad);
+
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++) {
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(x*scale, y*scale, scale-1, scale-1);
+  }
+  ctx.strokeStyle = 'rgba(200,255,210,0.5)';
+  ctx.lineWidth = 2;
+  for (let y=0;y<N;y++) for (let x=0;x<N;x++) {
+    if (wallH[y][x]) { ctx.beginPath(); ctx.moveTo(x*scale, (y+1)*scale); ctx.lineTo((x+1)*scale, (y+1)*scale); ctx.stroke(); }
+    if (wallV[y][x]) { ctx.beginPath(); ctx.moveTo((x+1)*scale, y*scale); ctx.lineTo((x+1)*scale, (y+1)*scale); ctx.stroke(); }
+  }
+  ctx.strokeRect(0,0,N*scale,N*scale);
+
+  // ゴール
+  ctx.fillStyle = '#ffe38a';
+  ctx.beginPath();
+  ctx.arc((goalCell.x+0.5)*scale, (goalCell.y+0.5)*scale, scale*0.28, 0, Math.PI*2);
+  ctx.fill();
+
+  // サーチライト(サブ役)が今照らしている場所
+  const lightFx = lightX / CELL + (N-1)/2;
+  const lightFy = lightZ / CELL + (N-1)/2;
+  const litRadiusPx = LIGHT_RADIUS / CELL * scale;
+  const glow = ctx.createRadialGradient(
+    (lightFx+0.5)*scale, (lightFy+0.5)*scale, 0,
+    (lightFx+0.5)*scale, (lightFy+0.5)*scale, litRadiusPx
+  );
+  const litColor = searchLightMesh.userData.playerLit ? 'rgba(255,90,64,0.6)' : 'rgba(255,150,90,0.42)';
+  glow.addColorStop(0, litColor);
+  glow.addColorStop(1, 'rgba(255,150,90,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc((lightFx+0.5)*scale, (lightFy+0.5)*scale, litRadiusPx, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = searchLightMesh.userData.playerLit ? 'rgba(255,110,80,0.95)' : 'rgba(255,170,120,0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc((lightFx+0.5)*scale, (lightFy+0.5)*scale, 3.5, 0, Math.PI*2);
+  ctx.stroke();
+
+  // メイン役
+  const pc = worldToCell(player.position);
+  ctx.fillStyle = isCamouflaged ? 'rgba(140,220,150,0.9)' : '#ffb347';
+  ctx.beginPath();
+  ctx.arc((pc.x+0.5)*scale, (pc.y+0.5)*scale, scale*0.3, 0, Math.PI*2);
+  ctx.fill();
+
+  // 番人(警戒中のみ表示)
+  if (guardian.material.emissiveIntensity > 0.7) {
+    const gc = worldToCell(guardian.position);
+    ctx.fillStyle = '#ff4433';
+    ctx.beginPath();
+    ctx.arc((gc.x+0.5)*scale, (gc.y+0.5)*scale, scale*0.28, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function updateHUD() {
+  const badge = document.getElementById('stateBadge');
+  badge.textContent = isCamouflaged ? '擬態中' : '発見されやすい';
+  badge.className = 'badge ' + (isCamouflaged ? 'hidden' : 'exposed');
+  const bar = document.getElementById('suspicionBar');
+  bar.style.width = suspicion + '%';
+  bar.classList.toggle('danger', suspicion > 65);
+  document.getElementById('timer').textContent = formatTime(elapsed);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (started && !gameOver) {
+    elapsed += dt;
+    updatePlayer(dt);
+    updateSearchLight(dt);
+    updateGuardian(dt);
+    checkGoal();
+  }
+
+  updateHUD();
+  drawMinimap();
+  renderer.render(scene, camera);
+}
+
+init();
+</script>
+</body>
+</html>

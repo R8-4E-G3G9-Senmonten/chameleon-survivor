@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>カメレオンナイト ― サバイバーモックアップ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000;
+               font-family: "Hiragino Sans", "Yu Gothic", sans-serif; }
+  canvas { display:block; }
+  #hud { position:fixed; top:0; left:0; padding:10px 14px; color:#dfffe0; max-width:56%;
+         text-shadow:0 1px 3px #000; pointer-events:none; z-index:5; }
+  #hud h1 { font-size:14px; margin:0 0 3px; letter-spacing:0.5px; opacity:0.9; }
+  #hud .row { font-size:11.5px; opacity:0.82; line-height:1.5; }
+  #hpWrap { margin-top:6px; width:180px; height:12px; background:rgba(255,255,255,0.15);
+            border-radius:6px; overflow:hidden; }
+  #hpBar { height:100%; width:100%; background:linear-gradient(90deg,#6fe08a,#9dffb0); transition:width 0.15s linear; }
+  #topRight { position:fixed; top:10px; right:12px; text-align:right; color:#dfffe0;
+              text-shadow:0 1px 3px #000; font-size:12px; z-index:5; pointer-events:none; }
+  #killCount { color:#ffb0b0; font-size:14px; margin-top:2px; }
+  #timer { margin-top:4px; color:#bcd; font-variant-numeric: tabular-nums; font-size:16px; }
+  #waveNote { margin-top:4px; color:#ffe38a; font-size:11px; opacity:0.85; }
+  #minimapWrap { position:fixed; bottom:14px; right:14px; z-index:5; }
+  #minimap { width:150px; height:150px; border-radius:50%; background:rgba(5,10,8,0.65);
+             border:2px solid rgba(200,255,210,0.35); display:block; }
+  #overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+             flex-direction:column; background:rgba(0,0,0,0.82); color:#fff; z-index:10; text-align:center; }
+  #overlay h2 { font-size:38px; margin:0 0 10px; color:#ff8f7a; }
+  #overlay .stats { font-size:14px; opacity:0.85; margin:0 0 20px; line-height:1.8; }
+  #overlay button { font-size:15px; padding:10px 26px; border-radius:8px; border:none;
+                     background:#3a8a4a; color:#fff; cursor:pointer; }
+  #overlay button:hover { background:#469a56; }
+  #hint { position:fixed; bottom:14px; left:0; right:180px; text-align:center; color:#cdeccd;
+          font-size:11.5px; opacity:0.7; text-shadow:0 1px 3px #000; z-index:5; pointer-events:none; }
+  #vignette { position:fixed; inset:0; pointer-events:none; z-index:4;
+              box-shadow: inset 0 0 0 0 rgba(255,40,20,0); transition: box-shadow 0.15s linear; }
+  #startOverlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+                  flex-direction:column; background:rgba(0,0,0,0.88); color:#fff; z-index:20; text-align:center; padding:20px; }
+  #startOverlay h1 { font-size:26px; margin:0 0 14px; color:#9dffb0; }
+  #startOverlay .desc { font-size:13px; line-height:2; opacity:0.85; max-width:460px; margin:0 0 22px; text-align:left; }
+  #startOverlay button { font-size:16px; padding:12px 34px; border-radius:8px; border:none;
+                          background:#3a8a4a; color:#fff; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="startOverlay">
+  <h1>🦎 カメレオンナイト ― サバイバーモックアップ</h1>
+  <div class="desc">
+    <b>目標: 夜のジャングルで、湧き続ける獣から生き延びる。</b><br><br>
+    移動: WASD / 矢印キー(メインプレイヤー)<br>
+    灯り(協力プレイヤーの代わり): マウス移動<br><br>
+    敵に光を<b>当て続ける</b>とダウンゲージが溜まり、倒せます。光を逸らすとゲージは回復してしまうので、
+    一体に狙いを定め続けることが大事です。<br>
+    ただし<b>あなたのすぐ近くの敵には光が効きません</b>。近づかれすぎたら光に頼らず距離を取りましょう。<br>
+    敵に触れられ続けるとHPが減ります。0になったら終了。<br>
+    時間が経つほど敵の数・強さが増えていきます。生存時間と撃破数を競うモックアップです。
+  </div>
+  <button id="startBtn">はじめる</button>
+</div>
+
+<div id="hud">
+  <h1>🦎 カメレオンナイト ― サバイバー (3D / HTML)</h1>
+  <div class="row">移動: WASD/矢印　灯り: マウス(当て続けると撃破)</div>
+  <div id="hpWrap"><div id="hpBar"></div></div>
+</div>
+<div id="topRight">
+  <div id="timer">00:00</div>
+  <div id="killCount">💀 撃破: 0</div>
+  <div id="waveNote"></div>
+</div>
+<div id="hint">光を当て続けるとダウンゲージが溜まって倒せます。あなたのすぐ近くの敵には効きません、近づかれたら距離を取りましょう。</div>
+<div id="vignette"></div>
+
+<div id="minimapWrap"><canvas id="minimap" width="150" height="150"></canvas></div>
+
+<div id="overlay">
+  <h2 id="overlayTitle">力尽きた…</h2>
+  <div class="stats" id="overlayStats"></div>
+  <button onclick="location.reload()">もう一度やり直す (R)</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+// カメレオンナイト サバイバーモックアップ
+//  - メインプレイヤー(WASD)は逃げ回るだけ。攻撃手段を持たない。
+//  - 協力プレイヤー(マウス=スマホの代わり)の光が唯一の攻撃手段。
+//    敵に当て続けるとダウンゲージが溜まって倒せるが、逸らすとゲージが回復する
+//    ("当てっぱなしにする"駆け引きを作るための挙動)。
+//  - 時間経過で出現間隔が短くなり、強い個体の出現率も上がる、素朴なサバイバー系ループ。
+// ---------------------------------------------------------------------------
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x02040a, 0.042);
+scene.background = new THREE.Color(0x02040a);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---- 夜の照明 ----
+scene.add(new THREE.AmbientLight(0x223344, 0.22));
+const moon = new THREE.DirectionalLight(0x4a5f8a, 0.22);
+moon.position.set(-10, 20, -6);
+scene.add(moon);
+
+// ---- 地面 ----
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(90, 90),
+  new THREE.MeshStandardMaterial({ color: 0x162414, roughness:1 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---- 地形の飾り(木/岩。視界を遮る障害物としても機能) ----
+const obstacles = [];
+function addTree(x, z, scale=1) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.25*scale, 0.35*scale, 2.2*scale, 8),
+    new THREE.MeshStandardMaterial({ color: 0x5a3d22, roughness:0.9 })
+  );
+  trunk.position.y = 1.1*scale;
+  trunk.castShadow = true;
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(1.4*scale, 10, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2f6b2f, roughness:0.85 })
+  );
+  leaves.position.y = 2.6*scale;
+  leaves.castShadow = true;
+  g.add(trunk, leaves);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  obstacles.push({ pos: new THREE.Vector2(x,z), radius: 0.5*scale });
+}
+function addRock(x, z, scale=1) {
+  const rock = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(0.8*scale, 0),
+    new THREE.MeshStandardMaterial({ color: 0x555a5f, roughness:1, flatShading:true })
+  );
+  rock.position.set(x, 0.5*scale, z);
+  rock.castShadow = true;
+  scene.add(rock);
+  obstacles.push({ pos: new THREE.Vector2(x,z), radius: 0.9*scale });
+}
+const treeSpots = [[4,-3],[8,2],[-6,4],[-3,-8],[10,-9],[2,10],[-10,-4],[6,9],[-9,9],[13,4],[-13,-2],[0,-14],[-7,-14],[14,10]];
+treeSpots.forEach(([x,z]) => addTree(x, z, 0.9 + Math.random()*0.5));
+const rockSpots = [[2,4],[-4,-2],[7,-5],[-8,-9],[11,7],[-2,8],[4,-12]];
+rockSpots.forEach(([x,z]) => addRock(x, z, 0.8 + Math.random()*0.6));
+
+// ---- プレイヤー(カメレオン) ----
+const player = new THREE.Group();
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6fae6f, roughness:0.6 });
+const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), bodyMat);
+body.scale.set(1, 0.85, 1.6);
+body.position.y = 0.55;
+body.castShadow = true;
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), bodyMat);
+head.position.set(0, 0.7, 0.75);
+head.castShadow = true;
+const eyeGeo = new THREE.SphereGeometry(0.08, 6, 6);
+const eyeMat = new THREE.MeshStandardMaterial({ color:0xfff2a0, emissive:0x554400, emissiveIntensity:0.4 });
+const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.18, 0.85, 0.95);
+const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.18, 0.85, 0.95);
+const tail = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 8), bodyMat);
+tail.position.set(0, 0.5, -0.95);
+tail.rotation.x = Math.PI/2.6;
+player.add(body, head, eyeL, eyeR, tail);
+player.position.set(0, 0, 0);
+scene.add(player);
+
+const selfGlow = new THREE.PointLight(0x2a4a3a, 0.6, 2.4);
+selfGlow.position.set(0, 0.8, 0);
+player.add(selfGlow);
+
+// ---- 灯り(マウス操作。協力プレイヤーのスマホの代わり) ----
+const flashlight = new THREE.SpotLight(0xfff2c0, 3.4, 16, Math.PI/6.2, 0.5, 1.4);
+flashlight.castShadow = true;
+scene.add(flashlight);
+scene.add(flashlight.target);
+
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2(0,0);
+const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+let lightTarget = new THREE.Vector3();
+const LIGHT_RADIUS = 2.4;   // この半径内にいる敵が光の効果を受ける
+const LIGHT_DEAD_ZONE = 1.6; // プレイヤーからこの距離より近い敵には光が効かない(接触ダメージは別途発生する)
+
+window.addEventListener('mousemove', (e) => {
+  mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// ---- 入力 ----
+const keys = {};
+window.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === 'r' && gameOver) location.reload();
+});
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+// ---------------------------------------------------------------------------
+// サウンド(Web Audio, 外部ファイル無し)
+// ---------------------------------------------------------------------------
+let actx = null;
+function unlockAudio() {
+  if (actx) return;
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  startAmbient();
+}
+function tone(freq, duration, type='sine', gain=0.12, delay=0, freqEnd=null) {
+  if (!actx) return;
+  const t0 = actx.currentTime + delay;
+  const osc = actx.createOscillator();
+  const g = actx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, t0 + duration);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(g).connect(actx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.05);
+}
+function startAmbient() {
+  const o1 = actx.createOscillator(), o2 = actx.createOscillator();
+  const g = actx.createGain();
+  const lp = actx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 220;
+  o1.type = 'sine'; o1.frequency.value = 55;
+  o2.type = 'sine'; o2.frequency.value = 58.5;
+  g.gain.value = 0.026;
+  o1.connect(lp); o2.connect(lp); lp.connect(g).connect(actx.destination);
+  o1.start(); o2.start();
+}
+function playHitBuzz() { tone(140, 0.08, 'sawtooth', 0.05, 0, 90); }
+function playDownChime() {
+  tone(700, 0.1, 'sine', 0.09, 0);
+  tone(1000, 0.14, 'sine', 0.08, 0.07);
+}
+function playPlayerHurt() { tone(180, 0.16, 'sawtooth', 0.1, 0, 70); }
+function playGameOverJingle() {
+  [392, 349, 294, 220].forEach((f,i) => tone(f, 0.3, 'sine', 0.1, i*0.16));
+}
+
+// ---- 開始画面 ----
+const startOverlay = document.getElementById('startOverlay');
+document.getElementById('startBtn').addEventListener('click', () => {
+  unlockAudio();
+  startOverlay.style.display = 'none';
+  gameStarted = true;
+});
+window.addEventListener('keydown', () => unlockAudio(), { once:true });
+
+// ---------------------------------------------------------------------------
+// 敵(獣): 弱い群れタイプと、硬いタイプの2種
+// ---------------------------------------------------------------------------
+const ENEMY_TYPES = {
+  moth:  { speed:2.6, contactDps:10, lightHp:34,  lightDrainRate:44, regenRate:16, color:0x8a4b8a, scale:0.55 },
+  brute: { speed:1.5, contactDps:22, lightHp:110, lightDrainRate:38, regenRate:20, color:0x8a3b3b, scale:1.0  },
+};
+
+const enemies = [];
+function spawnEnemy(type) {
+  const cfg = ENEMY_TYPES[type];
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 15 + Math.random()*3;
+  const pos = new THREE.Vector3(
+    THREE.MathUtils.clamp(player.position.x + Math.sin(angle)*dist, -19, 19),
+    0,
+    THREE.MathUtils.clamp(player.position.z + Math.cos(angle)*dist, -19, 19)
+  );
+
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    color: cfg.color, roughness:0.85, flatShading:true, emissive:0x000000, emissiveIntensity:0
+  });
+  const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(0.45*cfg.scale, 0), mat);
+  blob.scale.set(1, 0.8, 1.3);
+  blob.position.y = 0.4*cfg.scale;
+  blob.castShadow = true;
+  const eyeGeo2 = new THREE.SphereGeometry(0.07*cfg.scale, 6, 6);
+  const eyeMat2 = new THREE.MeshStandardMaterial({ color:0xffe066, emissive:0xffe066, emissiveIntensity:1.4 });
+  const eL = new THREE.Mesh(eyeGeo2, eyeMat2); eL.position.set(-0.16*cfg.scale, 0.55*cfg.scale, 0.55*cfg.scale);
+  const eR = new THREE.Mesh(eyeGeo2, eyeMat2); eR.position.set(0.16*cfg.scale, 0.55*cfg.scale, 0.55*cfg.scale);
+  g.add(blob, eL, eR);
+  g.position.copy(pos);
+  scene.add(g);
+
+  enemies.push({
+    type, mesh: g, mat, eyeMat: eyeMat2,
+    speed: cfg.speed, contactDps: cfg.contactDps,
+    lightHpMax: cfg.lightHp, lightHp: cfg.lightHp,
+    lightDrainRate: cfg.lightDrainRate, regenRate: cfg.regenRate,
+    scale: cfg.scale, dying: false, dieTimer: 0,
+  });
+}
+
+// ---- 出現ペース管理: 経過時間に応じて間隔が短くなり、bruteの出現率も上がる ----
+let spawnTimer = 1.2;
+function spawnInterval() {
+  return Math.max(0.35, 2.2 - elapsed*0.03);
+}
+function pickType() {
+  const bruteChance = Math.min(0.4, 0.04 + elapsed*0.006);
+  return Math.random() < bruteChance ? 'brute' : 'moth';
+}
+
+// ---- ミニマップ ----
+const mmCanvas = document.getElementById('minimap');
+const mmCtx = mmCanvas.getContext('2d');
+const WORLD_HALF = 19;
+function toMap(x, z) {
+  return [75 + ((x - player.position.x) / WORLD_HALF) * 70, 75 + ((z - player.position.z) / WORLD_HALF) * 70];
+}
+function drawMinimap() {
+  mmCtx.clearRect(0,0,150,150);
+  mmCtx.save();
+  mmCtx.beginPath(); mmCtx.arc(75,75,74,0,Math.PI*2); mmCtx.clip();
+  mmCtx.fillStyle = 'rgba(20,40,25,0.5)';
+  mmCtx.fillRect(0,0,150,150);
+
+  enemies.forEach(en => {
+    if (en.dying) return;
+    const [x,y] = toMap(en.mesh.position.x, en.mesh.position.z);
+    if (x < -10 || x > 160 || y < -10 || y > 160) return;
+    mmCtx.fillStyle = en.type === 'brute' ? '#ff6a5a' : '#c98aff';
+    mmCtx.beginPath(); mmCtx.arc(x,y, en.type==='brute'?4:2.6, 0, Math.PI*2); mmCtx.fill();
+  });
+
+  mmCtx.fillStyle = '#eafeea';
+  mmCtx.save();
+  mmCtx.translate(75,75);
+  mmCtx.rotate(player.rotation.y);
+  mmCtx.beginPath();
+  mmCtx.moveTo(0,-6); mmCtx.lineTo(4,5); mmCtx.lineTo(-4,5); mmCtx.closePath();
+  mmCtx.fill();
+  mmCtx.restore();
+
+  mmCtx.restore();
+}
+
+// ---- ゲーム状態 ----
+let gameStarted = false;
+let gameOver = false;
+const velocity = new THREE.Vector3();
+const moveSpeed = 5.6;
+const damping = 8;
+// カメラは常にプレイヤーを画面中心に固定するのではなく、ある程度の"遊び"
+// (デッドゾーン)の中でならプレイヤーが自由に動けるようにする。プレイヤーが
+// 灯り(マウス)から視覚的に離れて感じられるようにするための調整。
+const cameraFocus = player.position.clone();
+const CAMERA_DEADZONE = 3.2;
+let hp = 100, hpMax = 100;
+let elapsed = 0;
+let killCount = 0;
+let hurtFlashTimer = 0;
+
+const hpBar = document.getElementById('hpBar');
+const killCountEl = document.getElementById('killCount');
+const timerEl = document.getElementById('timer');
+const waveNoteEl = document.getElementById('waveNote');
+const overlay = document.getElementById('overlay');
+const vignette = document.getElementById('vignette');
+
+function fmtTime(s) {
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+}
+
+function showGameOver() {
+  overlay.style.display = 'flex';
+  document.getElementById('overlayTitle').textContent = '力尽きた…';
+  document.getElementById('overlayStats').innerHTML =
+    '生存時間: ' + fmtTime(elapsed) + '<br>' +
+    '💀 撃破数: ' + killCount;
+  gameOver = true;
+  playGameOverJingle();
+}
+
+function killEnemy(en) {
+  en.dying = true;
+  en.dieTimer = 0.4;
+  killCount++;
+  killCountEl.textContent = '💀 撃破: ' + killCount;
+  playDownChime();
+}
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (gameStarted && !gameOver) update(dt);
+  drawMinimap();
+  renderer.render(scene, camera);
+}
+
+function update(dt) {
+  elapsed += dt;
+  timerEl.textContent = fmtTime(elapsed);
+  waveNoteEl.textContent = '出現間隔: ' + spawnInterval().toFixed(2) + 's';
+
+  // --- プレイヤー移動 ---
+  const input = new THREE.Vector3();
+  if (keys['w'] || keys['arrowup']) input.z -= 1;
+  if (keys['s'] || keys['arrowdown']) input.z += 1;
+  if (keys['a'] || keys['arrowleft']) input.x -= 1;
+  if (keys['d'] || keys['arrowright']) input.x += 1;
+  if (input.lengthSq() > 0) {
+    input.normalize();
+    velocity.x += (input.x*moveSpeed - velocity.x) * Math.min(1, dt*10);
+    velocity.z += (input.z*moveSpeed - velocity.z) * Math.min(1, dt*10);
+    const angle = Math.atan2(input.x, input.z);
+    player.rotation.y += (angle - player.rotation.y) * Math.min(1, dt*10);
+  } else {
+    velocity.multiplyScalar(Math.max(0, 1 - damping*dt));
+  }
+  player.position.addScaledVector(velocity, dt);
+  player.position.x = THREE.MathUtils.clamp(player.position.x, -19, 19);
+  player.position.z = THREE.MathUtils.clamp(player.position.z, -19, 19);
+
+  // --- 灯り(マウス位置を地面に投影) ---
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hit = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(groundPlane, hit)) lightTarget.copy(hit);
+  flashlight.position.set(lightTarget.x, 9, lightTarget.z);
+  flashlight.target.position.copy(lightTarget);
+  flashlight.target.updateMatrixWorld();
+
+  // --- 出現 ---
+  spawnTimer -= dt;
+  if (spawnTimer <= 0) {
+    spawnEnemy(pickType());
+    spawnTimer = spawnInterval();
+  }
+
+  // --- 敵の更新 ---
+  let contactDamageThisFrame = 0;
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const en = enemies[i];
+
+    if (en.dying) {
+      en.dieTimer -= dt;
+      const s = Math.max(0, en.dieTimer / 0.4) * en.scale;
+      en.mesh.scale.set(s, s, s);
+      en.mesh.position.y += dt * 0.6;
+      if (en.dieTimer <= 0) {
+        scene.remove(en.mesh);
+        enemies.splice(i, 1);
+      }
+      continue;
+    }
+
+    // 追跡
+    const toPlayer = new THREE.Vector3().subVectors(player.position, en.mesh.position);
+    toPlayer.y = 0;
+    const dist = toPlayer.length();
+    if (dist > 0.7) {
+      toPlayer.normalize();
+      en.mesh.position.addScaledVector(toPlayer, en.speed*dt);
+      en.mesh.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+    }
+    if (dist < 0.9) {
+      contactDamageThisFrame = Math.max(contactDamageThisFrame, en.contactDps);
+    }
+
+    // 光を浴びているか(地面に投影した灯りの位置からの距離で判定)。
+    // ただし「プレイヤーのすぐ近く」は光が効かない死角にしてある。これが無いと、
+    // 灯りをプレイヤーの真上に置きっぱなしにするだけで寄ってくる敵が自動的に
+    // 焼けていく"詰み"状態になってしまうため(距離0なら効果0にして、この戦略を
+    // 構造的に無効化している)。
+    const distToLight = Math.hypot(en.mesh.position.x - lightTarget.x, en.mesh.position.z - lightTarget.z);
+    const lit = distToLight < LIGHT_RADIUS && dist > LIGHT_DEAD_ZONE;
+    if (lit) {
+      en.lightHp -= en.lightDrainRate * dt;
+      if (Math.random() < dt*8) playHitBuzz();
+    } else {
+      en.lightHp = Math.min(en.lightHpMax, en.lightHp + en.regenRate * dt);
+    }
+    const dmgRatio = 1 - THREE.MathUtils.clamp(en.lightHp / en.lightHpMax, 0, 1);
+    en.mat.emissive.setRGB(dmgRatio*1.2, dmgRatio*1.1, dmgRatio*0.6);
+    en.mat.emissiveIntensity = lit ? (0.6 + dmgRatio*1.8) : dmgRatio*0.6;
+
+    if (en.lightHp <= 0) killEnemy(en);
+  }
+
+  if (contactDamageThisFrame > 0) {
+    hp = Math.max(0, hp - contactDamageThisFrame*dt);
+    hurtFlashTimer = 0.15;
+    if (Math.random() < dt*3) playPlayerHurt();
+  }
+  hpBar.style.width = (hp/hpMax*100) + '%';
+  hpBar.style.background = hp < 30 ? 'linear-gradient(90deg,#ff5a4a,#ff8f7a)' : 'linear-gradient(90deg,#6fe08a,#9dffb0)';
+
+  if (hurtFlashTimer > 0) hurtFlashTimer -= dt;
+  vignette.style.boxShadow = 'inset 0 0 ' + (40+ (1-hp/hpMax)*120) + 'px ' + (10+(1-hp/hpMax)*30) + 'px rgba(255,40,20,' + (0.15 + (hurtFlashTimer>0?0.35:0) + (1-hp/hpMax)*0.25) + ')';
+
+  if (hp <= 0) { showGameOver(); }
+
+  // --- カメラ追従(デッドゾーン付き): プレイヤーが焦点から一定距離以上
+  // 離れたときだけ、焦点をその分だけ追いつかせる。常時ロックオンではないので
+  // プレイヤーは画面の中で動き回れる。 ---
+  const focusOffset = new THREE.Vector2(player.position.x - cameraFocus.x, player.position.z - cameraFocus.z);
+  const focusDist = focusOffset.length();
+  if (focusDist > CAMERA_DEADZONE) {
+    const pull = focusDist - CAMERA_DEADZONE;
+    focusOffset.normalize().multiplyScalar(pull);
+    cameraFocus.x += focusOffset.x;
+    cameraFocus.z += focusOffset.y;
+  }
+
+  const camOffset = new THREE.Vector3(0, 8, 8);
+  const desiredCamPos = cameraFocus.clone().add(camOffset);
+  camera.position.lerp(desiredCamPos, Math.min(1, dt*4));
+  camera.lookAt(cameraFocus.x, 0.6, cameraFocus.z);
+}
+
+animate();
+</script>
+</body>
+</html>

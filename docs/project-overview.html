@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>カメレオンナイト 開発まとめ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg:#0f172a; --card:#192134; --card-2:#1f2a41; --line:rgba(255,255,255,.12);
+    --fg:#eef2f7; --muted:#a3b3c8; --green:#22c55e; --gold:#f5a623; --red:#f06a5b; --blue:#7ec4ff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f4f6f9; --card:#ffffff; --card-2:#eef2f7; --line:rgba(15,23,42,.14); --fg:#16202f; --muted:#4a5a6e; --green:#15803d; --gold:#9a4a06; --red:#b3372a; --blue:#1a62a8; }
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.8 "Hiragino Sans","Yu Gothic UI","Segoe UI",sans-serif; -webkit-tap-highlight-color:transparent; }
+  a { color:var(--blue); }
+  :focus-visible { outline:3px solid var(--gold); outline-offset:2px; border-radius:6px; }
+  .skip { position:absolute; left:12px; top:-60px; background:var(--gold); color:#111; padding:8px 14px; border-radius:8px; z-index:20; transition:top .2s ease; }
+  .skip:focus { top:12px; }
+  #progress { position:fixed; inset:0 0 auto 0; height:3px; background:var(--green); transform:scaleX(0); transform-origin:left; z-index:30; }
+
+  header { max-width:960px; margin:0 auto; padding:44px 20px 20px; }
+  header h1 { margin:0 0 8px; font-size:30px; line-height:1.3; text-wrap:balance; }
+  header p { margin:0; color:var(--muted); max-width:62ch; text-wrap:pretty; }
+  .meta { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  .pill { padding:2px 12px; border-radius:999px; background:var(--card); border:1px solid var(--line); font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+
+  .toolbar { position:sticky; top:0; z-index:10; background:var(--bg); border-bottom:1px solid var(--line); }
+  .toolbar .in { max-width:960px; margin:0 auto; padding:8px 20px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .toolbar a { padding:5px 12px; border-radius:8px; color:var(--muted); text-decoration:none; font-size:14px; transition:background-color .2s ease, color .2s ease; }
+  .toolbar a:hover { background:var(--card); color:var(--fg); }
+  .btn { font:inherit; font-size:14px; color:var(--fg); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:5px 12px; cursor:pointer; touch-action:manipulation; transition:transform .15s ease, background-color .2s ease; }
+  .btn:hover { background:var(--card-2); }
+  .btn:active { transform:scale(.97); }
+  .grow { flex:1; }
+
+  main { max-width:960px; margin:0 auto; padding:8px 20px 96px; }
+  h2 { margin:0; font-size:18px; line-height:1.4; }
+  h3 { font-size:16px; margin:24px 0 8px; text-wrap:balance; }
+  p { margin:0 0 12px; text-wrap:pretty; }
+
+  details.theme { background:var(--card); border:1px solid var(--line); border-radius:14px; margin:14px 0; scroll-margin-top:64px; overflow:hidden; transition:border-color .25s ease; }
+  details.theme[open] { border-color:color-mix(in srgb, var(--green) 55%, var(--line)); }
+  details.theme > summary { list-style:none; cursor:pointer; padding:16px 20px; display:flex; align-items:center; gap:12px; touch-action:manipulation; transition:background-color .2s ease; }
+  details.theme > summary::-webkit-details-marker { display:none; }
+  details.theme > summary:hover { background:var(--card-2); }
+  .chev { width:22px; height:22px; flex:none; transition:transform .25s ease; }
+  details[open] > summary .chev { transform:rotate(90deg); }
+  .sum-sub { display:block; color:var(--muted); font-size:13px; font-weight:400; margin-top:2px; }
+  .body { padding:4px 20px 22px; }
+  details[open] > .body { animation:panel-in .3s ease both; }
+  @keyframes panel-in { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+
+  .card { background:var(--card-2); border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin:12px 0; }
+  .card > :last-child { margin-bottom:0; }
+  .note { border-left:4px solid var(--gold); padding:10px 14px; background:color-mix(in srgb, var(--gold) 12%, transparent); border-radius:0 10px 10px 0; margin:14px 0; }
+  code, kbd { font-family:Consolas,"Cascadia Mono",monospace; font-size:.9em; background:rgba(127,127,127,.18); padding:1px 6px; border-radius:5px; overflow-wrap:anywhere; }
+  kbd { border:1px solid var(--line); }
+  ul, ol { padding-left:22px; margin:0 0 12px; }
+  li { margin:4px 0; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; white-space:nowrap; }
+  td.num, th.num { font-variant-numeric:tabular-nums; text-align:right; }
+  .table-wrap { overflow-x:auto; margin:8px 0 14px; }
+  .tag { display:inline-block; padding:0 10px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
+  .tag.done { background:color-mix(in srgb, var(--green) 20%, transparent); color:var(--green); }
+  .tag.check { background:color-mix(in srgb, var(--gold) 22%, transparent); color:var(--gold); }
+  .tag.todo { background:color-mix(in srgb, var(--blue) 20%, transparent); color:var(--blue); }
+  .tag.issue { background:color-mix(in srgb, var(--red) 20%, transparent); color:var(--red); }
+
+  ol.steps { counter-reset:s; list-style:none; padding:0; }
+  ol.steps > li { counter-increment:s; position:relative; padding:0 0 18px 46px; }
+  ol.steps > li::before { content:counter(s); position:absolute; left:0; top:0; width:32px; height:32px; border-radius:50%; background:var(--green); color:#06210f; display:grid; place-items:center; font-weight:700; }
+  figure { margin:14px 0; }
+  figcaption { color:var(--muted); font-size:13px; margin-top:6px; }
+  figure img, figure svg { max-width:100%; height:auto; border-radius:10px; border:1px solid var(--line); display:block; }
+
+  .qa { border:1px solid var(--line); border-radius:12px; margin:10px 0; background:var(--card-2); }
+  .qa > summary { cursor:pointer; padding:12px 16px; font-weight:600; list-style:none; display:flex; gap:10px; touch-action:manipulation; transition:background-color .2s ease; border-radius:12px; }
+  .qa > summary::-webkit-details-marker { display:none; }
+  .qa > summary::before { content:"Q"; flex:none; width:24px; height:24px; border-radius:50%; background:var(--gold); color:#1a1000; display:grid; place-items:center; font-size:13px; }
+  .qa > summary:hover { background:color-mix(in srgb, var(--gold) 10%, transparent); }
+  .qa > div { padding:0 16px 14px 50px; }
+  .qa[open] > div { animation:panel-in .25s ease both; }
+
+  .group { background:var(--card-2); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:12px 0; }
+  .group h4 { margin:0 0 2px; font-size:15px; }
+  .group .hint { margin:0 0 8px; color:var(--muted); font-size:13px; }
+  .group ul { list-style:none; padding:0; margin:0; }
+  .group li { padding:6px 0; border-top:1px solid var(--line); }
+  .group li:first-child { border-top:0; }
+  .group li b { display:inline; }
+  .group li span { display:block; color:var(--muted); font-size:13px; }
+  .who { display:inline-block; margin-left:6px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:700; background:color-mix(in srgb, var(--blue) 20%, transparent); color:var(--blue); vertical-align:1px; }
+  .timeline { list-style:none; margin:0; padding:0 0 0 4px; border-left:2px solid var(--line); }
+  .timeline li { position:relative; padding:0 0 16px 22px; }
+  .timeline li::before { content:""; position:absolute; left:-9px; top:9px; width:12px; height:12px; border-radius:50%; background:var(--green); }
+  .timeline b { display:block; }
+  .timeline span { color:var(--muted); font-size:14px; }
+
+  .reveal { opacity:0; transform:translateY(14px); transition:opacity .5s ease, transform .5s ease; }
+  .reveal.in { opacity:1; transform:none; }
+
+  @media (max-width:560px) { header h1 { font-size:24px; } ol.steps > li { padding-left:40px; } .body { padding:4px 14px 20px; } }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior:auto; }
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+    .reveal { opacity:1; transform:none; }
+    #progress { display:none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+<div id="progress" aria-hidden="true"></div>
+
+<header>
+  <h1><span aria-hidden="true">🦎</span> カメレオンナイト 開発まとめ</h1>
+  <p>いま何を作っていて、なぜそうしていて、Unityのどこを操作すればよいかを、質問されても自分の言葉で説明できるレベルでまとめたページです。テーマごとに開いて読めます。</p>
+  <div class="meta">
+    <span class="pill">最終更新: <span id="lastUpdated"></span></span>
+    <span class="pill">Unity 6000.4.3f1</span>
+    <span class="pill">3D・ビルトインパイプライン</span>
+  </div>
+</header>
+
+<div class="toolbar"><div class="in">
+  <nav aria-label="テーマ一覧" style="display:flex;gap:4px;flex-wrap:wrap" id="toc"></nav>
+  <span class="grow"></span>
+  <button class="btn" type="button" id="expandAll">すべて開く</button>
+  <button class="btn" type="button" id="collapseAll">すべて閉じる</button>
+</div></div>
+
+<main id="main">
+
+<!-- ============ 1. 全体像 ============ -->
+<details class="theme reveal" id="overview" open>
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>1. 全体像<span class="sum-sub">何のゲームで、誰がどう遊ぶのか</span></h2></summary>
+  <div class="body">
+    <p><b>カメレオンナイト</b>は、暗い夜のジャングルを舞台にした、<b>2人で遊ぶ協力ゲーム</b>です。専門店などでの<b>展示・体験</b>を想定しています。</p>
+    <h3>2つの役割</h3>
+    <div class="table-wrap"><table>
+      <tr><th>役割</th><th>操作する人</th><th>やること</th></tr>
+      <tr><td>メイン(カメレオン)</td><td>キーボード(展示ではセンサーなどに置き換え予定)</td><td>逃げ回る。<b>攻撃手段はない</b>。</td></tr>
+      <tr><td>灯り役(協力プレイヤー)</td><td>スマホ(傾き/タッチ)。無い時はマウス</td><td>懐中電灯を動かし、敵に光を当て続けて倒す。</td></tr>
+    </table></div>
+    <div class="card"><p><b>面白さの核:</b> 「1人では戦えない」ので、2人の息が合わないと勝てません。灯り役は<b>1体に狙いを定め続ける</b>必要があり(逸らすと敵が回復する)、メイン役は敵を灯りの範囲に誘導するように逃げます。観ている人にも役割が分かりやすく、展示向きです。</p></div>
+    <h3>3つの作業場所</h3>
+    <div class="table-wrap"><table>
+      <tr><th>場所</th><th>中身</th><th>役割</th></tr>
+      <tr><td><code>mockup/</code></td><td>ブラウザで動くHTML試作3種</td><td>アイデアと遊びの検証。作り直しが速い。</td></tr>
+      <tr><td><code>Assets/</code></td><td>Unityのゲーム本体</td><td>展示で実際に使うもの。</td></tr>
+      <tr><td><code>docs/</code></td><td>このページ</td><td>状況の整理と説明用。</td></tr>
+    </table></div>
+    <figure>
+      <img src="images/game-view-light-icons.png" width="475" height="205" loading="lazy" alt="UnityのGameビュー。中央に緑のカメレオンがいて、電球と太陽のマークが重なって表示されている">
+      <figcaption>Unityの実際のGameビュー。電球・太陽のマークはUnityエディタのライトのアイコンで、ゲームの一部ではありません。</figcaption>
+    </figure>
+  </div>
+</details>
+
+<!-- ============ 2. HTMLモックアップ ============ -->
+<details class="theme reveal" id="mockups">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>2. HTMLモックアップ3種<span class="sum-sub">なぜ先にHTMLで作ったのか、それぞれ何を試したのか</span></h2></summary>
+  <div class="body">
+    <p>Unityは起動・ビルドに時間がかかるため、<b>遊びのアイデアはまずブラウザ(three.js)で素早く試作</b>しました。ファイルを開くだけで動くので、他の人にも見せやすい利点があります。</p>
+    <div class="table-wrap"><table>
+      <tr><th>ファイル</th><th>コンセプト</th><th>試したこと</th></tr>
+      <tr><td><code>chameleon-3d.html</code></td><td>擬態するステルス</td><td>止まると周囲の色に溶け込み、動くと目立つ。見つかり具合を表す「発見ゲージ」、ライフ3、ミニマップ、効果音。</td></tr>
+      <tr><td><code>maze3d.html</code></td><td>迷路×非対称対戦</td><td>圧力マット役(メイン)とスマホ傾き役(サーチライトで<b>妨害</b>)の対戦。一本道だと詰むため、迷路に抜け道(ループ)を追加。当たり判定を軸ごとにスライドさせる方式に修正。</td></tr>
+      <tr><td><code>chameleon-survivor.html</code></td><td>協力サバイバー</td><td>メインは逃げるだけ、灯り役が敵を焼き払う。時間で敵が増える。<b>Unity版の元になった試作。</b></td></tr>
+    </table></div>
+    <div class="note"><b>補足:</b> <code>maze3d.html</code> と <code>chameleon-survivor.html</code> は現時点でGitにはコミットしていません。GitHubに上がっているのは <code>chameleon-3d.html</code> のみです。</div>
+  </div>
+</details>
+
+<!-- ============ 3. ルール詳細 ============ -->
+<details class="theme reveal" id="rules">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>3. サバイバーのルールと数値<span class="sum-sub">「どういう仕組みで倒すの?」に答えるための詳細</span></h2></summary>
+  <div class="body">
+    <h3>倒し方(ダウンゲージ)</h3>
+    <ol>
+      <li>敵は<b>光の円(半径2.4)</b>の中にいて、かつ<b>プレイヤーから1.6より離れている</b>間だけ、体力(ダウンゲージ)が減ります。</li>
+      <li>光を外すと、ゲージは<b>自然回復</b>します。だから1体に当て続ける必要があります。</li>
+      <li>ゲージが0になると、敵は縮みながら浮いて消え、撃破数が1増えます。</li>
+    </ol>
+    <div class="card"><p><b>なぜ「プレイヤーの近くには光が効かない」のか:</b> これが無いと、灯りをプレイヤーの真上に置きっぱなしにするだけで、寄ってきた敵が全部焼けてしまいます。その必勝法を構造的に無効にするための調整です(HTML試作のコメントにも同じ意図が書かれています)。</p></div>
+
+    <h3>敵の種類</h3>
+    <div class="table-wrap"><table>
+      <tr><th>種類</th><th class="num">速さ</th><th class="num">接触ダメージ/秒</th><th class="num">ダウン体力</th><th class="num">光での減少/秒</th><th class="num">回復/秒</th><th>特徴</th></tr>
+      <tr><td>蛾(moth)</td><td class="num">2.6</td><td class="num">10</td><td class="num">34</td><td class="num">44</td><td class="num">16</td><td>小さく速い。すぐ倒せるが数が多い。</td></tr>
+      <tr><td>大型(brute)</td><td class="num">1.5</td><td class="num">22</td><td class="num">110</td><td class="num">38</td><td class="num">20</td><td>遅いが硬く、痛い。</td></tr>
+      <tr><td>突進(dasher)</td><td class="num">2.0</td><td class="num">16</td><td class="num">45</td><td class="num">44</td><td class="num">18</td><td><b>ギミック:</b> 0.6秒その場で黄色く光り(予告)、一直線に突進(0.45秒・速さ9)。約8秒後から出現。</td></tr>
+      <tr><td>光避け(skulker)</td><td class="num">2.9</td><td class="num">12</td><td class="num">36</td><td class="num">50</td><td class="num">22</td><td><b>ギミック:</b> 光が近づくと逃げる。壁際や角に追い詰めて当てる必要がある。約20秒後から出現。</td></tr>
+      <tr><td>分裂(splitter)</td><td class="num">1.9</td><td class="num">14</td><td class="num">80</td><td class="num">40</td><td class="num">18</td><td><b>ギミック:</b> 倒すと小さな蛾が2体飛び出す。約14秒後から出現。</td></tr>
+    </table></div>
+
+    <h3>時間で難しくなる仕組み</h3>
+    <ul>
+      <li>出現間隔 = <code>max(0.3, 1.5 − 経過秒 × 0.06)</code> 秒。開始直後は1.5秒ごと、約20秒で下限0.3秒になります(HTML試作より大幅に速い設定)。</li>
+      <li>大型が出る確率 = <code>min(0.3, 0.04 + 経過秒 × 0.012)</code>。最初は4%、約22秒で30%(上限)。突進・分裂・光避けは、それぞれ一定時間が経ってから、少しずつ混ざり始めます。</li>
+      <li>敵はプレイヤーの周囲15〜18の距離にランダムに出現します。画面内の敵は最大45体で、増えすぎて画面が騒がしくならないようにしています。</li>
+    </ul>
+
+    <h3>プレイヤー側</h3>
+    <ul>
+      <li>HP 100。敵に触れる(距離0.9未満)と、<b>重なっている敵の中で最大の</b>接触ダメージだけを毎秒受けます(合算ではありません)。さらに<b>ダメージ倍率2.2</b>をかけていて、HTML試作より短時間で倒されます。</li>
+      <li>移動速度 5.6。移動できる範囲は中心から±19。</li>
+      <li>HPが0でゲームオーバー。<b>制限時間はなし</b>で、生き残った時間を競います。ダメージ倍率と敵の増え方を上げることで、早めに決着がつく設計にしています(展示の回転を上げるため)。</li>
+      <li>ベストの生存時間と撃破数は端末に保存されます。</li>
+    </ul>
+  </div>
+</details>
+
+<!-- ============ 4. しくみ ============ -->
+<details class="theme reveal" id="tech">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>4. 技術のしくみ<span class="sum-sub">スマホ連携・シーン生成・当たり判定・カメラ・UI</span></h2></summary>
+  <div class="body">
+    <h3>スマホ連携(どうやって繋がるのか)</h3>
+    <ol>
+      <li>Unityゲームが起動すると、PC上に<b>小さなWebサーバー</b>(HTTP:8787 / HTTPS:8788)が立ちます。<code>PointerServer.cs</code> が担当します。</li>
+      <li>画面右上に、そのURLの<b>QRコード</b>が出ます。同じWi-Fiのスマホで読み取ると、専用ページが開きます。</li>
+      <li>スマホは指の位置(タッチ)または端末の傾きを、画面上の位置(0〜1の座標)に直して、約20回/秒でPCに送ります。</li>
+      <li>Unity側は、その座標から画面にレイを飛ばし、<b>地面に当たった位置</b>を懐中電灯の狙いにします(<code>FlashlightController.cs</code>)。</li>
+      <li>スマホが繋がっていなければ、マウスの位置を使います。HUDに「スマホ操作中/マウス操作中」と出ます。</li>
+    </ol>
+    <div class="note"><b>HTTPSがある理由:</b> iPhoneの傾きセンサーは安全な接続(HTTPS)でないと許可されないことがあるためです。自己署名証明書をWindowsのPowerShellで作っています。QRの読み取りと実機接続は<b>まだ確認できていません</b>。</div>
+
+    <h3>シーンの作り方(なぜボタンを押す必要があるのか)</h3>
+    <p>このプロジェクトは、地面・木・岩・プレイヤーなどを<b>手で配置していません</b>。メニュー <code>ChameleonNight › Build Survivor Scene</code> が、<code>SurvivorSceneBuilder.cs</code> の命令どおりに一括生成し、<code>ChameleonSurvivor.unity</code> として保存します。コードを変えたら、もう一度ボタンを押さないと反映されないのはそのためです。</p>
+    <p>見た目の部品(球・コーン・パネル・ロゴ・QR)も、画像ファイルを使わず<b>コードで生成</b>しています。既存プロトタイプから続く方針で、素材の管理が要らない代わりに、見た目は簡素です。</p>
+
+    <h3>当たり判定(なぜ木を通り抜けなくなったのか)</h3>
+    <p>Unityの物理エンジンは使わず、木・岩などを<b>円</b>として登録し(<code>SurvivorObstacle.cs</code>)、プレイヤーと敵が動いた後に「円にめり込んでいたら外へ押し出す」方式です。軽く、動きも滑らかです。最初は木の幹だけを当たり判定にしていたため、樹冠の下を通れて「貫通」に見えました。今は樹冠まで含めて拡大しています。</p>
+
+    <h3>カメラと左右の向き</h3>
+    <ul>
+      <li>カメラは斜め上(0,8,8)から、常にプレイヤーを画面中心にして追従します(<code>SurvivorCameraFollow.cs</code>)。</li>
+      <li><b>A/Dが逆になった理由:</b> HTML試作(three.js)は右手座標系、Unityは左手座標系のためです。同じ符号だと左右が反転するので、Unity側でX方向の符号を反転させました。</li>
+    </ul>
+
+    <h3>UIと明るさ設定</h3>
+    <ul>
+      <li>画面表示はUnity標準の即時描画(OnGUI)で作り、角丸パネルやロゴは<code>UITextureFactory.cs</code>が生成します。</li>
+      <li>配色は「夜の緑×灯りの金」を基本色として統一しています。</li>
+      <li><kbd>Esc</kbd>のポーズ画面に、<b>画面の明るさ</b>スライダー(×0.2〜×5)があります。環境光と月明かりの強さに倍率をかけるだけの、開発者向け設定です。設定値は保存されます。</li>
+    </ul>
+
+    <h3>素材</h3>
+    <ul>
+      <li>木・岩・草などは <b>Kenney Nature Kit</b>(CC0=著作権フリー、商用可、表記不要)。<code>Assets/Models/KenneyNature/</code>にFBX 329点とライセンス文を置いています。</li>
+      <li>主人公・敵は現在<b>球とコーンの簡易モデル</b>。主人公はTripo AIで作る予定です。</li>
+    </ul>
+  </div>
+</details>
+
+<!-- ============ 5. Unity操作 ============ -->
+<details class="theme reveal" id="unity">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>5. Unityの操作手順<span class="sum-sub">どのメニュー・ボタンを押すのか</span></h2></summary>
+  <div class="body">
+    <div class="note">下の2つの図は説明用の簡易イラストです(Unityの実際のスクリーンショットではありません)。</div>
+    <ol class="steps">
+      <li><b>Unityでプロジェクトを開く</b><br>Unity Hubで <code>chameleon-night-prototype</code> を開きます。<b>エディタは1つだけ</b>にしてください。</li>
+      <li><b>メニューからシーンを作る</b><br>上部メニューの <code>ChameleonNight</code> → <code>Build Survivor Scene</code> を押します。
+        <figure>
+          <svg viewBox="0 0 640 210" role="img" aria-label="Unityの上部メニューのChameleonNightを押し、Build Survivor Sceneを選ぶ位置を示した図" width="640" height="210">
+            <rect width="640" height="210" rx="10" fill="#2b2f36"/><rect width="640" height="30" fill="#3a3f48"/>
+            <g font-family="sans-serif" font-size="13" fill="#d6dbe3"><text x="14" y="20">File</text><text x="58" y="20">Edit</text><text x="102" y="20">Assets</text><text x="164" y="20">GameObject</text><text x="250" y="20">Component</text><text x="334" y="20">Window</text><text x="398" y="20">Help</text></g>
+            <rect x="446" y="5" width="132" height="20" rx="5" fill="#22c55e"/>
+            <text x="458" y="20" font-family="sans-serif" font-size="13" font-weight="700" fill="#06210f">ChameleonNight</text>
+            <rect x="446" y="30" width="230" height="118" rx="6" fill="#43484f" stroke="#22c55e" stroke-width="2"/>
+            <g font-family="sans-serif" font-size="13" fill="#e8edf3"><text x="458" y="52" font-weight="700" fill="#22c55e">▶ Build Survivor Scene</text><text x="458" y="76">Build Prototype Scene(旧・迷路版)</text><text x="458" y="100">Hide Light Icons In Game View</text></g>
+            <text x="20" y="180" font-family="sans-serif" font-size="14" fill="#f5a623">① 「ChameleonNight」を押す → ② 「Build Survivor Scene」を選ぶ</text>
+          </svg>
+          <figcaption>Consoleに「survivor scene built at Assets/Scenes/ChameleonSurvivor.unity」と出れば成功です。</figcaption>
+        </figure></li>
+      <li><b>シーンを開く</b><br>下の <code>Project</code> パネルで <code>Assets › Scenes › ChameleonSurvivor</code> をダブルクリックします。</li>
+      <li><b>Playする</b><br>画面上部中央の▶ボタンを押します。タイトル画面で <kbd>Enter</kbd> / <kbd>Space</kbd> / クリック、または「はじめる」で開始です。
+        <figure>
+          <svg viewBox="0 0 640 130" role="img" aria-label="Unityウィンドウ上部中央にある再生ボタンの位置を示した図" width="640" height="130">
+            <rect width="640" height="130" rx="10" fill="#2b2f36"/><rect width="640" height="40" fill="#3a3f48"/>
+            <rect x="278" y="6" width="84" height="28" rx="6" fill="#22c55e"/><polygon points="308,12 308,28 324,20" fill="#06210f"/>
+            <rect x="332" y="14" width="3" height="12" fill="#06210f"/><rect x="338" y="14" width="3" height="12" fill="#06210f"/>
+            <text x="20" y="90" font-family="sans-serif" font-size="14" fill="#f5a623">ウィンドウ上部・中央の ▶ を押すとゲーム開始。もう一度押すと停止。</text>
+          </svg>
+        </figure></li>
+      <li><b>Gameビューで確認する</b><br><code>Game</code> タブに映ります。電球や太陽のマークが出る場合は、Gameタブ右上の <b>Gizmos</b> ボタンをOFFにします。</li>
+    </ol>
+    <h3>ゲーム中の操作</h3>
+    <div class="table-wrap"><table>
+      <tr><th>操作</th><th>内容</th></tr>
+      <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 矢印</td><td>メインプレイヤーの移動</td></tr>
+      <tr><td>マウス</td><td>灯り(スマホ未接続時)</td></tr>
+      <tr><td>スマホ</td><td>右上のQRを読み取って接続。タッチまたは傾きで灯りを操作</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>ポーズ。画面の明るさ調整、再開、最初からやり直し</td></tr>
+      <tr><td><kbd>R</kbd></td><td>ゲームオーバー後のやり直し</td></tr>
+    </table></div>
+    <figure>
+      <img src="images/game-view-marks-before.png" width="537" height="396" loading="lazy" alt="Play中のGameビュー。敵と木のモデル、青と緑のライトのアイコンが映っている">
+      <figcaption>Play中のGameビュー例。青・緑のマークがライトのアイコン(ギズモ)です。</figcaption>
+    </figure>
+  </div>
+</details>
+
+<!-- ============ 6. トラブル ============ -->
+<details class="theme reveal" id="trouble">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>6. 起きた問題と原因・対処<span class="sum-sub">「あれ、なんでこうなったの?」の答え</span></h2></summary>
+  <div class="body">
+    <div class="table-wrap"><table id="troubleTable"></table></div>
+  </div>
+</details>
+
+<!-- ============ 7. Q&A ============ -->
+<details class="theme reveal" id="qa">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>7. 想定問答<span class="sum-sub">聞かれそうな質問と、答え方の例</span></h2></summary>
+  <div class="body" id="qaList"></div>
+</details>
+
+<!-- ============ 8. 状況 ============ -->
+<details class="theme reveal" id="status">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>8. 現在の状況と次にやること<span class="sum-sub">できたこと・確認待ち・未着手</span></h2></summary>
+  <div class="body">
+    <div class="table-wrap"><table id="statusTable"></table></div>
+    <h3>やることリスト</h3>
+    <p>「誰が」「何を」するかで分けています。上から順に進めるのがおすすめです。</p>
+    <div id="backlogList"></div>
+    <div class="note"><b>重要:</b> Claude(AI)は、Unityエディタが開いている間はコンパイル確認やPlay確認ができません。「要確認」は、Unityで実際にPlayした結果を教えてください。</div>
+  </div>
+</details>
+
+<!-- ============ 9. 履歴 ============ -->
+<details class="theme reveal" id="history">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>9. やったことの履歴<span class="sum-sub">時系列</span></h2></summary>
+  <div class="body"><ol class="timeline" id="timeline" reversed></ol></div>
+</details>
+
+<!-- ============ 10. ファイル ============ -->
+<details class="theme reveal" id="files">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>10. ファイルの場所<span class="sum-sub">どのファイルが何をしているか</span></h2></summary>
+  <div class="body"><div class="table-wrap"><table id="fileTable"></table></div></div>
+</details>
+
+<!-- ============ 11. 更新 ============ -->
+<details class="theme reveal" id="update">
+  <summary><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2>11. このページの更新方法<span class="sum-sub">いつでも更新できます</span></h2></summary>
+  <div class="body">
+    <p>Claude Codeに<b>「docs/project-overview.html を更新して」</b>と伝えれば、その時点までの作業を反映します。</p>
+    <p>手で直す場合は、このファイル末尾の <code>&lt;script&gt;</code> 内にある <code>UPDATED</code> / <code>STATUS</code> / <code>HISTORY</code> / <code>FILES</code> / <code>TROUBLES</code> / <code>QA</code> を編集してください。1行=1項目で、表示は自動で組み立てられます。</p>
+    <p>URLの末尾に <code>#tech</code> のように付けると、そのテーマを開いた状態で共有できます。</p>
+  </div>
+</details>
+
+</main>
+
+<script>
+// ============ ここを編集すればページが更新されます ============
+const UPDATED = "2026-09-19";
+
+// state: done / check / todo / issue
+const STATUS = [
+  { state:"done",  item:"HTML試作3種", note:"mockup/ に保存。Gitに載っているのは chameleon-3d.html のみ。" },
+  { state:"done",  item:"Unityサバイバー本体", note:"コンパイル成功とPlayモード開始までバッチ検証済み。" },
+  { state:"done",  item:"スマホ連携の組み込み", note:"サーバー起動まで確認。QR読み取り・実機接続は未確認。" },
+  { state:"check", item:"タイトル/HUD/ポーズ画面", note:"実装済み。見た目と操作感はUnityで確認待ち。" },
+  { state:"check", item:"木・岩の当たり判定", note:"樹冠まで拡大。貫通が残るか確認待ち。" },
+  { state:"check", item:"移動範囲の光る壁・暗い照明・カメラ中心固定", note:"シーン再構築後の見た目を確認待ち。" },
+  { state:"check", item:"A/D操作の向き", note:"修正済み。実機で向きを確認。" },
+  { state:"issue", item:"Gameビューのライトのマーク", note:"消す処理を作り直し済み。残る場合は Gizmos ボタンをOFF。" },
+  { state:"todo",  item:"主人公・敵の3Dモデル", note:"主人公はTripo AI予定。敵はBlenderまたは無料素材。現状は球体。" },
+  { state:"check", item:"コードによる簡易アニメーション", note:"歩行の上下・尻尾のスイング・呼吸、敵の脈動と迂回、撃破時の飛び散り、被ダメージの赤み。見た目はUnityで確認待ち。" },
+  { state:"check", item:"効果音(撃破時のみ)", note:"常時鳴る音・被ダメージ音などは不快なので削除し、敵を倒した時のチャイムだけに。音量はEscの設定で調整。" },
+  { state:"check", item:"制限時間なし・ダメージ増・敵の増え方を加速", note:"ダメージ倍率2.2、出現間隔は約20秒で下限。実際の難しさ(何秒で倒されるか)はUnityで確認待ち。" },
+  { state:"check", item:"新ギミックの敵3種", note:"突進(予告つき)・光避け・分裂。動きと見た目はUnityで確認待ち。" },
+  { state:"check", item:"ビネット・ベスト記録", note:"白いもやがかかる不具合(ビネットを白で描いていた)を、黒い着色に修正。ベスト撃破数の表示あり。" },
+  { state:"check", item:"敵が障害物に詰まる問題", note:"進めない時に少し迂回する簡易処理を追加。本格的な経路探索は未実装(バックログ参照)。" },
+  { state:"todo",  item:"骨を使った本格アニメーション", note:"3Dモデルができてから。詳細はバックログ。" },
+  { state:"todo",  item:"GitHubへの反映", note:"ブランチ mockup/chameleon-3d-demo に chameleon-3d.html をコミット済み。push(書き換え後はforce push)はご自身で。" },
+];
+
+// グループごとに整理。who: あなた / AI / 両方
+const BACKLOG = [
+  { title:"① まず確認する", hint:"AIはUnityが開いている間、動作確認ができません。あなたのPlay結果が次の作業の入口です。", items:[
+    { task:"Unityで実際にPlayして、見た目・音・難しさを確認", who:"あなた", note:"当たり判定、光る壁、暗さ、アニメ、新しい敵、何秒で倒されるかを見て、気になる点を伝える。" },
+    { task:"スマホのQR読み取りと実機接続を確認", who:"あなた", note:"同じWi-Fiでスマホから接続し、タッチ/傾きで灯りが動くか。" },
+  ]},
+  { title:"② 決めてほしいこと", hint:"方向性の判断で、決まればAIがすぐ実装できます。", items:[
+    { task:"後半に気持ち悪くなる問題の対策を選ぶ", who:"両方", note:"候補: 敵の脈動を弱める / カメラにわずかな遅れ / 赤い点滅を控えめに / 撃破エフェクトを減らす。" },
+    { task:"ランキング形式にするか", who:"あなた", note:"するなら、順位の基準(生存時間+撃破数)や名前入力の形式を決める。" },
+    { task:"展示でのメイン操作(圧力センサーなど)", who:"あなた", note:"センサーの機種・接続方式が決まれば、入力の差し替えを検討。" },
+  ]},
+  { title:"③ 素材づくり(あなたの作業が必要)", hint:"外部サービスやインストールが必要なため、AIだけでは進められません。", items:[
+    { task:"主人公の3Dモデル(Tripo AI)+骨付け(Mixamoなど)", who:"両方", note:"できたらFBX/GLBを Assets/ に入れる。取り込みはAIが担当。" },
+    { task:"敵の3Dモデル", who:"両方", note:"Blenderを入れればAIがPythonでローポリ作成も可能。無料素材を探す案もある。" },
+    { task:"docsに載せる実際のUnity画面のスクリーンショット", who:"あなた", note:"docs/images/ に入れてもらえれば、AIがページに組み込む。" },
+  ]},
+  { title:"④ AIがすぐ進められる作業", hint:"「これをやって」と言ってもらえれば着手できます。", items:[
+    { task:"ランキング表示(上位10人・イニシャル入力・今日のベスト)", who:"AI", note:"まずは端末内保存。会場の複数端末で共有するには別途サーバーが必要。" },
+    { task:"強化要素(一定数倒すたびに光の範囲・移動速度・回復などを選ぶ)", who:"AI", note:"遊びの幅が一気に広がる。" },
+    { task:"2人の連携を強くする仕掛け", who:"AI", note:"光を当てている間はメインが速くなる、ボスは2か所同時に照らす、など。" },
+    { task:"骨を使ったアニメーション", who:"AI", note:"モデルができてから。状況に応じて再生を切り替える実装。" },
+    { task:"ポストプロセス(ブルーム等)の導入", who:"AI", note:"パッケージ追加が必要。Unityを閉じた状態で設定する。" },
+    { task:"敵の本格的な経路探索", who:"AI", note:"今は簡易な迂回のみ。入り組んだ地形で詰まるなら対応。" },
+    { task:"難易度の調整", who:"AI", note:"プレイ結果(何秒で倒されたか)をもらえれば数値を合わせる。" },
+  ]},
+  { title:"⑤ 整理・運用", hint:"急がないが、放置すると散らかるもの。", items:[
+    { task:"Gitのコミット整理", who:"あなた", note:"未コミット: Assets/ のサバイバー関連、mockup/ の2ファイル、docs/。コミットはご依頼があった時だけ行う。" },
+    { task:"古いファイルの整理", who:"あなた", note:"旧2Dシーンとスクリプト、Assets/_Recovery、kenney_nature-kit/ の未使用形式。削除してよいか確認が必要。" },
+    { task:"運用ルール: Unityエディタは1つだけ開く", who:"あなた", note:"複数起動すると干渉する(過去に発生)。AIの検証前はUnityを閉じる。" },
+    { task:"自動テストの整備", who:"AI", note:"Playの自動化は不安定なので、コンパイルとシーン生成の確認のみ自動化する案。" },
+  ]},
+  { title:"💡 アイデア置き場(もっと面白くする工夫)", hint:"やると決めたものを上のグループへ移します。", items:[
+    { task:"ボス(一定時間ごとに出現し、2人で協力しないと倒せない)", who:"AI", note:"" },
+    { task:"コンボ(連続撃破で得点倍率が上がる)", who:"AI", note:"ランキングの基準にもできる。" },
+    { task:"地形ギミック(光で開く扉、隠れられる草むら、敵を遅くする沼)", who:"AI", note:"" },
+    { task:"擬態の要素を戻す(止まると景色に溶け込み、敵に気づかれにくい)", who:"AI", note:"元のコンセプトを活かす案。" },
+    { task:"フィールドアイテム(回復・光の強化・一時無敵)", who:"AI", note:"" },
+    { task:"敵の追加(光を吸収する、仲間を呼ぶ、壁の裏を回り込む)", who:"AI", note:"" },
+    { task:"2人の声かけを生む場面(画面外から突進する予告など)", who:"両方", note:"「右から来る!」と言い合える仕掛け。" },
+    { task:"観客向けの大画面表示(スコア・撃破数)", who:"AI", note:"展示で周りの人も盛り上がる。" },
+    { task:"難易度の選択(初心者/やり込み。係員が切り替え)", who:"AI", note:"" },
+    { task:"ピンチの演出(HPが少ない時に画面や音で知らせる)", who:"AI", note:"酔いにくいよう控えめに。" },
+  ]},
+];
+
+const HISTORY = [
+  { date:"09-01頃", title:"HTMLモックアップ(擬態3D)", body:"壁・床の色に擬態する基本コンセプトをthree.jsで試作。" },
+  { date:"〜09-15", title:"迷路×3D 対戦版", body:"圧力マット役 vs スマホ傾き役(サーチライトで妨害)。抜け道付き迷路、当たり判定・UIを作り込み。" },
+  { date:"09-13", title:"Gitブランチ作成", body:"mockup/chameleon-3d-demo に chameleon-3d.html だけをコミット。mainとは分離。" },
+  { date:"09-15", title:"Unityにサバイバーモードを実装", body:"chameleon-survivor.html を再現。プレイヤー・敵2種・懐中電灯・ミニマップ・HP。" },
+  { date:"09-15", title:"スマホ連携を追加", body:"既存のPointerServer(QR接続)から灯りを操作。未接続時はマウス。" },
+  { date:"09-16", title:"UI/UX改善", body:"タイトル画面、ロゴ、角丸パネル、配色を統一。" },
+  { date:"09-19", title:"操作・見た目の修正", body:"A/D反転を修正。Kenney Nature Kit(CC0)を導入して森を配置。" },
+  { date:"09-19", title:"ゲーム性の修正", body:"障害物の当たり判定、移動範囲の光る壁、カメラ中心固定、暗い照明、Escポーズと明るさ設定。" },
+  { date:"09-19", title:"ライトのマーク対策・このまとめページ", body:"ギズモ非表示処理の作り直し。docs/project-overview.html を追加し、テーマ別の開閉・アニメーション・詳細説明に拡充。" },
+  { date:"09-19", title:"制限時間を廃止し、難易度と敵の種類を強化", body:"制限時間はつまらないため廃止。ダメージ倍率2.2、出現間隔の短縮、新ギミックの敵(突進・光避け・分裂)を追加。同時に出る敵は最大45体。" },
+  { date:"09-19", title:"白いもや・音・30秒設定の修正", body:"ビネットが白く描かれて画面に白いもやがかかっていた不具合を修正。音は撃破時のみに変更。制限時間30秒を導入(のちに廃止)。" },
+  { date:"09-19", title:"改善点への対応", body:"敵の迂回、コードアニメーション(プレイヤー・敵・撃破エフェクト)、効果音と環境音、ビネット、ベスト記録、音量設定を実装。実施できないものはバックログに記録。" },
+];
+
+const FILES = [
+  ["Assets/Scripts/SurvivorManager.cs", "進行管理、HUD、タイトル・ポーズ・ゲームオーバー、ミニマップ、QR表示、明るさ設定。"],
+  ["Assets/Scripts/SurvivorPlayerController.cs", "メインプレイヤーの移動と見た目(球+コーンの簡易カメレオン)。"],
+  ["Assets/Scripts/SurvivorPredator.cs", "敵(蛾/大型)。追跡、光でのダウン、撃破演出。"],
+  ["Assets/Scripts/FlashlightController.cs", "灯り役の懐中電灯。スマホ入力を優先、なければマウス。"],
+  ["Assets/Scripts/SurvivorAudio.cs / SurvivorBurst.cs", "効果音・環境音のコード生成と、撃破時の飛び散りエフェクト。"],
+  ["Assets/Scripts/SurvivorObstacle.cs", "木・岩など通り抜けできない障害物(円の当たり判定)。"],
+  ["Assets/Scripts/SurvivorCameraFollow.cs", "プレイヤーを画面中心に追従するカメラ。"],
+  ["Assets/Scripts/PointerServer.cs", "スマホ連携のサーバー(既存)。QRで接続。"],
+  ["Assets/Scripts/UITextureFactory.cs / PrimitiveMeshFactory.cs", "角丸パネル・ロゴ・コーン形状をコードで生成。"],
+  ["Assets/Editor/SurvivorSceneBuilder.cs", "メニュー「Build Survivor Scene」の中身。地面・森・境界などを一括生成。"],
+  ["Assets/Editor/HideLightGizmoIcons.cs", "Gameビューのライトのマークを消す処理。"],
+  ["Assets/Scenes/ChameleonSurvivor.unity", "生成されたサバイバー用シーン(これをPlay)。"],
+  ["Assets/Models/KenneyNature/", "Kenney Nature Kit(CC0)のFBXとライセンス。"],
+  ["mockup/", "HTML試作3種。"],
+  ["docs/project-overview.html", "このページ。"],
+];
+
+// [症状, 原因, 対処]
+const TROUBLES = [
+  ["Unityで動かすと以前のデータが干渉した", "Unityエディタが同じプロジェクトを複数同時に開いていた(Unity.exeが3つ起動)。", "エディタを1つだけにする。"],
+  ["「Recovering Scene Backups」の通知が毎回出る", "前回Unityが正常終了しなかった印。検証中にプロセスを強制終了したことも一因。", "「No」で進めて問題なし。Unityは通常の終了操作で閉じる。"],
+  ["A/Dが逆", "HTML試作は右手座標系、Unityは左手座標系のため。", "X方向の符号を反転(ミニマップも同様)。"],
+  ["最初、画面が真っ暗", "照明が暗すぎて、暗い色の物体がほぼ黒になっていた。", "照明を調整。現在は意図して暗くし、明るさをEscで調整可能に。"],
+  ["木や岩を貫通する", "当たり判定が木の幹だけで、樹冠の下を通れた。", "樹冠まで含めた円に拡大。"],
+  ["電球・太陽のマークが映る", "Unityエディタのライトのアイコン(ギズモ)。ゲームの表示ではない。", "非表示処理を作り、Gameビューの Gizmos ボタンOFFでも消える。"],
+  ["移動範囲が分かりにくい", "境界の目印がなく、床の色差も小さかった。", "光る半透明の壁と、明るい内側の床を追加。"],
+  ["バッチ検証でPlayモードに入らない", "コマンド末尾の -quit が、Playモード開始前にUnityを終了させていた。", "検証は「Unityを閉じた状態」で行う運用にした。"],
+];
+
+// [質問, 答え(HTML可)]
+const QA = [
+  ["このゲームは何ですか?", "夜の森で逃げるカメレオン(キーボード)と、懐中電灯で敵を倒す協力者(スマホ)の2人で遊ぶ、展示向けの協力サバイバルです。1人では敵を倒せないので、2人の連携が要になります。"],
+  ["なぜ最初にHTMLで作ったのですか?", "Unityは起動・ビルドに時間がかかるため、遊びのアイデアはブラウザで素早く試して、良かったものだけをUnityに移す進め方にしました。HTMLならURLやファイルを渡すだけで他の人にも見せられます。"],
+  ["スマホはどうやって繋がっているのですか?", "ゲームを動かすPCが小さなWebサーバーになり、画面のQRコードから同じWi-Fiのスマホで専用ページを開きます。スマホが指の位置や傾きを1秒に約20回PCへ送り、それをゲーム内の光の位置に変換しています。専用アプリは不要です。"],
+  ["敵が倒せないときは?", "光を1体に当て続けているか確認します。逸らすと敵は回復します。また、プレイヤーのすぐ近く(距離1.6以内)の敵には光が効かないので、少し離して誘導する必要があります。"],
+  ["敵はどんな種類がいますか?", "5種類です。小さく速い蛾、遅くて硬い大型に加えて、突進する敵(直前に黄色く光って予告)、光から逃げる敵(追い詰めて当てる)、倒すと蛾に分裂する敵がいます。時間が経つほど強い敵やギミックのある敵が混ざります。"],
+  ["どうして球体のキャラなのですか?", "本番の3Dモデルができるまでの仮の見た目です。主人公はTripo AIで作る予定で、敵はBlenderか無料素材を検討しています。ゲームの仕組みは先に完成させ、見た目は後から差し替えられるようにしています。"],
+  ["木や岩の素材は自作ですか?", "Kenney Nature Kitという素材集で、CC0(著作権フリー)なので商用でも表記なしで使えます。ライセンス文もフォルダに入れています。"],
+  ["ライセンスは大丈夫ですか?", "現在使っている外部素材はKenney Nature Kit(CC0)のみです。今後追加する素材(Tripo AIの出力、無料アセット)は、利用条件を個別に確認する必要があります。"],
+  ["アニメーションはどうなりますか?", "コードによる簡易アニメーション(歩行の上下、尻尾のスイング、敵の脈動、撃破時の飛び散り)は実装済みです。骨を使った本格的なアニメーションは、3Dモデルができてからです。Tripoのモデルは骨なしで出ることが多く、Mixamoなどの自動リギングで骨を付けてから取り込む流れです。"],
+  ["いま動いていないもの、確認できていないものは?", "効果音・環境音はコードで生成して実装済みですが、聞こえ方は確認待ちです。スマホのQR読み取りと実機接続、最新の見た目(当たり判定・光る壁・暗さ・アニメ)も、Unityで実際に確認する段階です。「8. 現在の状況と次にやること」に、確認待ちとやることリストがあります。"],
+  ["展示ではどう遊ばせる想定ですか?", "メイン役は、いまはキーボードで代用しています。展示では圧力センサーなどで操作する構想です(HTML試作では圧力マットを想定)。灯り役は来場者のスマホで、QRを読むだけで参加できる形を想定しています。センサー連携はまだ作っていません。"],
+];
+// ============================================================
+
+const STATE_LABEL = { done:"完了", check:"要確認", todo:"未着手", issue:"問題あり" };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+document.getElementById("lastUpdated").textContent = UPDATED;
+
+document.getElementById("statusTable").innerHTML =
+  "<tr><th>状態</th><th>項目</th><th>補足</th></tr>" +
+  STATUS.map(r => `<tr><td><span class="tag ${r.state}">${STATE_LABEL[r.state] || r.state}</span></td><td>${esc(r.item)}</td><td>${esc(r.note)}</td></tr>`).join("");
+
+document.getElementById("backlogList").innerHTML = BACKLOG.map(g =>
+  `<div class="group"><h4>${esc(g.title)}</h4><p class="hint">${esc(g.hint)}</p><ul>` +
+  g.items.map(i => `<li><b>${esc(i.task)}</b><span class="who">${esc(i.who)}</span>${i.note ? `<span>${esc(i.note)}</span>` : ""}</li>`).join("") +
+  `</ul></div>`).join("");
+
+document.getElementById("timeline").innerHTML =
+  HISTORY.slice().reverse().map(h => `<li><b>${esc(h.title)}</b><span>${esc(h.date)} — ${esc(h.body)}</span></li>`).join("");
+
+document.getElementById("fileTable").innerHTML =
+  "<tr><th>ファイル</th><th>役割</th></tr>" +
+  FILES.map(f => `<tr><td><code>${esc(f[0])}</code></td><td>${esc(f[1])}</td></tr>`).join("");
+
+document.getElementById("troubleTable").innerHTML =
+  "<tr><th>症状</th><th>原因</th><th>対処</th></tr>" +
+  TROUBLES.map(t => `<tr><td>${esc(t[0])}</td><td>${esc(t[1])}</td><td>${esc(t[2])}</td></tr>`).join("");
+
+document.getElementById("qaList").innerHTML =
+  QA.map(q => `<details class="qa"><summary>${esc(q[0])}</summary><div><p>${esc(q[1])}</p></div></details>`).join("");
+
+// --- 目次(テーマ名から自動生成) ---
+const themes = [...document.querySelectorAll("details.theme")];
+document.getElementById("toc").innerHTML = themes.map(d => {
+  const label = d.querySelector("h2").firstChild.textContent.replace(/^\d+\.\s*/, "");
+  return `<a href="#${d.id}">${esc(label)}</a>`;
+}).join("");
+
+// --- URLのハッシュで該当テーマを開き、開閉をURLに反映(共有用) ---
+function openFromHash() {
+  const target = document.getElementById(location.hash.slice(1));
+  if (target && target.matches("details.theme")) {
+    target.open = true;
+    target.scrollIntoView({ block:"start" });
+  }
+}
+window.addEventListener("hashchange", openFromHash);
+openFromHash();
+themes.forEach(d => d.addEventListener("toggle", () => {
+  if (d.open) history.replaceState(null, "", "#" + d.id);
+}));
+
+document.getElementById("expandAll").addEventListener("click", () => themes.forEach(d => d.open = true));
+document.getElementById("collapseAll").addEventListener("click", () => themes.forEach(d => d.open = false));
+
+// --- アニメーション: スクロール連動のフェードイン(transform/opacityのみ)と進捗バー ---
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (reduce || !("IntersectionObserver" in window)) {
+  document.querySelectorAll(".reveal").forEach(el => el.classList.add("in"));
+} else {
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+  }, { rootMargin:"0px 0px -8% 0px" });
+  document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+  const bar = document.getElementById("progress");
+  let ticking = false;
+  addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      bar.style.transform = `scaleX(${max > 0 ? Math.min(1, scrollY / max) : 0})`;
+      ticking = false;
+    });
+  }, { passive:true });
+}
+</script>
+</body>
+</html>
