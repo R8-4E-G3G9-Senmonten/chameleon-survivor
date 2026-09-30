@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>カメレオンナイト ― サバイバーモックアップ v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000;
+               font-family: "Hiragino Sans", "Yu Gothic", sans-serif; }
+  canvas { display:block; }
+  #hud { position:fixed; top:0; left:0; padding:10px 14px; color:#dfffe0; max-width:56%;
+         text-shadow:0 1px 3px #000; pointer-events:none; z-index:5; }
+  #hud h1 { font-size:14px; margin:0 0 3px; letter-spacing:0.5px; opacity:0.9; }
+  #hud .row { font-size:11.5px; opacity:0.82; line-height:1.5; }
+  #hpWrap { margin-top:6px; width:180px; height:12px; background:rgba(255,255,255,0.15);
+            border-radius:6px; overflow:hidden; }
+  #hpBar { height:100%; width:100%; background:linear-gradient(90deg,#6fe08a,#9dffb0); transition:width 0.15s linear; }
+  #skillWrap { margin-top:6px; width:180px; height:10px; background:rgba(255,255,255,0.12);
+               border-radius:5px; overflow:hidden; border:1px solid rgba(160,210,255,0.3); }
+  #skillBar { height:100%; width:0%; background:linear-gradient(90deg,#5ac8ff,#c9ecff); transition:width 0.1s linear; }
+  #skillLabel { font-size:10.5px; margin-top:2px; opacity:0.85; }
+  #skillLabel.ready { color:#c9ecff; opacity:1; text-shadow:0 0 6px rgba(120,200,255,0.9); }
+  #topRight { position:fixed; top:10px; right:12px; text-align:right; color:#dfffe0;
+              text-shadow:0 1px 3px #000; font-size:12px; z-index:5; pointer-events:none; }
+  #killCount { color:#ffb0b0; font-size:14px; margin-top:2px; }
+  #timer { margin-top:4px; color:#bcd; font-variant-numeric: tabular-nums; font-size:16px; }
+  #waveNote { margin-top:4px; color:#ffe38a; font-size:11px; opacity:0.85; }
+  #poisonNote { margin-top:4px; color:#a6ff8a; font-size:11px; opacity:0; transition:opacity 0.2s; }
+  #minimapWrap { position:fixed; bottom:14px; right:14px; z-index:5; }
+  #minimap { width:150px; height:150px; border-radius:50%; background:rgba(5,10,8,0.65);
+             border:2px solid rgba(200,255,210,0.35); display:block; }
+  #overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+             flex-direction:column; background:rgba(0,0,0,0.82); color:#fff; z-index:10; text-align:center; }
+  #overlay h2 { font-size:38px; margin:0 0 10px; color:#ff8f7a; }
+  #overlay .stats { font-size:14px; opacity:0.85; margin:0 0 20px; line-height:1.8; }
+  #overlay button { font-size:15px; padding:10px 26px; border-radius:8px; border:none;
+                     background:#3a8a4a; color:#fff; cursor:pointer; }
+  #overlay button:hover { background:#469a56; }
+  #hint { position:fixed; bottom:14px; left:0; right:180px; text-align:center; color:#cdeccd;
+          font-size:11.5px; opacity:0.7; text-shadow:0 1px 3px #000; z-index:5; pointer-events:none; }
+  #vignette { position:fixed; inset:0; pointer-events:none; z-index:4;
+              box-shadow: inset 0 0 0 0 rgba(255,40,20,0); transition: box-shadow 0.15s linear; }
+  #startOverlay { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+                  flex-direction:column; background:rgba(0,0,0,0.88); color:#fff; z-index:20; text-align:center; padding:20px; }
+  #startOverlay h1 { font-size:26px; margin:0 0 14px; color:#9dffb0; }
+  #startOverlay .desc { font-size:13px; line-height:2; opacity:0.85; max-width:480px; margin:0 0 22px; text-align:left; }
+  #startOverlay button { font-size:16px; padding:12px 34px; border-radius:8px; border:none;
+                          background:#3a8a4a; color:#fff; cursor:pointer; }
+  #toast { position:fixed; top:48%; left:50%; transform:translate(-50%,-50%); color:#eafeea;
+           font-size:20px; text-shadow:0 2px 6px #000; z-index:6; pointer-events:none; opacity:0;
+           transition:opacity 0.25s, transform 0.25s; }
+  #toast.show { opacity:1; transform:translate(-50%,-60%); }
+</style>
+</head>
+<body>
+<div id="startOverlay">
+  <h1>🦎 カメレオンナイト ― サバイバーモックアップ v2</h1>
+  <div class="desc">
+    <b>目標: 夜の森で、湧き続ける獣から生き延びる。</b><br><br>
+    移動: WASD / 矢印キー(メインプレイヤー)<br>
+    灯り(協力プレイヤーの代わり): マウス移動<br><br>
+    敵に光を<b>当て続ける</b>とダウンゲージが溜まり、倒せます。光を逸らすとゲージは回復するので、
+    一体に狙いを定め続けることが大事です。<b>あなたのすぐ近くの敵には光が効きません。</b><br><br>
+    <b>新要素</b><br>
+    ・光を<b>自分に当てる</b>とスキルゲージが溜まり、満タンで<b>スペースキー</b>: 周囲の敵をノックバック&スタンできます。<br>
+    ・森に浮かぶ<b>光る箱</b>に灯りを当て続けると開いて、回復やスキルチャージなどの効果が手に入ります。<br>
+    ・新しい敵: 🌿ツルハンター(遠距離攻撃) / 🪵ウッドゴーレム(硬い中ボス) / 🍄キノコスライム(自爆) / ☠️ポイズンマッシュ(触れると毒)。<br><br>
+    敵に触れられ続けるとHPが減ります。0になったら終了。生存時間と撃破数を競うモックアップです。
+  </div>
+  <button id="startBtn">はじめる</button>
+</div>
+
+<div id="hud">
+  <h1>🦎 カメレオンナイト ― サバイバー v2 (3D / HTML)</h1>
+  <div class="row">移動: WASD/矢印　灯り: マウス　スキル: スペース(ゲージ満タン時)</div>
+  <div id="hpWrap"><div id="hpBar"></div></div>
+  <div id="skillWrap"><div id="skillBar"></div></div>
+  <div id="skillLabel">スキル: 光を自分に当てて充填</div>
+</div>
+<div id="topRight">
+  <div id="timer">00:00</div>
+  <div id="killCount">💀 撃破: 0</div>
+  <div id="waveNote"></div>
+  <div id="poisonNote">☠️ 毒 継続ダメージ中</div>
+</div>
+<div id="hint">光を当て続けると敵のダウンゲージが溜まります。自分に当てるとスキルゲージ、光る箱に当てるとアイテムが開きます。</div>
+<div id="vignette"></div>
+<div id="toast"></div>
+
+<div id="minimapWrap"><canvas id="minimap" width="150" height="150"></canvas></div>
+
+<div id="overlay">
+  <h2 id="overlayTitle">力尽きた…</h2>
+  <div class="stats" id="overlayStats"></div>
+  <button onclick="location.reload()">もう一度やり直す (R)</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+// カメレオンナイト サバイバーモックアップ v2
+//  ベース(chameleon-survivor.html)に、以下を追加:
+//   - スキルゲージ: 協力プレイヤーの光をメインプレイヤーに当てると充填。
+//     満タンでスペースキーを押すと周囲の敵をノックバック&スタンさせる
+//     (暇な時間帯に協力プレイヤーへ役割を与えるための仕組み)。
+//   - アイテムボックス: 森に置かれた光る箱に灯りを当て続けると開き、
+//     回復/スキルチャージ/移動速度上昇のいずれかを付与する。
+//   - 新しい敵4種: 遠距離攻撃(ツルハンター)/中ボス(ウッドゴーレム)/
+//     自爆(キノコスライム)/毒付与(ポイズンマッシュ)。
+// ---------------------------------------------------------------------------
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x02040a, 0.042);
+scene.background = new THREE.Color(0x02040a);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---- 夜の照明 ----
+scene.add(new THREE.AmbientLight(0x223344, 0.22));
+const moon = new THREE.DirectionalLight(0x4a5f8a, 0.22);
+moon.position.set(-10, 20, -6);
+scene.add(moon);
+
+// ---- 地面 ----
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(90, 90),
+  new THREE.MeshStandardMaterial({ color: 0x162414, roughness:1 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---- 地形の飾り(木/岩。視界を遮る障害物としても機能) ----
+const obstacles = [];
+function addTree(x, z, scale=1) {
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.25*scale, 0.35*scale, 2.2*scale, 8),
+    new THREE.MeshStandardMaterial({ color: 0x5a3d22, roughness:0.9 })
+  );
+  trunk.position.y = 1.1*scale;
+  trunk.castShadow = true;
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(1.4*scale, 10, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2f6b2f, roughness:0.85 })
+  );
+  leaves.position.y = 2.6*scale;
+  leaves.castShadow = true;
+  g.add(trunk, leaves);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  obstacles.push({ pos: new THREE.Vector2(x,z), radius: 0.5*scale });
+}
+function addRock(x, z, scale=1) {
+  const rock = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(0.8*scale, 0),
+    new THREE.MeshStandardMaterial({ color: 0x555a5f, roughness:1, flatShading:true })
+  );
+  rock.position.set(x, 0.5*scale, z);
+  rock.castShadow = true;
+  scene.add(rock);
+  obstacles.push({ pos: new THREE.Vector2(x,z), radius: 0.9*scale });
+}
+const treeSpots = [[4,-3],[8,2],[-6,4],[-3,-8],[10,-9],[2,10],[-10,-4],[6,9],[-9,9],[13,4],[-13,-2],[0,-14],[-7,-14],[14,10]];
+treeSpots.forEach(([x,z]) => addTree(x, z, 0.9 + Math.random()*0.5));
+const rockSpots = [[2,4],[-4,-2],[7,-5],[-8,-9],[11,7],[-2,8],[4,-12]];
+rockSpots.forEach(([x,z]) => addRock(x, z, 0.8 + Math.random()*0.6));
+
+// ---- プレイヤー(カメレオン) ----
+const player = new THREE.Group();
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6fae6f, roughness:0.6 });
+const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), bodyMat);
+body.scale.set(1, 0.85, 1.6);
+body.position.y = 0.55;
+body.castShadow = true;
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), bodyMat);
+head.position.set(0, 0.7, 0.75);
+head.castShadow = true;
+const eyeGeo = new THREE.SphereGeometry(0.08, 6, 6);
+const eyeMat = new THREE.MeshStandardMaterial({ color:0xfff2a0, emissive:0x554400, emissiveIntensity:0.4 });
+const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.18, 0.85, 0.95);
+const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.18, 0.85, 0.95);
+const tail = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 8), bodyMat);
+tail.position.set(0, 0.5, -0.95);
+tail.rotation.x = Math.PI/2.6;
+player.add(body, head, eyeL, eyeR, tail);
+player.position.set(0, 0, 0);
+scene.add(player);
+
+const selfGlow = new THREE.PointLight(0x2a4a3a, 0.6, 2.4);
+selfGlow.position.set(0, 0.8, 0);
+player.add(selfGlow);
+
+// スキル満タン時に本体をうっすら発光させて、協力プレイヤー/本人双方に伝わるようにする
+const skillAura = new THREE.PointLight(0x6fd0ff, 0, 4);
+skillAura.position.set(0, 0.7, 0);
+player.add(skillAura);
+
+// ---- 灯り(マウス操作。協力プレイヤーのスマホの代わり) ----
+const flashlight = new THREE.SpotLight(0xfff2c0, 3.4, 16, Math.PI/6.2, 0.5, 1.4);
+flashlight.castShadow = true;
+scene.add(flashlight);
+scene.add(flashlight.target);
+
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2(0,0);
+const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+let lightTarget = new THREE.Vector3();
+const LIGHT_RADIUS = 2.4;   // この半径内にいる敵/箱/プレイヤーが光の効果を受ける
+const LIGHT_DEAD_ZONE = 1.6; // プレイヤーからこの距離より近い敵には光が効かない(接触ダメージは別途発生する)
+
+window.addEventListener('mousemove', (e) => {
+  mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// ---- 入力 ----
+const keys = {};
+window.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === 'r' && gameOver) location.reload();
+  if (e.key === ' ') { tryUseSkill(); e.preventDefault(); }
+});
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+// ---------------------------------------------------------------------------
+// サウンド(Web Audio, 外部ファイル無し)
+// ---------------------------------------------------------------------------
+let actx = null;
+function unlockAudio() {
+  if (actx) return;
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  startAmbient();
+}
+function tone(freq, duration, type='sine', gain=0.12, delay=0, freqEnd=null) {
+  if (!actx) return;
+  const t0 = actx.currentTime + delay;
+  const osc = actx.createOscillator();
+  const g = actx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, t0 + duration);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(g).connect(actx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.05);
+}
+function startAmbient() {
+  const o1 = actx.createOscillator(), o2 = actx.createOscillator();
+  const g = actx.createGain();
+  const lp = actx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 220;
+  o1.type = 'sine'; o1.frequency.value = 55;
+  o2.type = 'sine'; o2.frequency.value = 58.5;
+  g.gain.value = 0.026;
+  o1.connect(lp); o2.connect(lp); lp.connect(g).connect(actx.destination);
+  o1.start(); o2.start();
+}
+function playHitBuzz() { tone(140, 0.08, 'sawtooth', 0.05, 0, 90); }
+function playDownChime() {
+  tone(700, 0.1, 'sine', 0.09, 0);
+  tone(1000, 0.14, 'sine', 0.08, 0.07);
+}
+function playPlayerHurt() { tone(180, 0.16, 'sawtooth', 0.1, 0, 70); }
+function playGameOverJingle() {
+  [392, 349, 294, 220].forEach((f,i) => tone(f, 0.3, 'sine', 0.1, i*0.16));
+}
+function playChargeTick() { tone(880, 0.05, 'sine', 0.04, 0); }
+function playSkillReady() {
+  tone(660, 0.1, 'triangle', 0.09, 0);
+  tone(990, 0.14, 'triangle', 0.08, 0.08);
+}
+function playSkillUse() {
+  tone(220, 0.22, 'sawtooth', 0.12, 0, 60);
+  tone(440, 0.18, 'sine', 0.08, 0.02);
+}
+function playBoxOpen() {
+  tone(520, 0.12, 'sine', 0.09, 0);
+  tone(780, 0.12, 'sine', 0.08, 0.06);
+  tone(1040, 0.16, 'sine', 0.07, 0.12);
+}
+function playExplosion() { tone(90, 0.3, 'sawtooth', 0.16, 0, 40); }
+function playPoisonTick() { tone(330, 0.06, 'square', 0.03, 0, 300); }
+function playRangedShot() { tone(500, 0.08, 'sine', 0.06, 0, 260); }
+
+// ---- 開始画面 ----
+const startOverlay = document.getElementById('startOverlay');
+document.getElementById('startBtn').addEventListener('click', () => {
+  unlockAudio();
+  startOverlay.style.display = 'none';
+  gameStarted = true;
+});
+window.addEventListener('keydown', () => unlockAudio(), { once:true });
+
+// ---- トースト(アイテム取得などの短い通知) ----
+const toastEl = document.getElementById('toast');
+let toastTimer = 0;
+function showToast(text) {
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  toastTimer = 1.6;
+}
+
+// ---------------------------------------------------------------------------
+// 敵(獣): 基本2種 + 新規4種(遠距離/中ボス/自爆/毒)
+// ---------------------------------------------------------------------------
+const ENEMY_TYPES = {
+  moth:    { speed:2.6, contactDps:10, lightHp:34,  lightDrainRate:44, regenRate:16, color:0x8a4b8a, scale:0.55 },
+  brute:   { speed:1.5, contactDps:22, lightHp:110, lightDrainRate:38, regenRate:20, color:0x8a3b3b, scale:1.0  },
+  // 🌿ツルハンター: 遠くからでも狙ってくる。近寄らず光を当て続けて倒す想定
+  hunter:  { speed:1.8, contactDps:8,  lightHp:40,  lightDrainRate:42, regenRate:18, color:0xb03a5a, scale:0.7,
+             ranged:true, shotRange:9, shotInterval:1.8, shotDamage:9 },
+  // 🪵ウッドゴーレム: 硬くて遅い中ボス。HPが多いので狙いを定め続ける根気が要る
+  golem:   { speed:0.9, contactDps:26, lightHp:260, lightDrainRate:30, regenRate:14, color:0x6b4a2a, scale:1.7,
+             miniboss:true },
+  // 🍄キノコスライム: 光を当てられていないと直進して自爆する。倒すか光で足止めするかの駆け引き
+  slime:   { speed:2.2, contactDps:0,  lightHp:26,  lightDrainRate:50, regenRate:20, color:0x8fae3a, scale:0.6,
+             selfDestruct:true, blastRadius:2.6, blastDamage:32 },
+  // ☠️ポイズンマッシュ: 接触すると毒(継続ダメージ)を付与する、動きは遅め
+  poisonMash: { speed:1.2, contactDps:4, lightHp:38, lightDrainRate:40, regenRate:18, color:0x7a9a3a, scale:0.75,
+                poison:true, poisonDps:6, poisonDuration:3 },
+};
+
+const enemies = [];
+const projectiles = [];
+
+function spawnEnemy(type) {
+  const cfg = ENEMY_TYPES[type];
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 15 + Math.random()*3;
+  const pos = new THREE.Vector3(
+    THREE.MathUtils.clamp(player.position.x + Math.sin(angle)*dist, -19, 19),
+    0,
+    THREE.MathUtils.clamp(player.position.z + Math.cos(angle)*dist, -19, 19)
+  );
+
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    color: cfg.color, roughness:0.85, flatShading:true, emissive:0x000000, emissiveIntensity:0
+  });
+  const geo = cfg.miniboss ? new THREE.DodecahedronGeometry(0.55*cfg.scale, 0)
+            : cfg.selfDestruct ? new THREE.SphereGeometry(0.42*cfg.scale, 8, 6)
+            : new THREE.IcosahedronGeometry(0.45*cfg.scale, 0);
+  const blob = new THREE.Mesh(geo, mat);
+  blob.scale.set(1, 0.8, 1.3);
+  blob.position.y = 0.4*cfg.scale;
+  blob.castShadow = true;
+  const eyeGeo2 = new THREE.SphereGeometry(0.07*cfg.scale, 6, 6);
+  const eyeMat2 = new THREE.MeshStandardMaterial({ color:0xffe066, emissive:0xffe066, emissiveIntensity:1.4 });
+  const eL = new THREE.Mesh(eyeGeo2, eyeMat2); eL.position.set(-0.16*cfg.scale, 0.55*cfg.scale, 0.55*cfg.scale);
+  const eR = new THREE.Mesh(eyeGeo2, eyeMat2); eR.position.set(0.16*cfg.scale, 0.55*cfg.scale, 0.55*cfg.scale);
+  g.add(blob, eL, eR);
+  g.position.copy(pos);
+  scene.add(g);
+
+  enemies.push({
+    type, mesh: g, mat, eyeMat: eyeMat2,
+    speed: cfg.speed, contactDps: cfg.contactDps,
+    lightHpMax: cfg.lightHp, lightHp: cfg.lightHp,
+    lightDrainRate: cfg.lightDrainRate, regenRate: cfg.regenRate,
+    scale: cfg.scale, dying: false, dieTimer: 0,
+    ranged: !!cfg.ranged, shotRange: cfg.shotRange, shotInterval: cfg.shotInterval, shotCooldown: Math.random()*1.5,
+    shotDamage: cfg.shotDamage,
+    miniboss: !!cfg.miniboss,
+    selfDestruct: !!cfg.selfDestruct, blastRadius: cfg.blastRadius, blastDamage: cfg.blastDamage,
+    poison: !!cfg.poison, poisonDps: cfg.poisonDps, poisonDuration: cfg.poisonDuration,
+    knockback: new THREE.Vector3(), stunTimer: 0,
+  });
+}
+
+function spawnProjectile(from, dir, damage) {
+  const geo = new THREE.SphereGeometry(0.1, 6, 6);
+  const mat = new THREE.MeshStandardMaterial({ color:0xff6a8a, emissive:0xff2a4a, emissiveIntensity:1.4 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(from);
+  mesh.position.y = 0.5;
+  scene.add(mesh);
+  projectiles.push({ mesh, dir: dir.clone(), speed: 7, life: 3, damage });
+  playRangedShot();
+}
+
+// ---------------------------------------------------------------------------
+// アイテムボックス: 光を当て続けると開いて効果を付与する
+// ---------------------------------------------------------------------------
+const ITEM_EFFECTS = ['heal', 'skillCharge', 'speedBoost'];
+const itemBoxes = [];
+function spawnItemBox() {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 6 + Math.random()*10;
+  const pos = new THREE.Vector3(
+    THREE.MathUtils.clamp(player.position.x + Math.sin(angle)*dist, -18, 18),
+    0,
+    THREE.MathUtils.clamp(player.position.z + Math.cos(angle)*dist, -18, 18)
+  );
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:0x3a5a8a, emissive:0x2a4a7a, emissiveIntensity:0.5, roughness:0.4 });
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5), mat);
+  box.position.y = 0.3;
+  box.rotation.y = Math.random()*Math.PI;
+  box.castShadow = true;
+  g.add(box);
+  g.position.copy(pos);
+  scene.add(g);
+  itemBoxes.push({ mesh: g, box, mat, progress: 0, opened: false, baseY: 0.3 });
+}
+function openItemBox(ib) {
+  ib.opened = true;
+  const effect = ITEM_EFFECTS[Math.floor(Math.random()*ITEM_EFFECTS.length)];
+  playBoxOpen();
+  if (effect === 'heal') {
+    hp = Math.min(hpMax, hp + 30);
+    showToast('❤️ 回復 +30');
+  } else if (effect === 'skillCharge') {
+    skillGauge = skillGaugeMax;
+    showToast('✨ スキルゲージ満タン!');
+  } else if (effect === 'speedBoost') {
+    speedBoostTimer = 6;
+    showToast('👟 移動速度アップ!');
+  }
+  // 開封演出: 箱が弾けて消える
+  scene.remove(ib.mesh);
+  itemBoxes.splice(itemBoxes.indexOf(ib), 1);
+}
+
+// ---- 出現ペース管理: 経過時間に応じて間隔が短くなり、強敵の出現率も上がる ----
+let spawnTimer = 1.2;
+let itemBoxTimer = 8;
+function spawnInterval() {
+  return Math.max(0.35, 2.2 - elapsed*0.03);
+}
+function pickType() {
+  const r = Math.random();
+  const t = elapsed;
+  // 序盤はmoth中心、時間経過で強敵/ギミック敵の比率が増える
+  const bruteChance   = Math.min(0.22, 0.02 + t*0.0022);
+  const hunterChance  = Math.min(0.16, t > 20 ? 0.03 + t*0.0016 : 0);
+  const slimeChance   = Math.min(0.14, t > 15 ? 0.03 + t*0.0014 : 0);
+  const poisonChance  = Math.min(0.14, t > 25 ? 0.02 + t*0.0014 : 0);
+  const golemChance   = Math.min(0.06, t > 45 ? 0.01 + t*0.0006 : 0);
+  let acc = 0;
+  const table = [
+    ['golem', golemChance], ['brute', bruteChance], ['hunter', hunterChance],
+    ['slime', slimeChance], ['poisonMash', poisonChance],
+  ];
+  for (const [type, chance] of table) {
+    acc += chance;
+    if (r < acc) return type;
+  }
+  return 'moth';
+}
+
+// ---- スキル: 周囲ノックバック&スタン ----
+const skillGaugeMax = 100;
+let skillGauge = 0;
+let skillReady = false;
+const SKILL_RADIUS = 6;
+const SKILL_STUN = 1.4;
+function tryUseSkill() {
+  if (!gameStarted || gameOver || !skillReady) return;
+  skillGauge = 0;
+  skillReady = false;
+  playSkillUse();
+  showToast('💫 スキル発動: 周囲の敵をノックバック!');
+  enemies.forEach(en => {
+    if (en.dying) return;
+    const off = new THREE.Vector3().subVectors(en.mesh.position, player.position);
+    off.y = 0;
+    const d = off.length();
+    if (d < SKILL_RADIUS) {
+      const power = (1 - d/SKILL_RADIUS) * 10 + 3;
+      off.normalize();
+      en.knockback.copy(off).multiplyScalar(power);
+      en.stunTimer = SKILL_STUN;
+    }
+  });
+  // 発動演出: 一瞬リングを表示
+  const ringGeo = new THREE.RingGeometry(0.2, SKILL_RADIUS, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color:0x6fd0ff, transparent:true, opacity:0.5, side:THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI/2;
+  ring.position.copy(player.position);
+  ring.position.y = 0.05;
+  scene.add(ring);
+  let ringLife = 0.4;
+  const shrink = () => {
+    ringLife -= 0.016;
+    ringMat.opacity = Math.max(0, ringLife/0.4*0.5);
+    ring.scale.setScalar(1 + (0.4-ringLife)*1.5);
+    if (ringLife > 0) requestAnimationFrame(shrink); else scene.remove(ring);
+  };
+  shrink();
+}
+
+// ---- ミニマップ ----
+const mmCanvas = document.getElementById('minimap');
+const mmCtx = mmCanvas.getContext('2d');
+const WORLD_HALF = 19;
+function toMap(x, z) {
+  return [75 + ((x - player.position.x) / WORLD_HALF) * 70, 75 + ((z - player.position.z) / WORLD_HALF) * 70];
+}
+const MINIMAP_COLORS = {
+  moth:'#c98aff', brute:'#ff6a5a', hunter:'#ff6ab0', golem:'#c99a5a', slime:'#c9ff6a', poisonMash:'#6aff9a',
+};
+function drawMinimap() {
+  mmCtx.clearRect(0,0,150,150);
+  mmCtx.save();
+  mmCtx.beginPath(); mmCtx.arc(75,75,74,0,Math.PI*2); mmCtx.clip();
+  mmCtx.fillStyle = 'rgba(20,40,25,0.5)';
+  mmCtx.fillRect(0,0,150,150);
+
+  itemBoxes.forEach(ib => {
+    const [x,y] = toMap(ib.mesh.position.x, ib.mesh.position.z);
+    if (x < -10 || x > 160 || y < -10 || y > 160) return;
+    mmCtx.fillStyle = '#5ac8ff';
+    mmCtx.beginPath(); mmCtx.rect(x-2.5,y-2.5,5,5); mmCtx.fill();
+  });
+
+  enemies.forEach(en => {
+    if (en.dying) return;
+    const [x,y] = toMap(en.mesh.position.x, en.mesh.position.z);
+    if (x < -10 || x > 160 || y < -10 || y > 160) return;
+    mmCtx.fillStyle = MINIMAP_COLORS[en.type] || '#c98aff';
+    mmCtx.beginPath(); mmCtx.arc(x,y, en.miniboss?5.5:(en.type==='brute'?4:2.6), 0, Math.PI*2); mmCtx.fill();
+  });
+
+  mmCtx.fillStyle = '#eafeea';
+  mmCtx.save();
+  mmCtx.translate(75,75);
+  mmCtx.rotate(player.rotation.y);
+  mmCtx.beginPath();
+  mmCtx.moveTo(0,-6); mmCtx.lineTo(4,5); mmCtx.lineTo(-4,5); mmCtx.closePath();
+  mmCtx.fill();
+  mmCtx.restore();
+
+  mmCtx.restore();
+}
+
+// ---- ゲーム状態 ----
+let gameStarted = false;
+let gameOver = false;
+const velocity = new THREE.Vector3();
+const moveSpeedBase = 5.6;
+const damping = 8;
+let speedBoostTimer = 0;
+// カメラは常にプレイヤーを画面中心に固定するのではなく、ある程度の"遊び"
+// (デッドゾーン)の中でならプレイヤーが自由に動けるようにする。プレイヤーが
+// 灯り(マウス)から視覚的に離れて感じられるようにするための調整。
+const cameraFocus = player.position.clone();
+const CAMERA_DEADZONE = 3.2;
+let hp = 100, hpMax = 100;
+let elapsed = 0;
+let killCount = 0;
+let hurtFlashTimer = 0;
+let poisonDps = 0, poisonTimer = 0;
+
+const hpBar = document.getElementById('hpBar');
+const skillBar = document.getElementById('skillBar');
+const skillLabel = document.getElementById('skillLabel');
+const killCountEl = document.getElementById('killCount');
+const timerEl = document.getElementById('timer');
+const waveNoteEl = document.getElementById('waveNote');
+const poisonNoteEl = document.getElementById('poisonNote');
+const overlay = document.getElementById('overlay');
+const vignette = document.getElementById('vignette');
+
+function fmtTime(s) {
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+}
+
+function showGameOver() {
+  overlay.style.display = 'flex';
+  document.getElementById('overlayTitle').textContent = '力尽きた…';
+  document.getElementById('overlayStats').innerHTML =
+    '生存時間: ' + fmtTime(elapsed) + '<br>' +
+    '💀 撃破数: ' + killCount;
+  gameOver = true;
+  playGameOverJingle();
+}
+
+function killEnemy(en) {
+  en.dying = true;
+  en.dieTimer = 0.4;
+  killCount++;
+  killCountEl.textContent = '💀 撃破: ' + killCount;
+  playDownChime();
+}
+
+function explodeEnemy(en) {
+  en.dying = true;
+  en.dieTimer = 0.25;
+  playExplosion();
+  const toPlayer = new THREE.Vector2(player.position.x - en.mesh.position.x, player.position.z - en.mesh.position.z);
+  if (toPlayer.length() < en.blastRadius) {
+    hp = Math.max(0, hp - en.blastDamage);
+    hurtFlashTimer = 0.25;
+  }
+  // 爆発の光の輪
+  const ringGeo = new THREE.RingGeometry(0.1, en.blastRadius, 24);
+  const ringMat = new THREE.MeshBasicMaterial({ color:0xffaa4a, transparent:true, opacity:0.6, side:THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI/2;
+  ring.position.copy(en.mesh.position);
+  ring.position.y = 0.05;
+  scene.add(ring);
+  let life = 0.3;
+  const shrink = () => {
+    life -= 0.016;
+    ringMat.opacity = Math.max(0, life/0.3*0.6);
+    if (life > 0) requestAnimationFrame(shrink); else scene.remove(ring);
+  };
+  shrink();
+}
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (gameStarted && !gameOver) update(dt);
+  drawMinimap();
+  renderer.render(scene, camera);
+}
+
+function update(dt) {
+  elapsed += dt;
+  timerEl.textContent = fmtTime(elapsed);
+  waveNoteEl.textContent = '出現間隔: ' + spawnInterval().toFixed(2) + 's';
+
+  if (toastTimer > 0) {
+    toastTimer -= dt;
+    if (toastTimer <= 0) toastEl.classList.remove('show');
+  }
+
+  // --- プレイヤー移動 ---
+  const moveSpeed = moveSpeedBase * (speedBoostTimer > 0 ? 1.6 : 1);
+  if (speedBoostTimer > 0) speedBoostTimer -= dt;
+  const input = new THREE.Vector3();
+  if (keys['w'] || keys['arrowup']) input.z -= 1;
+  if (keys['s'] || keys['arrowdown']) input.z += 1;
+  if (keys['a'] || keys['arrowleft']) input.x -= 1;
+  if (keys['d'] || keys['arrowright']) input.x += 1;
+  if (input.lengthSq() > 0) {
+    input.normalize();
+    velocity.x += (input.x*moveSpeed - velocity.x) * Math.min(1, dt*10);
+    velocity.z += (input.z*moveSpeed - velocity.z) * Math.min(1, dt*10);
+    const angle = Math.atan2(input.x, input.z);
+    player.rotation.y += (angle - player.rotation.y) * Math.min(1, dt*10);
+  } else {
+    velocity.multiplyScalar(Math.max(0, 1 - damping*dt));
+  }
+  player.position.addScaledVector(velocity, dt);
+  player.position.x = THREE.MathUtils.clamp(player.position.x, -19, 19);
+  player.position.z = THREE.MathUtils.clamp(player.position.z, -19, 19);
+
+  // --- 灯り(マウス位置を地面に投影) ---
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hit = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(groundPlane, hit)) lightTarget.copy(hit);
+  flashlight.position.set(lightTarget.x, 9, lightTarget.z);
+  flashlight.target.position.copy(lightTarget);
+  flashlight.target.updateMatrixWorld();
+
+  // --- スキルゲージ: 灯りをメインプレイヤーに当てると充填 ---
+  const distLightToPlayer = Math.hypot(player.position.x - lightTarget.x, player.position.z - lightTarget.z);
+  const chargingSelf = distLightToPlayer < LIGHT_RADIUS && !skillReady;
+  if (chargingSelf) {
+    skillGauge = Math.min(skillGaugeMax, skillGauge + 34*dt);
+    if (Math.random() < dt*10) playChargeTick();
+  }
+  if (!skillReady && skillGauge >= skillGaugeMax) {
+    skillReady = true;
+    playSkillReady();
+  }
+  skillBar.style.width = (skillGauge/skillGaugeMax*100) + '%';
+  skillLabel.textContent = skillReady ? 'スキル: 準備完了! スペースで発動' : (chargingSelf ? 'スキル: 充填中…' : 'スキル: 光を自分に当てて充填');
+  skillLabel.classList.toggle('ready', skillReady);
+  skillAura.intensity = skillReady ? 1.4 + Math.sin(elapsed*8)*0.4 : 0;
+
+  // --- アイテムボックスの出現 ---
+  itemBoxTimer -= dt;
+  if (itemBoxTimer <= 0 && itemBoxes.length < 3) {
+    spawnItemBox();
+    itemBoxTimer = 10 + Math.random()*6;
+  }
+  itemBoxes.forEach(ib => {
+    ib.box.rotation.y += dt*0.6;
+    ib.box.position.y = ib.baseY + Math.sin(elapsed*2 + ib.mesh.position.x) * 0.05;
+    const d = Math.hypot(ib.mesh.position.x - lightTarget.x, ib.mesh.position.z - lightTarget.z);
+    if (d < LIGHT_RADIUS) {
+      ib.progress = Math.min(1, ib.progress + dt*0.6);
+      ib.mat.emissiveIntensity = 0.5 + ib.progress*1.5;
+      if (ib.progress >= 1) openItemBox(ib);
+    } else {
+      ib.progress = Math.max(0, ib.progress - dt*0.4);
+      ib.mat.emissiveIntensity = 0.5 + ib.progress*1.5;
+    }
+  });
+
+  // --- 出現 ---
+  spawnTimer -= dt;
+  if (spawnTimer <= 0) {
+    spawnEnemy(pickType());
+    spawnTimer = spawnInterval();
+  }
+
+  // --- 飛翔物(ツルハンターの攻撃)の更新 ---
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    p.mesh.position.addScaledVector(p.dir, p.speed*dt);
+    p.life -= dt;
+    const dToPlayer = p.mesh.position.distanceTo(player.position);
+    if (dToPlayer < 0.6) {
+      hp = Math.max(0, hp - p.damage);
+      hurtFlashTimer = 0.15;
+      playPlayerHurt();
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+      continue;
+    }
+    if (p.life <= 0) {
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+    }
+  }
+
+  // --- 敵の更新 ---
+  let contactDamageThisFrame = 0;
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const en = enemies[i];
+
+    if (en.dying) {
+      en.dieTimer -= dt;
+      const s = Math.max(0, en.dieTimer / 0.4) * en.scale;
+      en.mesh.scale.set(s, s, s);
+      en.mesh.position.y += dt * 0.6;
+      if (en.dieTimer <= 0) {
+        scene.remove(en.mesh);
+        enemies.splice(i, 1);
+      }
+      continue;
+    }
+
+    // ノックバック/スタン(スキル発動時)
+    if (en.stunTimer > 0) {
+      en.stunTimer -= dt;
+      en.mesh.position.addScaledVector(en.knockback, dt);
+      en.knockback.multiplyScalar(Math.max(0, 1 - 6*dt));
+      // スタン中は光ダメージも追跡もしないが、ダウンゲージ表示のため下の処理は継続させる
+    }
+
+    // 追跡 / 各タイプ固有の挙動
+    const toPlayer = new THREE.Vector3().subVectors(player.position, en.mesh.position);
+    toPlayer.y = 0;
+    const dist = toPlayer.length();
+
+    if (en.stunTimer <= 0) {
+      if (en.selfDestruct) {
+        // キノコスライム: 光が当たっていない間は直進して自爆を狙う
+        if (dist > 0.75) {
+          toPlayer.normalize();
+          en.mesh.position.addScaledVector(toPlayer, en.speed*dt);
+          en.mesh.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+        }
+        const distToLightSD = Math.hypot(en.mesh.position.x - lightTarget.x, en.mesh.position.z - lightTarget.z);
+        if (dist < en.blastRadius*0.6 && distToLightSD > LIGHT_RADIUS) {
+          explodeEnemy(en);
+          continue;
+        }
+      } else if (en.ranged) {
+        // ツルハンター: 射程内を維持しつつ定期的に攻撃する(近づきすぎたら少し離れる)
+        const desired = en.shotRange*0.7;
+        if (dist > desired + 1) {
+          toPlayer.normalize();
+          en.mesh.position.addScaledVector(toPlayer, en.speed*dt);
+        } else if (dist < desired - 1) {
+          toPlayer.normalize();
+          en.mesh.position.addScaledVector(toPlayer, -en.speed*0.6*dt);
+        }
+        en.mesh.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+        en.shotCooldown -= dt;
+        if (en.shotCooldown <= 0 && dist < en.shotRange) {
+          en.shotCooldown = en.shotInterval;
+          spawnProjectile(en.mesh.position, toPlayer.clone().normalize(), en.shotDamage);
+        }
+      } else {
+        if (dist > 0.7) {
+          toPlayer.normalize();
+          en.mesh.position.addScaledVector(toPlayer, en.speed*dt);
+          en.mesh.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+        }
+      }
+    }
+
+    if (dist < 0.9 && en.contactDps > 0) {
+      contactDamageThisFrame = Math.max(contactDamageThisFrame, en.contactDps);
+    }
+    if (dist < 0.9 && en.poison) {
+      poisonDps = Math.max(poisonDps, en.poisonDps);
+      poisonTimer = Math.max(poisonTimer, en.poisonDuration);
+    }
+
+    // 光を浴びているか(地面に投影した灯りの位置からの距離で判定)。
+    // ただし「プレイヤーのすぐ近く」は光が効かない死角にしてある。
+    const distToLight = Math.hypot(en.mesh.position.x - lightTarget.x, en.mesh.position.z - lightTarget.z);
+    const lit = distToLight < LIGHT_RADIUS && dist > LIGHT_DEAD_ZONE;
+    if (lit) {
+      en.lightHp -= en.lightDrainRate * dt;
+      if (Math.random() < dt*8) playHitBuzz();
+    } else {
+      en.lightHp = Math.min(en.lightHpMax, en.lightHp + en.regenRate * dt);
+    }
+    const dmgRatio = 1 - THREE.MathUtils.clamp(en.lightHp / en.lightHpMax, 0, 1);
+    en.mat.emissive.setRGB(dmgRatio*1.2, dmgRatio*1.1, dmgRatio*0.6);
+    en.mat.emissiveIntensity = lit ? (0.6 + dmgRatio*1.8) : dmgRatio*0.6;
+
+    if (en.lightHp <= 0) killEnemy(en);
+  }
+
+  if (contactDamageThisFrame > 0) {
+    hp = Math.max(0, hp - contactDamageThisFrame*dt);
+    hurtFlashTimer = 0.15;
+    if (Math.random() < dt*3) playPlayerHurt();
+  }
+
+  // --- 毒(継続ダメージ) ---
+  if (poisonTimer > 0) {
+    poisonTimer -= dt;
+    hp = Math.max(0, hp - poisonDps*dt);
+    if (Math.random() < dt*4) playPoisonTick();
+    poisonNoteEl.style.opacity = 1;
+  } else {
+    poisonDps = 0;
+    poisonNoteEl.style.opacity = 0;
+  }
+
+  hpBar.style.width = (hp/hpMax*100) + '%';
+  hpBar.style.background = hp < 30 ? 'linear-gradient(90deg,#ff5a4a,#ff8f7a)' : 'linear-gradient(90deg,#6fe08a,#9dffb0)';
+
+  if (hurtFlashTimer > 0) hurtFlashTimer -= dt;
+  const poisonGlow = poisonTimer > 0 ? 0.12 : 0;
+  vignette.style.boxShadow = 'inset 0 0 ' + (40+ (1-hp/hpMax)*120) + 'px ' + (10+(1-hp/hpMax)*30) + 'px rgba(' +
+    (poisonTimer>0 ? '60,255,120,' : '255,40,20,') +
+    (0.15 + (hurtFlashTimer>0?0.35:0) + (1-hp/hpMax)*0.25 + poisonGlow) + ')';
+
+  if (hp <= 0) { showGameOver(); }
+
+  // --- カメラ追従(デッドゾーン付き) ---
+  const focusOffset = new THREE.Vector2(player.position.x - cameraFocus.x, player.position.z - cameraFocus.z);
+  const focusDist = focusOffset.length();
+  if (focusDist > CAMERA_DEADZONE) {
+    const pull = focusDist - CAMERA_DEADZONE;
+    focusOffset.normalize().multiplyScalar(pull);
+    cameraFocus.x += focusOffset.x;
+    cameraFocus.z += focusOffset.y;
+  }
+
+  const camOffset = new THREE.Vector3(0, 8, 8);
+  const desiredCamPos = cameraFocus.clone().add(camOffset);
+  camera.position.lerp(desiredCamPos, Math.min(1, dt*4));
+  camera.lookAt(cameraFocus.x, 0.6, cameraFocus.z);
+}
+
+animate();
+</script>
+</body>
+</html>

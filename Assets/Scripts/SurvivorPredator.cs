@@ -115,15 +115,10 @@ public class SurvivorPredator : MonoBehaviour
         blobBaseY = blobT.localPosition.y;
         pulsePhase = Random.value * Mathf.PI * 2f;
 
-        bodyMat = new Material(Shader.Find("Standard"));
-        bodyMat.color = cfg.color;
-        bodyMat.EnableKeyword("_EMISSION");
-        bodyMat.SetColor("_EmissionColor", Color.black);
+        bodyMat = EmissiveMaterialFactory.Create(cfg.color);
         blob.GetComponent<MeshRenderer>().material = bodyMat;
 
-        var eyeMat = new Material(Shader.Find("Standard"));
-        eyeMat.color = new Color(1f, 0.878f, 0.4f);
-        eyeMat.EnableKeyword("_EMISSION");
+        var eyeMat = EmissiveMaterialFactory.Create(new Color(1f, 0.878f, 0.4f));
         eyeMat.SetColor("_EmissionColor", new Color(1f, 0.878f, 0.4f) * 1.4f);
         CreateEye(new Vector3(-0.16f * cfg.scale, 0.55f * cfg.scale, 0.55f * cfg.scale), eyeMat);
         CreateEye(new Vector3(0.16f * cfg.scale, 0.55f * cfg.scale, 0.55f * cfg.scale), eyeMat);
@@ -236,9 +231,14 @@ public class SurvivorPredator : MonoBehaviour
             lightHp = Mathf.Min(cfg.lightHpMax, lightHp + cfg.regenRate * dt);
         }
 
+        // ダメージ量(dmgRatio)だけで光の強さを決めていると、光が当たった直後はまだダメージが
+        // 蓄積していないためほとんど光らず、「今まさに光が当たっている」ことが分かりにくかった。
+        // そこで「光を受けている間は即座に基本の輝きが出る」ようにし、ダメージが溜まるほど
+        // 赤みを帯びて強く光るようにする。光が外れた後も、残っているダメージ分だけ薄く残光させる。
         float dmgRatio = 1f - Mathf.Clamp01(lightHp / cfg.lightHpMax);
-        float emissiveScale = lit ? (0.6f + dmgRatio * 1.8f) : dmgRatio * 0.6f;
-        Color emission = new Color(dmgRatio * 1.2f, dmgRatio * 1.1f, dmgRatio * 0.6f) * emissiveScale;
+        Color litColor = Color.Lerp(new Color(1f, 0.95f, 0.55f), new Color(1.2f, 0.35f, 0.1f), dmgRatio);
+        float intensity = lit ? Mathf.Lerp(0.9f, 2.4f, dmgRatio) : dmgRatio * 0.5f;
+        Color emission = litColor * intensity;
         if (windup) emission = new Color(1f, 0.9f, 0.25f) * (1.2f + Mathf.Sin(Time.time * 30f) * 0.5f); // 突進の予告
         bodyMat.SetColor("_EmissionColor", emission);
 

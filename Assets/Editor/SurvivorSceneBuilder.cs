@@ -55,11 +55,19 @@ public static class SurvivorSceneBuilder
         CreateBoundary();
         ScatterEnvironment();
 
-        // --- プレイヤー ---
+        // --- プレイヤー(見た目はMeshy AIで作った3Dアセット。先に ChameleonNight > Setup Chameleon Model
+        //     を実行してリグ・Animator Controllerを整えておくこと) ---
         var playerGO = new GameObject("Player");
         playerGO.transform.position = Vector3.zero;
         var playerCtrl = playerGO.AddComponent<SurvivorPlayerController>();
         playerCtrl.worldHalfExtent = WorldHalfExtent;
+        playerCtrl.characterModelPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Models/ChameleonMeshy/Chameleon.fbx");
+        playerCtrl.animatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Models/ChameleonMeshy/ChameleonAnimator.controller");
+        if (playerCtrl.characterModelPrefab == null)
+        {
+            Debug.LogWarning("SurvivorSceneBuilder: Chameleon.fbx が見つかりません。" +
+                "先に ChameleonNight > Setup Chameleon Model を実行してください(未実行でもシーンは作られます)。");
+        }
 
         // --- 懐中電灯(協力プレイヤー役。スマホ接続時はPointerServer経由、未接続時はマウス) ---
         var flashlightGO = new GameObject("Flashlight");

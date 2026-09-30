@@ -20,9 +20,7 @@ public class SurvivorBurst : MonoBehaviour
 
     void Init(Color color, int count)
     {
-        var mat = new Material(Shader.Find("Standard"));
-        mat.color = color;
-        mat.EnableKeyword("_EMISSION");
+        var mat = EmissiveMaterialFactory.Create(color);
         mat.SetColor("_EmissionColor", color * 1.5f);
 
         pieces = new Piece[count];
