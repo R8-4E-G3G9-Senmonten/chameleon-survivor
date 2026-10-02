@@ -31,6 +31,7 @@ public class PointerServer : MonoBehaviour
     public int httpsPort = 8788;
     public string ServerUrl { get; private set; } = "起動中...";
     public string HttpsServerUrl { get; private set; } = "起動中...";
+    public string LocalIp { get; private set; } = "取得中...";
 
     TcpListener listener;
     Thread acceptThread;
@@ -80,6 +81,7 @@ public class PointerServer : MonoBehaviour
     void Start()
     {
         string ip = GetLocalIPv4();
+        LocalIp = ip;
 
         try
         {

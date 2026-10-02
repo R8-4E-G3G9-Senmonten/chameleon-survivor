@@ -178,6 +178,10 @@ public class NightHud : MonoBehaviour
         if (helpOpen) Label(new Rect(cx - helpW / 2f, y, helpW, helpH), paragraph, helpStyle);
 
         Label(new Rect(16, H - 24, W - 32, 18), "Enter でプレイ開始　1 / 2 / 3 でマップ選択", S("titleKeys", 10, C(0x8fada4, 0.7f), TextAnchor.MiddleLeft));
+
+        // 展示会場でESP32やスマホの接続先を手動設定する際にすぐ分かるよう、PCのIPを大きめに表示しておく
+        string ip = PointerServer.Instance != null ? PointerServer.Instance.LocalIp : "取得中...";
+        Label(new Rect(16, H - 44, W - 32, 18), "このPCのIP: " + ip, S("titleIp", 13, C(0xdfc985, 0.95f), TextAnchor.MiddleLeft, bold: true));
     }
 
     void DrawControlStrip(float y)
