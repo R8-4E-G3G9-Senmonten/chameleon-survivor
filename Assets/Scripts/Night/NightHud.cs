@@ -257,7 +257,7 @@ public class NightHud : MonoBehaviour
     // ================= HUD =================
     void DrawHud()
     {
-        Rect r = new Rect(12, 12, 248, 104);
+        Rect r = new Rect(12, 12, 248, 120);
         Panel(r, PanelTex(), 9);
         float x = r.x + 14, y = r.y + 10;
         GUI.DrawTexture(new Rect(x, y + 1, 16, 16), markTex);
@@ -267,7 +267,13 @@ public class NightHud : MonoBehaviour
         string rowText = "移動: WASD/矢印　灯り: " + (game.Flashlight.HasPhoneInput ? "スマホ" : "マウス") + "　止まる=擬態　光の球を2つ集めよう";
         float rowH = row.CalcHeight(new GUIContent(rowText), 220);
         Shadowed(new Rect(x, y, 220, rowH), rowText, row);
-        y += rowH + 4;
+        y += rowH + 2;
+
+        // 圧力マット(ESP32)との接続表示。展示中に接続が切れていないか一目で分かるように。
+        bool matConnected = PressureMatServer.Instance != null && PressureMatServer.Instance.Connected;
+        var matStyle = S(matConnected ? "matOn" : "matOff", 10, matConnected ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleLeft);
+        Shadowed(new Rect(x, y, 220, 14), (matConnected ? "● " : "○ ") + "圧力マット: " + (matConnected ? "接続中" : "未接続"), matStyle);
+        y += 14 + 4;
 
         float hpRatio = game.Hp / NightGame.HpMax;
         bool low = hpRatio < 0.3f;
@@ -405,6 +411,7 @@ public class NightHud : MonoBehaviour
         string httpsUrl = PointerServer.Instance != null ? PointerServer.Instance.HttpsServerUrl : "起動中...";
         string httpUrl = PointerServer.Instance != null ? PointerServer.Instance.ServerUrl : "起動中...";
         bool phone = game.Flashlight != null && game.Flashlight.HasPhoneInput;
+        int phoneCount = PointerServer.Instance != null ? PointerServer.Instance.GetActivePointers().Count : 0;
 
         float qr = title ? 120f : 92f;
         float w = qr + 20f;
@@ -428,7 +435,8 @@ public class NightHud : MonoBehaviour
         }
 
         var status = S(phone ? "qrOn" : "qrOff", 10, phone ? C(0x9dffb0) : C(0x98b6a8), TextAnchor.MiddleCenter);
-        Label(new Rect(r.x + 4, qrRect.yMax + 3, r.width - 8, 14), phone ? "● スマホ操作中" : "○ マウス操作中", status);
+        string statusText = phone ? "● スマホ " + phoneCount + "人操作中" : "○ マウス操作中";
+        Label(new Rect(r.x + 4, qrRect.yMax + 3, r.width - 8, 14), statusText, status);
         var url = S("qrUrl", 8, C(0x98b6a8, 0.8f), TextAnchor.MiddleCenter);
         Label(new Rect(r.x + 2, qrRect.yMax + 16, r.width - 4, 12), httpsUrl, url);
     }

@@ -46,12 +46,22 @@ public class PointerServer : MonoBehaviour
         public float x, y;
         public bool active;
         public int lastReceiveTimeMs;
+        public int colorIndex;
     }
 
     // Keyed by a per-page-load client id so multiple phones can each drive
     // their own light at once. Entries are pruned after a while of silence
     // so a long session with people joining/leaving doesn't leak memory.
     readonly Dictionary<string, PointerEntry> pointers = new Dictionary<string, PointerEntry>();
+    int nextColorIndex;
+    const int MaxParticipants = 7; // これ以上は満員として新規参加を断る(誰か抜ければ空きが出る)
+
+    // 誰が見ても区別しやすい、はっきりした色の並び。参加した順に1人ずつ割り当てる(人数が多ければ循環する)。
+    static readonly int[] Palette = { 0xff6b6b, 0x6bdfff, 0xffe066, 0xb388ff, 0x6bff95, 0xff9f6b, 0xff6bd6, 0x8c8cff };
+    static Color ColorOf(int index) => NightMeshes.Hex(Palette[((index % Palette.Length) + Palette.Length) % Palette.Length]);
+    static string HexOf(int index) => "#" + (Palette[((index % Palette.Length) + Palette.Length) % Palette.Length] & 0xffffff).ToString("x6");
+
+    public struct PointerSample { public Vector2 pos; public Color color; }
 
     [Serializable]
     class PointerMsg
@@ -199,6 +209,8 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
     {
         try
         {
+            client.NoDelay = true; // Nagleアルゴリズムを無効化。光の座標のような小さいパケットを即座に送る
+            client.ReceiveTimeout = 30000;
             using (client)
             {
                 Stream stream = client.GetStream();
@@ -212,31 +224,40 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
 
                 using (stream)
                 {
-                    string requestLine;
-                    string body;
-                    ReadRequest(stream, out requestLine, out body);
-                    if (string.IsNullOrEmpty(requestLine)) return;
+                    // Keep-Alive: 毎リクエストでTCP(HTTPSならTLSハンドシェイクも)を繋ぎ直すと、
+                    // スマホが20Hzで送ってくる /pointer のたびにその接続コストがそのまま遅延になってしまう。
+                    // 同じ接続を使い回して複数リクエストを処理し続けることで、この遅延をほぼ無くせる。
+                    while (running)
+                    {
+                        ReadRequest(stream, out string requestLine, out string body);
+                        if (string.IsNullOrEmpty(requestLine)) break;
 
-                    string[] parts = requestLine.Split(' ');
-                    string method = parts.Length > 0 ? parts[0] : "GET";
-                    string path = parts.Length > 1 ? parts[1] : "/";
+                        string[] parts = requestLine.Split(' ');
+                        string method = parts.Length > 0 ? parts[0] : "GET";
+                        string path = parts.Length > 1 ? parts[1] : "/";
 
-                    if (method == "POST" && path == "/pointer")
-                    {
-                        HandlePointerPost(body);
-                        WriteResponse(stream, "200 OK", "text/plain", "ok");
-                    }
-                    else if (method == "GET" && (path == "/" || path == "/phone.html"))
-                    {
-                        WriteResponse(stream, "200 OK", "text/html; charset=utf-8", PhoneHtml);
-                    }
-                    else
-                    {
-                        WriteResponse(stream, "404 Not Found", "text/plain", "not found");
+                        if (method == "POST" && path == "/pointer")
+                        {
+                            string colorHex = HandlePointerPost(body);
+                            string json = colorHex != null
+                                ? "{\"ok\":true,\"color\":\"" + colorHex + "\"}"
+                                : "{\"ok\":false,\"full\":true}";
+                            WriteResponse(stream, "200 OK", "application/json", json);
+                        }
+                        else if (method == "GET" && (path == "/" || path == "/phone.html"))
+                        {
+                            WriteResponse(stream, "200 OK", "text/html; charset=utf-8", PhoneHtml);
+                        }
+                        else
+                        {
+                            WriteResponse(stream, "404 Not Found", "text/plain", "not found");
+                        }
                     }
                 }
             }
         }
+        catch (ObjectDisposedException) { /* サーバー終了処理中 */ }
+        catch (IOException) { /* Keep-Alive接続がアイドルタイムアウト/相手に閉じられた。通常の動作 */ }
         catch (Exception e)
         {
             Debug.LogWarning("PointerServer client error: " + e.Message);
@@ -311,28 +332,32 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
         return -1;
     }
 
-    void HandlePointerPost(string body)
+    // 戻り値はこのクライアントに割り当てられた色(#rrggbb)。満員で新規参加を断った場合は null。
+    string HandlePointerPost(string body)
     {
         try
         {
             PointerMsg msg = JsonUtility.FromJson<PointerMsg>(body);
-            if (msg == null || string.IsNullOrEmpty(msg.id)) return;
+            if (msg == null || string.IsNullOrEmpty(msg.id)) return HexOf(0);
             lock (dataLock)
             {
                 if (!pointers.TryGetValue(msg.id, out PointerEntry entry))
                 {
-                    entry = new PointerEntry();
+                    if (pointers.Count >= MaxParticipants) return null; // 満員(最大7人)
+                    entry = new PointerEntry { colorIndex = nextColorIndex++ };
                     pointers[msg.id] = entry;
                 }
                 entry.x = Mathf.Clamp01(msg.x);
                 entry.y = Mathf.Clamp01(msg.y);
                 entry.active = msg.active;
                 entry.lastReceiveTimeMs = Environment.TickCount;
+                return HexOf(entry.colorIndex);
             }
         }
         catch (Exception e)
         {
             Debug.LogWarning("PointerServer bad payload: " + e.Message);
+            return HexOf(0);
         }
     }
 
@@ -358,6 +383,15 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
     public List<Vector2> GetActivePointers()
     {
         var result = new List<Vector2>();
+        foreach (var s in GetActiveSamples()) result.Add(s.pos);
+        return result;
+    }
+
+    // GetActivePointers と同じ対象を、各クライアントに割り当てた色つきで返す
+    // (ライトの色をスマホ役ごとに変えるため)。
+    public List<PointerSample> GetActiveSamples()
+    {
+        var result = new List<PointerSample>();
         int now = Environment.TickCount;
         List<string> stale = null;
 
@@ -368,7 +402,7 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
                 int age = now - kv.Value.lastReceiveTimeMs;
                 if (kv.Value.active && age < 500)
                 {
-                    result.Add(new Vector2(kv.Value.x, kv.Value.y));
+                    result.Add(new PointerSample { pos = new Vector2(kv.Value.x, kv.Value.y), color = ColorOf(kv.Value.colorIndex) });
                 }
                 if (age > 30000)
                 {
@@ -439,11 +473,17 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
   #debug { position:absolute; top:34px; left:0; right:0; text-align:center;
            color:#ff8; font-size:11px; font-family:monospace; white-space:pre-wrap;
            pointer-events:none; padding:0 8px; }
+  #colorBadge { position:absolute; top:56px; left:0; right:0; display:flex;
+                flex-direction:column; align-items:center; gap:4px; pointer-events:none; }
+  #colorSwatch { width:34px; height:34px; border-radius:50%; border:2px solid rgba(255,255,255,0.8);
+                 box-shadow:0 0 14px 2px currentColor; background:#fff2c0; transition:background .2s; }
+  #colorLabel { color:#ddd; font-size:11px; }
 </style>
 </head>
 <body>
 <div id=""msg"">画面を指でなぞって照らしてください</div>
 <div id=""debug""></div>
+<div id=""colorBadge""><div id=""colorSwatch""></div><div id=""colorLabel"">あなたの光の色</div></div>
 <div id=""dot""></div>
 <div id=""bar"">
   <button id=""btnTouch"" class=""active"">タッチで操作</button>
@@ -457,6 +497,15 @@ var debugEl = document.getElementById('debug');
 var btnTouch = document.getElementById('btnTouch');
 var btnGyro = document.getElementById('btnGyro');
 var btnRecenter = document.getElementById('btnRecenter');
+var colorSwatch = document.getElementById('colorSwatch');
+
+// サーバーから割り当てられた自分の光の色を反映する(光の点・スウォッチ両方)
+function applyMyColor(hex) {
+  if (!hex) return;
+  colorSwatch.style.background = hex;
+  colorSwatch.style.color = hex;
+  dot.style.background = 'radial-gradient(circle, ' + hex + ', transparent 70%)';
+}
 
 function setDebug(text) { debugEl.textContent = text; }
 
@@ -471,6 +520,18 @@ function setDebug(text) { debugEl.textContent = text; }
 // One id per page load so the server can tell multiple simultaneous phones
 // apart and give each of them their own light.
 var clientId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+// 画面が自動で消灯すると(特にAndroidで)Wi-Fiが省電力モードに入り、送信が数百ms単位で遅れることがある。
+// Screen Wake Lock で画面を点灯させ続けることで、この遅延スパイクをできるだけ避ける。
+var wakeLock = null;
+function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  navigator.wakeLock.request('screen').then(function(lock){ wakeLock = lock; }).catch(function(){});
+}
+requestWakeLock();
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') requestWakeLock();
+});
 
 var mode = 'touch';
 var gyroBase = null;      // calibration point; tilt/rotation is measured relative to this
@@ -499,8 +560,14 @@ function send(x, y, active) {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({id:clientId, x:x, y:y, active:active})
-  }).then(function(r){
+  }).then(function(r){ return r.json(); }).then(function(data){
     okCount++;
+    if (data && data.full) {
+      msg.textContent = '満員です(最大7人)。誰か抜けるまでお待ちください。';
+      dot.style.opacity = 0;
+      return;
+    }
+    if (data && data.color) applyMyColor(data.color);
     if (mode === 'touch') setDebug('送信中: x=' + x.toFixed(2) + ' y=' + y.toFixed(2) + ' (成功 ' + okCount + '/' + sendCount + ')');
   }).catch(function(err){
     errCount++;

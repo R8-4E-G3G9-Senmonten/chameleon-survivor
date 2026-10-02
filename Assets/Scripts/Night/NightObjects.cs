@@ -42,7 +42,7 @@ public class NightLamp
     {
         if (!lit)
         {
-            Vector3 lt = g.LightTarget;
+            Vector3 lt = g.NearestLightTargetTo(new Vector3(x, height, z));
             bool aimed = Mathf.Sqrt((x - lt.x) * (x - lt.x) + (z - lt.z) * (z - lt.z)) < 1.25f && Mathf.Abs(lt.y - height) < 2.15f;
             charge = aimed ? Mathf.Min(ChargeTime, charge + dt) : 0f;
             float p = charge / ChargeTime;
@@ -120,7 +120,7 @@ public class NightGuidePlant
 
     public void Tick(NightGame g, float dt)
     {
-        Vector3 lt = g.LightTarget;
+        Vector3 lt = g.NearestLightTargetTo(new Vector3(x, height, z));
         bool aimed = Mathf.Sqrt((x - lt.x) * (x - lt.x) + (z - lt.z) * (z - lt.z)) < 1.05f && Mathf.Abs(lt.y - height) < 1.5f;
         if (!aimed) { charge = 0f; latched = false; }
         else if (!latched)
@@ -183,7 +183,7 @@ public class NightOrb
         Vector3 p0 = root.position;
         root.position = new Vector3(p0.x, baseY + Mathf.Sin(phase) * 0.18f, p0.z);
 
-        Vector3 lt = g.LightTarget;
+        Vector3 lt = g.NearestLightTargetTo(p0);
         float distToLight = Mathf.Sqrt((p0.x - lt.x) * (p0.x - lt.x) + (p0.z - lt.z) * (p0.z - lt.z));
         bool beingLit = distToLight < LightRadius && Mathf.Abs(lt.y - baseY) < 1.8f;
 

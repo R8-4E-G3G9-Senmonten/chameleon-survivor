@@ -20,6 +20,7 @@ public class PressureMatServer : MonoBehaviour
 
     public int port = 5005;
     const int StaleMs = 500; // このミリ秒を超えて新しいパケットが届かなければ「踏んでいない」とみなす
+    const int ConnectedStaleMs = 2000; // 接続表示用。多少パケットが飛んでもチラつかないよう緩めの猶予を持たせる
 
     UdpClient udp;
     Thread thread;
@@ -33,7 +34,8 @@ public class PressureMatServer : MonoBehaviour
     public bool Back { get; private set; }
     public bool Left { get; private set; }
     public bool Right { get; private set; }
-    public bool HasMatInput { get; private set; } // 直近にESP32からパケットを受信できているか(接続確認用)
+    public bool HasMatInput { get; private set; } // 直近にESP32からパケットを受信できているか(入力用、短い猶予)
+    public bool Connected { get; private set; } // 画面表示用の接続状態(長めの猶予でチラつきを抑える)
 
     void Awake()
     {
@@ -90,7 +92,9 @@ public class PressureMatServer : MonoBehaviour
     {
         lock (dataLock)
         {
-            HasMatInput = Environment.TickCount - lastReceiveTimeMs < StaleMs;
+            int sinceMs = Environment.TickCount - lastReceiveTimeMs;
+            HasMatInput = sinceMs < StaleMs;
+            Connected = sinceMs < ConnectedStaleMs;
             Front = HasMatInput && rxFront;
             Back = HasMatInput && rxBack;
             Left = HasMatInput && rxLeft;

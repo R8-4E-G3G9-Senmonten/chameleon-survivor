@@ -527,14 +527,20 @@ public class NightWorld : MonoBehaviour
     static readonly Color GlowColor = new Color(1f, 0.92f, 0.45f);
     const float GlowRadius = 3f, GlowHeightTolerance = 1.8f;
 
-    public void UpdateGlow(Vector3 lightTarget, float dt)
+    // lightTargets: 接続中のスマホ何人ぶんの照準点も渡せる(誰か1人でも当てていれば光る)
+    public void UpdateGlow(System.Collections.Generic.List<Vector3> lightTargets, float dt)
     {
         float r2 = GlowRadius * GlowRadius;
         foreach (var p in Props)
         {
             if (p.materials == null || p.materials.Length == 0) continue;
-            float dx = p.position.x - lightTarget.x, dz = p.position.z - lightTarget.z;
-            bool lit = dx * dx + dz * dz < r2 && Mathf.Abs(p.position.y - lightTarget.y) < GlowHeightTolerance;
+            bool lit = false;
+            for (int i = 0; i < lightTargets.Count && !lit; i++)
+            {
+                Vector3 lightTarget = lightTargets[i];
+                float dx = p.position.x - lightTarget.x, dz = p.position.z - lightTarget.z;
+                lit = dx * dx + dz * dz < r2 && Mathf.Abs(p.position.y - lightTarget.y) < GlowHeightTolerance;
+            }
             float prev = p.glow;
             p.glow = Mathf.MoveTowards(p.glow, lit ? 1f : 0f, dt * (lit ? 10f : 4f));
             if (p.glow < 0.002f && prev < 0.002f) continue; // 既に消えていて今回も光っていないなら何もしない

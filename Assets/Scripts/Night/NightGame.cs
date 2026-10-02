@@ -80,8 +80,24 @@ public class NightGame : MonoBehaviour
 
     public NightGuidance Guidance { get; private set; }
 
-    public Vector3 LightTarget { get; private set; }
+    public Vector3 LightTarget { get; private set; } // 代表点(Targets[0])。ランタン・導きの花・球の判定に使う
+    public List<Vector3> LightTargets => Flashlight.Targets; // 接続中の全スマホ(何人でも)の照準点
     public Vector3 PlayerPos => Player.transform.position;
+
+    // pos から見て最も近い照準点を返す(どのスマホが照らしても反応させたい箇所向け)
+    public Vector3 NearestLightTargetTo(Vector3 pos)
+    {
+        var targets = LightTargets;
+        if (targets.Count == 0) return LightTarget;
+        Vector3 best = targets[0];
+        float bestD = (best - pos).sqrMagnitude;
+        for (int i = 1; i < targets.Count; i++)
+        {
+            float d = (targets[i] - pos).sqrMagnitude;
+            if (d < bestD) { bestD = d; best = targets[i]; }
+        }
+        return best;
+    }
 
     // ---- 表示用 ----
     public string ToastText { get; private set; } = "";
@@ -123,6 +139,9 @@ public class NightGame : MonoBehaviour
     {
         BuildMap();
         ApplyLighting(0f);
+        // play_night.bat から -skipTitle 付きで起動した場合は、タイトル画面を省いてすぐプレイ開始する
+        // (展示会場でダブルクリックしたらそのままゲーム画面に飛べるようにするため)。
+        if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-skipTitle") >= 0) StartGame();
     }
 
     void BuildMap()
@@ -252,7 +271,7 @@ public class NightGame : MonoBehaviour
         // --- 灯り ---
         Flashlight.Aim(Cam, Map, PlayerPos.y);
         LightTarget = Flashlight.Target;
-        World.UpdateGlow(LightTarget, dt);
+        World.UpdateGlow(LightTargets, dt);
         foreach (var lamp in World.Lamps) lamp.Tick(this, dt);
         if (Guidance != null && Guidance.orb != null && Guidance.orb.collected) ClearGuidance();
         foreach (var plant in World.Plants) plant.Tick(this, dt);
@@ -392,10 +411,12 @@ public class NightGame : MonoBehaviour
             }
             if (dist < 0.9f && Mathf.Abs(en.Position.y - pp.y) < 0.9f) contactDps = Mathf.Max(contactDps, en.cfg.contactDps);
 
-            // 光: 当て続けるとダウンゲージが減る。プレイヤーのすぐ近く(死角)には効かない
+            // 光: 当て続けるとダウンゲージが減る。プレイヤーのすぐ近く(死角)には効かない。
+            // 接続中のスマホは何人でも同時に照らせるので、どれか1つでも当たっていればヒット扱い。
             Vector3 ep = en.Position;
-            float distToLight = Mathf.Sqrt((ep.x - LightTarget.x) * (ep.x - LightTarget.x) + (ep.z - LightTarget.z) * (ep.z - LightTarget.z));
-            bool spotHit = distToLight < NightFlashlight.LightRadius && dist > NightFlashlight.DeadZone && Mathf.Abs(ep.y - LightTarget.y) < 1.8f;
+            Vector3 nearestTarget = NearestLightTargetTo(ep);
+            float distToLight = Mathf.Sqrt((ep.x - nearestTarget.x) * (ep.x - nearestTarget.x) + (ep.z - nearestTarget.z) * (ep.z - nearestTarget.z));
+            bool spotHit = distToLight < Flashlight.LightRadius && dist > Flashlight.DeadZone && Mathf.Abs(ep.y - nearestTarget.y) < 1.8f;
             bool flashHit = FlashLevel > 0.05f && dist < FlashRange;
             float lantern = LanternDamageAt(ep);
             bool lit = spotHit || flashHit || lantern > 0f;
