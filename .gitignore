@@ -34,3 +34,6 @@
 crashlytics-build.properties
 
 sysinfo.txt
+
+# play_*.bat が毎回出力するビルドログ
+unity_build_*.log

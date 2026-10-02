@@ -274,9 +274,13 @@ public class NightHud : MonoBehaviour
         y += rowH + 2;
 
         // 圧力マット(ESP32)との接続表示。展示中に接続が切れていないか一目で分かるように。
-        bool matConnected = PressureMatServer.Instance != null && PressureMatServer.Instance.Connected;
+        var mat = PressureMatServer.Instance;
+        bool matConnected = mat != null && mat.Connected;
         var matStyle = S(matConnected ? "matOn" : "matOff", 10, matConnected ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleLeft);
-        Shadowed(new Rect(x, y, 220, 14), (matConnected ? "● " : "○ ") + "圧力マット: " + (matConnected ? "接続中" : "未接続"), matStyle);
+        string matText = matConnected
+            ? "接続中(" + mat.Source + ")"
+            : "未接続" + (mat != null && mat.SerialStatus.Length > 0 ? "  USB: " + mat.SerialStatus : "");
+        Shadowed(new Rect(x, y, 220, 14), (matConnected ? "● " : "○ ") + "コントローラー: " + matText, matStyle);
         y += 14 + 4;
 
         float hpRatio = game.Hp / NightGame.HpMax;
