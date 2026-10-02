@@ -75,12 +75,15 @@ public class SurvivorPlayerController : MonoBehaviour
     {
         if (SurvivorManager.Instance != null && SurvivorManager.Instance.State != SurvivorManager.GameState.Playing) return;
 
+        // 本番は圧力マット(PressureMatServer経由のESP32)、開発・動作確認中はWASDでも動かせるよう、
+        // どちらの入力も同時にOR(合成)して受け付ける。
+        var mat = PressureMatServer.Instance;
         Vector3 input = Vector3.zero;
-        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) input.z -= 1;
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) input.z += 1;
+        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) || (mat != null && mat.Front)) input.z -= 1;
+        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) || (mat != null && mat.Back)) input.z += 1;
         // Unityは左手座標系で、カメラは+Z側から-Z方向を見ているため、画面右は-X方向になる。
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) input.x += 1;
-        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) input.x -= 1;
+        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) || (mat != null && mat.Left)) input.x += 1;
+        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) || (mat != null && mat.Right)) input.x -= 1;
 
         float dt = Time.deltaTime;
         bool isMoving = input.sqrMagnitude > 0f;

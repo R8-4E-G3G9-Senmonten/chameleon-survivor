@@ -11,6 +11,10 @@ public static class SurvivorSceneBuilder
     [MenuItem("ChameleonNight/Build Survivor Scene")]
     public static void Build()
     {
+        // スタンドアロンビルドで発光(_EMISSION)が消える問題の対策。シーン生成のたびに確実に効かせる。
+        FixGraphicsSettings.Run();
+        CreateEmissiveMaterialTemplate.Run();
+
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         // --- 夜の照明・フォグ ---
@@ -76,6 +80,8 @@ public static class SurvivorSceneBuilder
         // --- スマホ連携用HTTPサーバー(タッチ/傾きをQR経由でLAN越しに受信) ---
         var ps = new GameObject("PointerServer");
         ps.AddComponent<PointerServer>();
+
+        new GameObject("PressureMatServer").AddComponent<PressureMatServer>();
 
         // --- マネージャー ---
         var managerGO = new GameObject("SurvivorManager");

@@ -1,24 +1,24 @@
 @echo off
-REM ã‚µãƒã‚¤ãƒãƒ¼ãƒ¢ãƒ¼ãƒ‰ã‚’ã€Unityã‚¨ãƒ‡ã‚£ã‚¿ã‚’é–‹ã‹ãšã«ãƒ“ãƒ«ãƒ‰ã—ã¦å³èµ·å‹•ã™ã‚‹ã‚·ãƒ§ãƒ¼ãƒˆã‚«ãƒƒãƒˆã€‚
-REM ã‚³ãƒ¼ãƒ‰/ã‚·ãƒ¼ãƒ³ã‚’ç›´ã—ãŸã‚ã¨ã«å‹•ä½œç¢ºèªã—ãŸã„ã¨ãã¯ã€ã“ã‚Œã‚’ãƒ€ãƒ–ãƒ«ã‚¯ãƒªãƒƒã‚¯ã™ã‚‹ã ã‘ã§ã‚ˆã„ã€‚
-REM (åˆå›žã‚„å¤‰æ›´å¾Œã¯ãƒ“ãƒ«ãƒ‰ã«æ•°åç§’ã€œæ•°åˆ†ã‹ã‹ã‚Šã¾ã™ã€‚å®Ÿè¡Œä¸­ã¯ã‚³ãƒ³ã‚½ãƒ¼ãƒ«ãŒé–‹ã„ãŸã¾ã¾ã«ãªã‚Šã¾ã™)
+REM ƒTƒoƒCƒo[ƒ‚[ƒh‚ðAUnityƒGƒfƒBƒ^‚ðŠJ‚©‚¸‚Éƒrƒ‹ƒh‚µ‚Ä‘¦‹N“®‚·‚éƒVƒ‡[ƒgƒJƒbƒgB
+REM ƒR[ƒh/ƒV[ƒ“‚ð’¼‚µ‚½‚ ‚Æ‚É“®ìŠm”F‚µ‚½‚¢‚Æ‚«‚ÍA‚±‚ê‚ðƒ_ƒuƒ‹ƒNƒŠƒbƒN‚·‚é‚¾‚¯‚Å‚æ‚¢B
+REM (‰‰ñ‚â•ÏXŒã‚Íƒrƒ‹ƒh‚É”\•b`”•ª‚©‚©‚è‚Ü‚·BŽÀs’†‚ÍƒRƒ“ƒ\[ƒ‹‚ªŠJ‚¢‚½‚Ü‚Ü‚É‚È‚è‚Ü‚·)
 
 setlocal
 set UNITY_EXE="C:\Program Files\Unity\Hub\Editor\6000.4.3f1\Editor\Unity.exe"
 set PROJECT_DIR=%~dp0
 set LOGFILE=%PROJECT_DIR%unity_build_survivor.log
 
-echo [1/2] Unity ã§ãƒ“ãƒ«ãƒ‰ä¸­... (ãƒ­ã‚°: %LOGFILE%)
+echo [1/2] Unity ‚Åƒrƒ‹ƒh’†... (ƒƒO: %LOGFILE%)
 %UNITY_EXE% -batchmode -nographics -quit ^
   -projectPath "%PROJECT_DIR%." ^
   -executeMethod BuildScript.BuildSurvivor ^
   -logFile "%LOGFILE%"
 
 if %ERRORLEVEL% NEQ 0 (
-    echo ãƒ“ãƒ«ãƒ‰ã«å¤±æ•—ã—ã¾ã—ãŸã€‚%LOGFILE% ã‚’ç¢ºèªã—ã¦ãã ã•ã„ã€‚
+    echo ƒrƒ‹ƒh‚ÉŽ¸”s‚µ‚Ü‚µ‚½B%LOGFILE% ‚ðŠm”F‚µ‚Ä‚­‚¾‚³‚¢B
     pause
     exit /b 1
 )
 
-echo [2/2] èµ·å‹•ã—ã¾ã™...
+echo [2/2] ‹N“®‚µ‚Ü‚·...
 start "" "%PROJECT_DIR%Build\ChameleonSurvivor.exe"
