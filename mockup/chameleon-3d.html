@@ -51,6 +51,8 @@
 <div id="startOverlay">
   <h1>🦎 カメレオンナイト ― モックアップ</h1>
   <div class="desc">
+    <b>目標: 捕食者に見つからず、ジャングルの外へ脱出する。</b><br>
+    頭上の緑の矢印が常にゴールの方角を指しています。<br><br>
     移動: WASD / 矢印キー<br>
     灯り(協力プレイヤーの代わり): マウス移動<br>
     ホタルを舌で捕まえる: 近づいて E キー(一時的に周囲が光り、そこがチェックポイントになる)<br><br>
@@ -204,6 +206,23 @@ goalLight.position.set(0, 1.5, 0);
 goal.add(goalLight);
 goal.position.copy(goalPos);
 scene.add(goal);
+
+// ---- ゴール方向インジケーター: プレイヤーの頭上に常に浮かべて、ゴールの
+// 方角へ向け続ける。捕食者を避けるルート取りは自分で考える必要があるが、
+// 「どっちへ逃げればいいか」は常に分かるようにする。
+const goalArrow = new THREE.Group();
+const arrowMat = new THREE.MeshStandardMaterial({
+  color: 0x9dffb0, emissive: 0x6fe08a, emissiveIntensity: 1.8, roughness: 0.4
+});
+const arrowShaft = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.42), arrowMat);
+arrowShaft.position.z = -0.06;
+const arrowHead = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.32, 10), arrowMat);
+arrowHead.rotation.x = Math.PI / 2; // ローカル+Zが矢印の指す向き
+arrowHead.position.z = 0.28;
+goalArrow.add(arrowShaft, arrowHead);
+const goalArrowLight = new THREE.PointLight(0x9dffb0, 0.5, 2.5);
+goalArrow.add(goalArrowLight);
+scene.add(goalArrow);
 
 // ---- プレイヤー(カメレオン) ----
 const player = new THREE.Group();
@@ -697,6 +716,19 @@ function update(dt) {
   if (player.position.distanceTo(goalPos) < 1.6) {
     showOverlay('success', 'ジャングル脱出成功！');
   }
+
+  // --- ゴール方向インジケーターの向き/位置更新 ---
+  const toGoal = new THREE.Vector3().subVectors(goalPos, player.position);
+  toGoal.y = 0;
+  if (toGoal.lengthSq() > 0.0001) {
+    const goalAngle = Math.atan2(toGoal.x, toGoal.z);
+    goalArrow.rotation.y += (goalAngle - goalArrow.rotation.y) * Math.min(1, dt * 8);
+  }
+  goalArrow.position.set(
+    player.position.x,
+    1.7 + Math.sin(t * 2.4) * 0.08,
+    player.position.z
+  );
 
   // --- カメラ追従(見下ろし気味の追従カメラ) ---
   const camOffset = new THREE.Vector3(0, 7, 7);

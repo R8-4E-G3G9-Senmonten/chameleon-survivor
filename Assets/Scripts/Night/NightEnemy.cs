@@ -48,6 +48,13 @@ public class NightEnemy
         go.transform.position = pos;
         float sc = cfg.scale;
 
+        var model = NightEnemyModels.Instance != null ? NightEnemyModels.Instance.For(kind) : null;
+        if (model != null)
+        {
+            BuildModel(model);
+            return;
+        }
+
         mat = EmissiveMaterialFactory.Create(cfg.color);
         mat.SetFloat("_Glossiness", 0.1f);
         var blob = NightMeshes.MeshObject("Blob", NightMeshes.Icosahedron(), mat, go.transform);
@@ -72,10 +79,62 @@ public class NightEnemy
         float dmg = 1f - Mathf.Clamp01(lightHp / lightHpMax);
         Color litColor = Color.Lerp(new Color(1f, 0.95f, 0.55f), new Color(1f, 0.35f, 0.1f), dmg);
         float blend = lit ? Mathf.Lerp(0.75f, 1f, dmg) : dmg * 0.35f;
+        if (modelMats != null)
+        {
+            // テクスチャ付きモデルは「白 × テクスチャ」が元の見た目。光を浴びたら 1 を超える色を掛けて
+            // テクスチャの暗い部分まで黄色く(オーバーブライトに)光らせる。
+            Color c = Color.Lerp(Color.white, litColor * 2.4f, blend);
+            c.a = 1f;
+            foreach (var m in modelMats) if (m != null) m.color = c;
+            return;
+        }
         mat.color = Color.Lerp(cfg.color, litColor, blend);
     }
 
-    public void Destroy() => Object.Destroy(go);
+    Material[] modelMats;
+    UnityEngine.Playables.PlayableGraph graph;
+
+    // Meshy AI の3Dモデルを読み込み、指定の高さに合わせて地面に立たせ、歩行アニメを再生する。
+    void BuildModel(NightEnemyModel model)
+    {
+        var inst = Object.Instantiate(model.prefab, go.transform);
+        inst.transform.localPosition = Vector3.zero;
+        inst.transform.localRotation = Quaternion.Euler(0, model.yaw, 0);
+
+        var renderers = inst.GetComponentsInChildren<Renderer>();
+        Bounds b = new Bounds();
+        bool first = true;
+        foreach (var r in renderers) { if (first) { b = r.bounds; first = false; } else b.Encapsulate(r.bounds); }
+        if (!first && b.size.y > 0.001f)
+        {
+            float k = model.targetHeight / b.size.y;
+            inst.transform.localScale = Vector3.one * k;
+            // 足元(最下点)が地面に来るように持ち上げ、中心はXZの原点に揃える
+            Vector3 center = go.transform.InverseTransformPoint(b.center);
+            inst.transform.localPosition = new Vector3(-center.x * k, -(b.min.y - go.transform.position.y) * k, -center.z * k);
+        }
+
+        var mats = new System.Collections.Generic.List<Material>();
+        foreach (var r in renderers) mats.AddRange(r.materials);
+        modelMats = mats.ToArray();
+        foreach (var m in modelMats) m.SetFloat("_Glossiness", 0.15f);
+
+        var animator = inst.GetComponentInChildren<Animator>();
+        if (animator == null) animator = inst.AddComponent<Animator>();
+        animator.runtimeAnimatorController = null;
+        animator.applyRootMotion = false;
+        if (model.walk != null)
+        {
+            UnityEngine.Playables.AnimationPlayableUtilities.PlayClip(animator, model.walk, out graph);
+            var root = graph.GetRootPlayable(0); UnityEngine.Playables.PlayableExtensions.SetSpeed(root, model.animSpeed);
+        }
+    }
+
+    public void Destroy()
+    {
+        if (graph.IsValid()) graph.Destroy();
+        Object.Destroy(go);
+    }
 }
 
 public class NightBullet

@@ -152,7 +152,7 @@ public class NightAutoShot : MonoBehaviour
             yield return AimAt(() => target.go != null ? target.Position : g.PlayerPos, 0.5f);
             if (target.go != null)
             {
-                var mr = target.go.GetComponentInChildren<MeshRenderer>();
+                var mr = target.go.GetComponentInChildren<Renderer>();
                 Debug.Log("NightAutoShot: lit enemy " + target.kind + " color=" + mr.sharedMaterial.color + " lightHp=" + target.lightHp.ToString("0.0") + "/" + target.lightHpMax);
             }
             yield return Shot("05_enemy_lit");
@@ -214,6 +214,19 @@ public class NightAutoShot : MonoBehaviour
                       " color=" + (litProp.materials.Length > 0 ? litProp.materials[0].color.ToString() : "n/a"));
             yield return Shot("09b_prop_glow");
         }
+
+        // 敵の3Dモデル(狼・巨人・キノコ)を並べて確認する。1枚は光を当て、1枚は当てない
+        Vector3 pc = g.PlayerPos;
+        var kinds = new[] { NightEnemy.Kind.Moth, NightEnemy.Kind.Brute, NightEnemy.Kind.Shooter };
+        for (int i = 0; i < kinds.Length; i++)
+        {
+            float ex = pc.x + (i - 1) * 2.6f, ez = pc.z - 6f;
+            g.Enemies.Add(new NightEnemy(kinds[i], new Vector3(ex, g.Map.SurfaceAt(ex, ez), ez)));
+        }
+        yield return LockCameraOn(new Vector3(pc.x, pc.y, pc.z - 6f), 0.3f);
+        yield return Shot("12a_enemy_models_colossus_lit");
+        yield return LockCameraOn(new Vector3(pc.x - 2.6f, pc.y, pc.z - 6f), 0.4f);
+        yield return Shot("12b_enemy_wolf_lit");
 
         // 閃光
         wait = 0f;

@@ -23,6 +23,7 @@ public static class NightSceneBuilder
     public static void Build()
     {
         FixGraphicsSettings.Run();
+        SetupEnemyModels.Run();
         CreateEmissiveMaterialTemplate.Run();
         CreateUnlitTemplate();
 
@@ -88,10 +89,23 @@ public static class NightSceneBuilder
         gameGO.AddComponent<NightHud>().game = game;
         gameGO.AddComponent<NightAutoShot>();
 
+        // 敵の見た目: 群れ型=狼 / 硬い型=巨人 / 遠距離型=キノコの守り手(いずれもMeshy AI製)
+        var models = gameGO.AddComponent<NightEnemyModels>();
+        models.moth = MakeEnemyModel(SetupEnemyModels.Wolf, 1.0f);
+        models.brute = MakeEnemyModel(SetupEnemyModels.Colossus, 2.5f);
+        models.shooter = MakeEnemyModel(SetupEnemyModels.Mushroom, 1.5f);
+
         if (!Directory.Exists("Assets/Scenes")) Directory.CreateDirectory("Assets/Scenes");
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.SaveAssets();
         Debug.Log("NightSceneBuilder: " + ScenePath + " を作成しました。");
+    }
+
+    static NightEnemyModel MakeEnemyModel(SetupEnemyModels.Def def, float height)
+    {
+        var prefab = SetupEnemyModels.LoadPrefab(def);
+        if (prefab == null) Debug.LogWarning("NightSceneBuilder: 敵モデル " + def.name + " が見つかりません。簡易形状で代用します。");
+        return new NightEnemyModel { prefab = prefab, walk = prefab != null ? SetupEnemyModels.LoadClip(def) : null, targetHeight = height };
     }
 
     static GameObject[] LoadModels(string[] names)
