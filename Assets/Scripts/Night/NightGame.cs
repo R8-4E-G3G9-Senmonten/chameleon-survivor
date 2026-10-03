@@ -540,7 +540,7 @@ public class NightGame : MonoBehaviour
     void KnockbackPulse()
     {
         Audio.PlayPulse();
-        AddPulse(PlayerPos + Vector3.up * 0.06f, 0.4f, 0.6f, NightMeshes.Hex(0x8fe6ff, 0.9f), 0.45f, 1f + KnockRadius * 1.6f);
+        AddPulse(PlayerPos + Vector3.up * 0.15f, 0.4f, 0.6f, NightMeshes.Hex(0x8fe6ff, 0.9f), 0.45f, 1f + KnockRadius * 1.6f);
         foreach (var en in Enemies)
         {
             if (en.dying) continue;
@@ -633,7 +633,7 @@ public class NightGame : MonoBehaviour
                 if (Map.Walkable(x, z, 0.1f))
                 {
                     var m = NightMeshes.MeshObject("GuideLeaf", leaf, g.material, g.group.transform);
-                    m.transform.position = new Vector3(x, Map.SurfaceAt(x, z) + 0.06f, z);
+                    m.transform.position = new Vector3(x, Map.SurfaceAt(x, z) + 0.22f, z);
                     m.transform.rotation = Quaternion.Euler(0, Mathf.Atan2(-dx, -dz) * Mathf.Rad2Deg, 0);
                     g.markers.Add(m.transform);
                 }

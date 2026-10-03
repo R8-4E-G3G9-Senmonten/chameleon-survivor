@@ -78,7 +78,7 @@ public class NightFlashlight : MonoBehaviour
             var ring = aimRings[i];
             ring.GetComponent<MeshRenderer>().sharedMaterial.color = new Color(color.r, color.g, color.b, 0.4f);
             ring.localScale = Vector3.one * Mathf.Clamp(scale, 0.4f, 1f);
-            ring.position = new Vector3(target.x, map.SurfaceAt(target.x, target.z) + 0.035f, target.z);
+            ring.position = new Vector3(target.x, map.SurfaceAt(target.x, target.z) + 0.15f, target.z);
         }
     }
 
