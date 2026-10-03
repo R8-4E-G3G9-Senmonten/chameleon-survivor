@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カメレオンナイト システム解説ガイド</title>
+<meta name="description" content="カメレオンナイト(光の球収集版)の仕組み・工夫・苦労した点をテーマごとにまとめた解説ガイド">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020617; --surface: #0b1224; --surface-2: #111a30; --muted: #1a2238; --line: #2a3650;
+    --text: #f1f5f9; --text-2: #b6c2d6; --text-3: #8a98b0;
+    --accent: #22c55e; --accent-2: #86efac; --accent-ink: #04210f;
+    --warn: #fbbf24; --danger: #f87171; --info: #38bdf8; --violet: #a78bfa;
+    --radius: 14px; --s1: 8px; --s2: 16px; --s3: 24px; --s4: 32px; --s5: 48px;
+    --sidebar: 280px;
+    --ease-out: cubic-bezier(.16,1,.3,1);
+    --dur: 220ms;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #f8fafc; --surface: #ffffff; --surface-2: #f1f5f9; --muted: #e2e8f0; --line: #cbd5e1;
+    --text: #0f172a; --text-2: #334155; --text-3: #5b6b82;
+    --accent: #15803d; --accent-2: #166534; --accent-ink: #ffffff;
+    --warn: #a16207; --danger: #b91c1c; --info: #0369a1; --violet: #6d28d9;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "Noto Sans JP", system-ui, sans-serif; line-height: 1.75; font-size: 16px; }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .9em; }
+  code { background: var(--muted); padding: 1px 6px; border-radius: 6px; color: var(--accent-2); overflow-wrap: anywhere; }
+  a { color: var(--info); }
+  :focus-visible { outline: 3px solid var(--info); outline-offset: 2px; border-radius: 6px; }
+
+  /* ---------- top bar ---------- */
+  .progress { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: var(--accent); z-index: 100; transition: width 80ms linear; }
+  header.top { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: var(--s2); padding: 10px var(--s3);
+    background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  header.top .brand { font-weight: 900; letter-spacing: .02em; white-space: nowrap; }
+  header.top .brand span { color: var(--accent); }
+  .search { flex: 1; max-width: 420px; margin-left: auto; position: relative; }
+  .search input { width: 100%; min-height: 44px; padding: 0 14px 0 38px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--text); font: inherit; font-size: 15px; }
+  .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-3); }
+  .iconbtn { min-width: 44px; min-height: 44px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .iconbtn:hover { border-color: var(--accent); }
+  .menu-btn { display: none; }
+
+  /* ---------- layout ---------- */
+  .layout { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); max-width: 1320px; margin: 0 auto; }
+  nav.toc { position: sticky; top: 65px; height: calc(100vh - 65px); overflow-y: auto; padding: var(--s3) var(--s2); border-right: 1px solid var(--line); }
+  nav.toc p { margin: 0 0 8px; font-size: 12px; color: var(--text-3); letter-spacing: .08em; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+  nav.toc li a { display: flex; gap: 10px; align-items: baseline; padding: 7px 10px; border-radius: 10px; color: var(--text-2); text-decoration: none; font-size: 14px; transition: background var(--dur), color var(--dur); }
+  nav.toc li a::before { counter-increment: toc; content: counter(toc, decimal-leading-zero); font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--text-3); }
+  nav.toc li a:hover { background: var(--surface-2); color: var(--text); }
+  nav.toc li a[aria-current="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+  nav.toc li.hidden { display: none; }
+  main { padding: var(--s4) var(--s4) 96px; min-width: 0; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; overflow: hidden; border-radius: 22px; padding: var(--s5) var(--s4); border: 1px solid var(--line);
+    background: radial-gradient(ellipse at 20% -10%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 55%),
+                radial-gradient(ellipse at 90% 120%, color-mix(in srgb, var(--info) 22%, transparent), transparent 50%), var(--surface); }
+  .hero h1 { font-size: clamp(28px, 4vw, 44px); line-height: 1.25; margin: 0 0 12px; font-weight: 900; }
+  .hero h1 .grad { background: linear-gradient(90deg, var(--accent), var(--info)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p.lead { color: var(--text-2); max-width: 760px; margin: 0; font-size: 17px; }
+  .orbs span { position: absolute; border-radius: 50%; filter: blur(1px); opacity: .55; animation: float 9s ease-in-out infinite; pointer-events: none; }
+  @keyframes float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-18px) } }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s2); margin-top: var(--s4); }
+  .stat { background: color-mix(in srgb, var(--bg) 55%, transparent); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .stat b { display: block; font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--accent-2); }
+  .stat span { font-size: 13px; color: var(--text-3); }
+
+  /* ---------- sections ---------- */
+  section.theme { margin-top: var(--s5); scroll-margin-top: 80px; }
+  section.theme.hidden { display: none; }
+  .theme-head { display: flex; align-items: center; gap: 14px; margin-bottom: var(--s2); }
+  .theme-head .num { flex: none; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; font-family: "JetBrains Mono", monospace; font-weight: 600;
+    background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-2); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  .theme-head h2 { margin: 0; font-size: clamp(22px, 2.6vw, 30px); line-height: 1.3; }
+  .theme-head .sub { display: block; font-size: 13px; color: var(--text-3); font-weight: 400; }
+  .summary { color: var(--text-2); margin: 0 0 var(--s3); max-width: 860px; }
+  .grid { display: grid; gap: var(--s2); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--s2) var(--s3); }
+  .card h3 { font-size: 17px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+  .card p, .card li { color: var(--text-2); font-size: 15px; }
+  .card ul, .card ol { padding-left: 20px; margin: 8px 0 0; }
+  .card li { margin: 4px 0; }
+  .label { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .04em; }
+  .l-idea { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-2); }
+  .l-hard { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+  .l-how { background: color-mix(in srgb, var(--info) 18%, transparent); color: var(--info); }
+  .l-file { background: var(--muted); color: var(--text-2); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 8px 0 0; font-size: 14px; }
+  .kv dt { color: var(--text-3); }
+  .kv dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
+  .files { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--s2); }
+  .files code { font-size: 12.5px; }
+
+  /* problem → cause → fix */
+  .pcf { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  .pcf div { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 14px; color: var(--text-2); }
+  .pcf b { display: block; font-size: 12px; letter-spacing: .06em; margin-bottom: 4px; }
+  .pcf .p b { color: var(--danger); } .pcf .c b { color: var(--warn); } .pcf .f b { color: var(--accent-2); }
+  @media (max-width: 760px) { .pcf { grid-template-columns: 1fr; } }
+
+  details.deep { margin-top: var(--s2); border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  details.deep summary { cursor: pointer; padding: 14px var(--s3); font-weight: 700; list-style: none; display: flex; align-items: center; gap: 10px; min-height: 48px; }
+  details.deep summary::-webkit-details-marker { display: none; }
+  details.deep summary::before { content: ""; width: 9px; height: 9px; border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg); transition: transform var(--dur) var(--ease-out); }
+  details.deep[open] summary::before { transform: rotate(45deg); }
+  details.deep .body { padding: 0 var(--s3) var(--s3); color: var(--text-2); font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--text-3); font-weight: 600; font-size: 13px; }
+  .tablewrap { overflow-x: auto; }
+  pre { background: var(--muted); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.6; color: var(--text); }
+  .callout { border-left: 4px solid var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); padding: 12px 16px; border-radius: 0 12px 12px 0; color: var(--text-2); margin: var(--s2) 0; }
+  .callout.warn { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 9%, transparent); }
+
+  /* diagrams */
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--s2); margin: var(--s2) 0; overflow-x: auto; }
+  .diagram svg { display: block; width: 100%; min-width: 720px; height: auto; }
+  .diagram svg text { font-family: "Noto Sans JP", sans-serif; }
+  .flow { stroke-dasharray: 6 6; animation: dash 1.4s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -24; } }
+  .pulse-node { animation: pnode 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes pnode { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 560ms var(--ease-out), transform 560ms var(--ease-out); }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; } }
+
+  /* tools */
+  .tool { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--s3); }
+  .tool label { display: block; font-size: 14px; color: var(--text-2); margin: 10px 0 4px; }
+  .tool input[type=range] { width: 100%; min-height: 36px; accent-color: var(--accent); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button { min-height: 44px; padding: 0 18px; border: 0; background: transparent; color: var(--text-2); font: inherit; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .bigscore { font-size: 40px; font-weight: 900; color: var(--warn); font-variant-numeric: tabular-nums; }
+  .bar { height: 12px; border-radius: 6px; background: var(--muted); overflow: hidden; margin-top: 6px; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--info)); transition: width 300ms var(--ease-out); }
+
+  /* timeline */
+  .timeline { position: relative; margin: var(--s2) 0; padding-left: 26px; }
+  .timeline::before { content: ""; position: absolute; left: 8px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
+  .timeline li { list-style: none; position: relative; margin: 0 0 14px; color: var(--text-2); font-size: 15px; }
+  .timeline li::before { content: ""; position: absolute; left: -24px; top: 8px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .timeline b { color: var(--text); }
+
+  .qa { display: grid; gap: 10px; }
+  .qa details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+  .qa summary { cursor: pointer; padding: 14px 18px; font-weight: 700; min-height: 48px; display: flex; gap: 10px; align-items: center; }
+  .qa summary::before { content: "Q"; font-family: "JetBrains Mono", monospace; color: var(--accent-2); }
+  .qa .a { padding: 0 18px 16px 42px; color: var(--text-2); font-size: 15px; }
+  .empty { display: none; padding: var(--s4); text-align: center; color: var(--text-3); border: 1px dashed var(--line); border-radius: var(--radius); margin-top: var(--s4); }
+  footer { margin-top: var(--s5); color: var(--text-3); font-size: 13px; border-top: 1px solid var(--line); padding-top: var(--s3); }
+  .totop { position: fixed; right: 18px; bottom: 18px; z-index: 40; opacity: 0; pointer-events: none; transition: opacity var(--dur); }
+  .totop.show { opacity: 1; pointer-events: auto; }
+
+  /* responsive */
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { position: fixed; top: 65px; left: 0; bottom: 0; width: min(86vw, 320px); z-index: 60; background: var(--bg); transform: translateX(-100%); transition: transform 260ms var(--ease-out); border-right: 1px solid var(--line); height: auto; }
+    nav.toc.open { transform: none; }
+    .menu-btn { display: inline-flex; }
+    main { padding: var(--s3) var(--s2) 96px; }
+    .hero { padding: var(--s4) var(--s3); }
+    header.top .brand small { display: none; }
+  }
+  @media (max-width: 560px) { .search { max-width: none; } header.top .brand { display: none; } }
+</style>
+</head>
+<body>
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<header class="top">
+  <button class="iconbtn menu-btn" id="menuBtn" aria-label="目次を開く" aria-expanded="false" aria-controls="toc">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <div class="brand">Chameleon <span>Night</span> <small style="color:var(--text-3);font-weight:500">システム解説ガイド</small></div>
+  <div class="search" role="search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="キーワードで絞り込み(例: 遅延, 発光, CSV)" aria-label="ガイド内を検索">
+  </div>
+  <button class="iconbtn" id="themeBtn" aria-label="ライト/ダーク表示の切り替え">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+  </button>
+</header>
+
+<div class="layout">
+  <nav class="toc" id="toc" aria-label="目次">
+    <p>CONTENTS</p>
+    <ol id="tocList"></ol>
+  </nav>
+
+  <main id="main">
+    <!-- ================= HERO ================= -->
+    <section class="hero reveal" aria-labelledby="title">
+      <div class="orbs" aria-hidden="true">
+        <span style="width:120px;height:120px;right:6%;top:12%;background:radial-gradient(circle,#78c8ff,transparent 70%)"></span>
+        <span style="width:90px;height:90px;right:22%;bottom:10%;background:radial-gradient(circle,#ffcf65,transparent 70%);animation-delay:-3s"></span>
+      </div>
+      <h1 id="title">カメレオンナイト<br><span class="grad">システム解説ガイド</span></h1>
+      <p class="lead">床の圧力マットで動く「カメレオン役」と、スマホのライトで敵を照らす「灯り役(最大7人)」が協力して、夜の森から脱出するゲームです。このガイドは、仕組みをテーマごとに分け、<b>工夫した点</b>と<b>難しかったこと(原因と対策)</b>まで説明できるようにまとめたものです。</p>
+      <div class="stats" aria-label="プロジェクトの規模">
+        <div class="stat"><b data-count="6024">0</b><span>主要C#コードの行数</span></div>
+        <div class="stat"><b data-count="3">0</b><span>マップ(A・B・C)</span></div>
+        <div class="stat"><b data-count="3">0</b><span>敵の種類(Meshy AI製)</span></div>
+        <div class="stat"><b data-count="7">0</b><span>同時に遊べる灯り役</span></div>
+        <div class="stat"><b data-count="2">0</b><span>ESP32コントローラー方式</span></div>
+      </div>
+    </section>
+
+    <section class="card reveal" style="margin-top:var(--s3)" aria-labelledby="pitch">
+      <h3 id="pitch"><span class="label l-how">30秒で説明するなら</span></h3>
+      <p>Unity製の協力型ゲームです。カメレオン役は、ESP32につないだ圧力マットを踏んで移動し、止まると擬態して無敵になります。灯り役は、画面のQRコードをスマホで読み取るだけで参加し、指や傾きでライトを動かして敵を照らして倒します。光の球を2つ集めて門から脱出するまでの時間と撃破数がスコアになり、マップごとのランキング(Excelで管理できるCSV)に残ります。</p>
+    </section>
+
+    <!-- ================= 01 ARCHITECTURE ================= -->
+    <section class="theme" id="arch" data-keywords="全体 構成 アーキテクチャ unity シーン データの流れ">
+      <div class="theme-head reveal"><div class="num">01</div><h2>全体の構成<span class="sub">何が、どこから、どこへ流れているか</span></h2></div>
+      <p class="summary reveal">ゲーム本体はUnity(6000.4.3f1、Built-in レンダーパイプライン)のWindowsアプリです。入力は2系統あり、カメレオン役は<b>ESP32→UDP/USB</b>、灯り役は<b>スマホのブラウザ→HTTP/HTTPS</b>でPCに届きます。PCの中では <code>NightGame</code> が司令塔になり、地形・敵・ギミック・画面・音・ランキングを順番に動かします。</p>
+
+      <div class="diagram reveal" role="img" aria-label="システム構成図。ESP32と圧力マットからUDPまたはUSBでPressureMatServerへ、スマホからHTTPSでPointerServerへ入力が届き、NightGameが各部品を動かす">
+        <svg viewBox="0 0 980 420">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#22c55e"/></marker></defs>
+          <g font-size="14" fill="#f1f5f9">
+            <rect x="20" y="40" width="190" height="96" rx="14" fill="#111a30" stroke="#2a3650"/>
+            <text x="115" y="72" text-anchor="middle" font-weight="700">ESP32 + 圧力マット</text>
+            <text x="115" y="96" text-anchor="middle" fill="#b6c2d6" font-size="12">前・後・左・右の4枚</text>
+            <text x="115" y="118" text-anchor="middle" fill="#b6c2d6" font-size="12">Wi-Fi(UDP) / USB</text>
+
+            <rect x="20" y="270" width="190" height="110" rx="14" fill="#111a30" stroke="#2a3650"/>
+            <text x="115" y="302" text-anchor="middle" font-weight="700">スマホ(灯り役)</text>
+            <text x="115" y="326" text-anchor="middle" fill="#b6c2d6" font-size="12">QRを読むだけ・最大7人</text>
+            <text x="115" y="348" text-anchor="middle" fill="#b6c2d6" font-size="12">タッチ / 傾き</text>
+            <text x="115" y="368" text-anchor="middle" fill="#b6c2d6" font-size="12">POST /pointer 20Hz</text>
+
+            <rect x="300" y="40" width="210" height="96" rx="14" fill="#0b1224" stroke="#22c55e"/>
+            <text x="405" y="74" text-anchor="middle" font-weight="700">PressureMatServer</text>
+            <text x="405" y="98" text-anchor="middle" fill="#b6c2d6" font-size="12">UDP :5005 / COMポート自動検出</text>
+            <text x="405" y="118" text-anchor="middle" fill="#b6c2d6" font-size="12">WASDとOR合成</text>
+
+            <rect x="300" y="270" width="210" height="110" rx="14" fill="#0b1224" stroke="#22c55e"/>
+            <text x="405" y="304" text-anchor="middle" font-weight="700">PointerServer</text>
+            <text x="405" y="328" text-anchor="middle" fill="#b6c2d6" font-size="12">HTTP :8787 / HTTPS :8788</text>
+            <text x="405" y="348" text-anchor="middle" fill="#b6c2d6" font-size="12">色の割り当て・人数上限</text>
+            <text x="405" y="368" text-anchor="middle" fill="#b6c2d6" font-size="12">Keep-Alive で低遅延</text>
+
+            <rect class="pulse-node" x="600" y="150" width="170" height="120" rx="16" fill="#0f2a1a" stroke="#22c55e" stroke-width="2"/>
+            <text x="685" y="196" text-anchor="middle" font-weight="900" font-size="17">NightGame</text>
+            <text x="685" y="220" text-anchor="middle" fill="#86efac" font-size="12">司令塔(状態遷移)</text>
+            <text x="685" y="240" text-anchor="middle" fill="#b6c2d6" font-size="12">毎フレーム Tick()</text>
+
+            <g font-size="13">
+              <rect x="830" y="20" width="135" height="40" rx="10" fill="#111a30" stroke="#2a3650"/><text x="897" y="45" text-anchor="middle">NightWorld 地形</text>
+              <rect x="830" y="72" width="135" height="40" rx="10" fill="#111a30" stroke="#2a3650"/><text x="897" y="97" text-anchor="middle">NightEnemy 敵</text>
+              <rect x="830" y="124" width="135" height="40" rx="10" fill="#111a30" stroke="#2a3650"/><text x="897" y="149" text-anchor="middle">NightObjects</text>
+              <rect x="830" y="176" width="135" height="40" rx="10" fill="#111a30" stroke="#2a3650"/><text x="897" y="201" text-anchor="middle">NightFlashlight</text>
+              <rect x="830" y="228" width="135" height="40" rx="10" fill="#111a30" stroke="#2a3650"/><text x="897" y="253" text-anchor="middle">NightHud 画面</text>
+              <rect x="830" y="280" width="135" height="40" rx="10" fill="#111a30" stroke="#2a3650"/><text x="897" y="305" text-anchor="middle">NightAudio 音</text>
+              <rect x="830" y="332" width="135" height="40" rx="10" fill="#111a30" stroke="#2a3650"/><text x="897" y="357" text-anchor="middle">NightRanking</text>
+            </g>
+          </g>
+          <g stroke="#22c55e" stroke-width="2" fill="none" marker-end="url(#ar)">
+            <path class="flow" d="M210 88 H296"/>
+            <path class="flow" d="M210 325 H296"/>
+            <path class="flow" d="M510 88 C560 88 560 190 596 195"/>
+            <path class="flow" d="M510 325 C560 325 560 230 596 225"/>
+          </g>
+          <g stroke="#38bdf8" stroke-width="1.6" fill="none" marker-end="url(#ar)" opacity=".85">
+            <path class="flow" d="M770 180 L826 40"/><path class="flow" d="M770 190 L826 92"/><path class="flow" d="M770 200 L826 144"/>
+            <path class="flow" d="M770 210 L826 196"/><path class="flow" d="M770 222 L826 248"/><path class="flow" d="M770 234 L826 300"/><path class="flow" d="M770 246 L826 352"/>
+          </g>
+        </svg>
+      </div>
+
+      <div class="grid">
+        <div class="card reveal">
+          <h3><span class="label l-idea">工夫</span>シーンを「コード」で組み立てる</h3>
+          <p>Unityのシーンは手作業で配置せず、エディタ用スクリプト <code>NightSceneBuilder</code> が毎回ゼロから組み立てます。カメラ、月明かり、各サーバー、敵モデルの参照まで、すべてコードで決まります。</p>
+          <ul><li>だれがビルドしても同じシーンになる(再現性)。</li><li>シーンファイルの衝突で作業が壊れにくい。</li><li>地形はゲーム開始時にマップごとに生成するので、シーンには「部品」だけを置く。</li></ul>
+        </div>
+        <div class="card reveal">
+          <h3><span class="label l-idea">工夫</span>Unityエディタを開かずに作って試す</h3>
+          <p>ビルドは <code>-batchmode -nographics</code> のコマンドで行い、出来上がったexeを自動撮影モード(<code>-nightAutoShot</code>)で起動します。タイトル→プレイ→敵に照射→ランタン→結果画面まで、14枚前後のスクリーンショットを自動で撮って確認しました。</p>
+        </div>
+        <div class="card reveal">
+          <h3><span class="label l-hard">難しかった</span>画面を見ずに「見た目」を保証する</h3>
+          <p>発光やちらつきの不具合は、ログの数値が正しくても画面では違うことがありました。そのため、必ず実際のexeで撮影した画像で確認する流れにしています(詳しくは「光と発光」「ビルドとテスト」)。</p>
+        </div>
+      </div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>Assets/Editor/NightSceneBuilder.cs</code><code>Assets/Editor/BuildScript.cs</code><code>Assets/Scripts/Night/NightGame.cs</code><code>play_night.bat</code></div>
+    </section>
+
+    <!-- ================= 02 FLOW ================= -->
+    <section class="theme" id="flow" data-keywords="状態遷移 タイトル 名前入力 プレイ 一時停止 結果 ステージ選択 キー操作">
+      <div class="theme-head reveal"><div class="num">02</div><h2>ゲームの流れ(状態遷移)<span class="sub">画面はどう切り替わるか</span></h2></div>
+      <p class="summary reveal"><code>NightGame</code> は5つの状態を持ち、状態ごとに受け付けるキーと描く画面が変わります。exeを起動するとまずマップ(コース)選択から始まり、ゲーム開始前に名前を入力します。</p>
+      <div class="diagram reveal" role="img" aria-label="状態遷移図。タイトルから名前入力、プレイ、結果へ進み、プレイ中はESCで一時停止。結果からはやり直しかステージ選択へ戻る">
+        <svg viewBox="0 0 980 230">
+          <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#86efac"/></marker></defs>
+          <g font-size="14" fill="#f1f5f9" text-anchor="middle">
+            <rect x="20" y="70" width="150" height="70" rx="14" fill="#111a30" stroke="#22c55e"/><text x="95" y="100" font-weight="700">Title</text><text x="95" y="122" font-size="12" fill="#b6c2d6">マップ選択・ランキング</text>
+            <rect x="220" y="70" width="150" height="70" rx="14" fill="#111a30" stroke="#22c55e"/><text x="295" y="100" font-weight="700">NameEntry</text><text x="295" y="122" font-size="12" fill="#b6c2d6">名前(任意・8文字)</text>
+            <rect x="420" y="70" width="150" height="70" rx="14" fill="#0f2a1a" stroke="#22c55e" stroke-width="2"/><text x="495" y="100" font-weight="700">Playing</text><text x="495" y="122" font-size="12" fill="#b6c2d6">ゲーム本編</text>
+            <rect x="420" y="170" width="150" height="50" rx="14" fill="#111a30" stroke="#2a3650"/><text x="495" y="200" font-weight="700">Paused</text>
+            <rect x="620" y="70" width="150" height="70" rx="14" fill="#111a30" stroke="#22c55e"/><text x="695" y="100" font-weight="700">Ended</text><text x="695" y="122" font-size="12" fill="#b6c2d6">結果・スコア・順位</text>
+            <rect x="820" y="70" width="140" height="70" rx="14" fill="#111a30" stroke="#2a3650"/><text x="890" y="100" font-weight="700">Restart</text><text x="890" y="122" font-size="12" fill="#b6c2d6">シーン再読み込み</text>
+          </g>
+          <g stroke="#86efac" stroke-width="2" fill="none" marker-end="url(#ar2)">
+            <path class="flow" d="M170 105 H216"/><path class="flow" d="M370 105 H416"/><path class="flow" d="M570 105 H616"/><path class="flow" d="M770 105 H816"/>
+            <path class="flow" d="M495 140 V166"/><path class="flow" d="M520 170 V144"/>
+            <path class="flow" d="M695 70 C695 20 95 20 95 66"/>
+          </g>
+          <g font-size="12" fill="#b6c2d6" text-anchor="middle">
+            <text x="193" y="96">Enter</text><text x="393" y="96">Enter</text><text x="593" y="96">脱出/力尽</text><text x="793" y="96">R</text>
+            <text x="455" y="160">Esc</text><text x="395" y="34">T: ステージ選択へ戻る</text>
+          </g>
+        </svg>
+      </div>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-how">キー操作</span>まとめ</h3>
+          <div class="tablewrap"><table><tr><th>画面</th><th>キー</th><th>動き</th></tr>
+            <tr><td>タイトル</td><td><code>1</code><code>2</code><code>3</code> / <code>Enter</code></td><td>マップ選択 / 名前入力へ</td></tr>
+            <tr><td>名前入力</td><td><code>Enter</code> / <code>Esc</code></td><td>開始 / マップ選択へ戻る</td></tr>
+            <tr><td>プレイ中</td><td><code>WASD</code>・矢印 / <code>Esc</code></td><td>移動 / 一時停止</td></tr>
+            <tr><td>一時停止</td><td><code>Esc</code> / <code>T</code></td><td>再開 / ステージ選択へ</td></tr>
+            <tr><td>結果</td><td><code>R</code> / <code>T</code></td><td>やり直す / ステージ選択へ</td></tr></table></div></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>シーンを読み直しても「戻り先」を覚える</h3>
+          <p>やり直しやステージ選択は、シーンを丸ごと読み直して初期化します。読み直すと普通の変数は消えるので、<code>static</code> の「タイトルへ戻る」フラグだけを残し、次の起動処理で名前入力を飛ばすかどうかを判断しています。</p></div>
+        <div class="card reveal"><h3><span class="label l-hard">難しかった</span>要望の変化に合わせた起動の仕方</h3>
+          <p>最初は「exeですぐゲーム画面へ」でしたが、ランキングをマップ別にしたことで「起動はマップ選択から、開始前に名前」へ変わりました。今は起動オプション <code>-skipTitle</code> を付けたときだけ選択を飛ばせます。</p></div>
+      </div>
+    </section>
+
+    <!-- ================= 03 MAP ================= -->
+    <section class="theme" id="map" data-keywords="マップ 地形 通路 グラフ 階段 橋 湖 森 zファイティング ちかちか ガビガビ テクスチャ">
+      <div class="theme-head reveal"><div class="num">03</div><h2>マップと地形<span class="sub">通路グラフ・メッシュ生成・描画の不具合対策</span></h2></div>
+      <p class="summary reveal">マップは「通路(線分)」と「広場(円)」の組み合わせで定義されています(<code>NightMap</code>)。この同じデータから、見た目の地面メッシュ・当たり判定・敵の経路探索をすべて作るので、見た目と動きがずれません。</p>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-how">仕組み</span>3つのマップ</h3>
+          <dl class="kv"><dt>A 森の迷路</dt><dd>分岐が多い。導きの花・祠</dd><dt>B 遺跡攻略</dt><dd>階段・高台・石造遺跡(高低差あり)</dd><dt>C 中央湖の周回</dt><dd>湖のまわりを周回。橋と小島</dd></dl>
+          <p style="margin-top:10px">同じマップは毎回同じ景色になるよう、マップIDから決まる乱数(線形合同法)で木や岩を配置しています。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">仕組み</span>同じデータを使い回す関数</h3>
+          <ul><li><code>SurfaceAt(x,z)</code> … その場所の地面の高さ</li><li><code>Walkable(x,z)</code> … 歩ける場所か</li><li><code>ConstrainActor</code> … 通路の外に出たら内側へ戻す</li><li><code>ClearSight(a,b)</code> … 2点の間が見通せるか</li><li><code>NavigationPath</code> … 通路グラフ上のダイクストラ法で経路</li></ul></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>邪魔な木を自動で隠す</h3>
+          <p>カメラはプレイヤーの斜め後ろから見下ろすため、手前の木の葉がプレイヤーを隠してしまいます。プレイヤーの前方にある木の葉だけを毎フレーム非表示にする処理(<code>UpdateCanopies</code>)を入れました。</p></div>
+      </div>
+
+      <h3 class="reveal" style="margin-top:var(--s4)">難しかったこと:地面の「線」「ちかちか」「ガビガビ」</h3>
+      <p class="reveal" style="color:var(--text-2)">地面の描画不具合は4回、それぞれ別の原因でした。見た目は似ていても原因が違うため、1つずつ切り分けています。</p>
+      <div class="card reveal"><h3><span class="label l-hard">1</span>地面に線がたくさん出る</h3>
+        <div class="pcf"><div class="p"><b>症状</b>通路に細い線が多数</div><div class="c"><b>原因</b>帯メッシュを作る処理で、三角形を作る順番が頂点の追加と混ざり、裏返った三角形ができていた</div><div class="f"><b>対策</b>頂点をすべて追加してから、別のループで三角形を作るように修正</div></div></div>
+      <div class="card reveal" style="margin-top:10px"><h3><span class="label l-hard">2</span>通路がちらつく(Zファイティング)</h3>
+        <div class="pcf"><div class="p"><b>症状</b>重なった面がちらちら入れ替わる</div><div class="c"><b>原因</b>カメラの手前クリップが0.1で、奥行きの精度が無駄に近くへ使われていた</div><div class="f"><b>対策</b>カメラは常に約17.7離れているので、手前クリップを3に上げて精度を必要な範囲に集中</div></div></div>
+      <div class="card reveal" style="margin-top:10px"><h3><span class="label l-hard">3</span>ギザギザの細い線がちかちか</h3>
+        <div class="pcf"><div class="p"><b>症状</b>オレンジ色のギザギザ線</div><div class="c"><b>原因</b>光の道の葉っぱが地面ぎりぎり(0.06上)に置かれ、場所によって地面に埋まって端だけ見えていた</div><div class="f"><b>対策</b>葉を0.22浮かせ、照準リングなども0.15上へ。修正後に拡大画像で確認</div></div></div>
+      <div class="card reveal" style="margin-top:10px"><h3><span class="label l-hard">4</span>曲がり角のちかちか・地面のガビガビ</h3>
+        <div class="pcf"><div class="p"><b>症状</b>角でちらつき、地面が粗い</div><div class="c"><b>原因</b>隣の通路の帯がまったく同じ高さで重なっていた。テクスチャは細かく高コントラストの斑点</div><div class="f"><b>対策</b>通路ごとに2mm刻みで高さをずらす。斑点を2回ぼかし、異方性フィルタ8・MSAA 4倍</div></div></div>
+      <details class="deep reveal"><summary>深掘り:なぜ手前クリップを上げるとちらつきが減るのか</summary><div class="body">
+        <p>深度バッファの精度は、カメラに近いほど細かく、遠いほど粗くなります(おおよそ距離の2乗に比例して粗くなる)。手前クリップが0.1だと、精度のほとんどが0.1〜数mの範囲に使われ、実際に地面がある約17m先では粗くなります。手前を3にすると、同じビット数でも17m付近の分解能が大きく上がります。それでも「完全に同じ高さ」の面は区別できないので、4つ目の対策(2mmずらし)が別に必要でした。</p></div></details>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightMap.cs</code><code>NightWorld.cs</code><code>NightMeshes.cs</code></div>
+    </section>
+
+    <!-- ================= 04 PLAYER ================= -->
+    <section class="theme" id="player" data-keywords="カメレオン プレイヤー 擬態 無敵 ノックバック meshy モデル アニメーション">
+      <div class="theme-head reveal"><div class="num">04</div><h2>カメレオン(プレイヤー)と擬態<span class="sub">止まると無敵、という駆け引き</span></h2></div>
+      <p class="summary reveal">カメレオン役は上下左右に動くだけで、攻撃はできません。攻撃は灯り役の光が担当します。その代わり、<b>止まると擬態</b>してゲージがある間は無敵になり、擬態に入った瞬間に周りの敵を押し返します。</p>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-how">数値</span>擬態ゲージ</h3>
+          <dl class="kv"><dt>擬態に入る</dt><dd>0.3秒止まる(ゲージ30以上)</dd><dt>減る速さ</dt><dd>40 / 秒(擬態中)</dd><dt>回復</dt><dd>22 / 秒(移動中)</dd><dt>切れたあと</dt><dd>35まで回復するまで使えない</dd><dt>押し返し</dt><dd>半径5m、速さ11(近いほど強い)</dd><dt>HP</dt><dd>100</dd></dl></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>周りの色に溶け込む</h3>
+          <p>擬態中は、近くにある木・岩・地面の色(<code>NearestTerrainColor</code>)にカメレオンの色を寄せます。見た目でも「隠れている」ことが分かります。</p></div>
+        <div class="card reveal"><h3><span class="label l-hard">難しかった</span>Meshy AIのモデルを動かす</h3>
+          <p>本体と歩きアニメが別ファイルで出力されるため、<code>SetupChameleonModel</code> で骨格(アバター)を共有させ、歩きをループ再生(1.4倍速)にしています。さらに、歩きアニメだけ腰の高さが約0.2高く焼き込まれていて、歩き出すと浮いて見えたため、アニメのカーブを静止姿勢の高さに合わせて補正しました。</p></div>
+      </div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightPlayer.cs</code><code>NightGame.cs (擬態の処理)</code><code>Assets/Editor/SetupChameleonModel.cs</code></div>
+    </section>
+
+    <!-- ================= 05 INPUT ================= -->
+    <section class="theme" id="input" data-keywords="圧力マット esp32 udp usb シリアル 入力 wasd コントローラー">
+      <div class="theme-head reveal"><div class="num">05</div><h2>圧力マット入力(ESP32)<span class="sub">Wi-FiでもUSBでも、WASDと同時でも動く</span></h2></div>
+      <p class="summary reveal">床の4枚の圧力センサーを ESP32 が読み取り、「前・後・左・右」を踏んでいるかをPCへ送ります。受け取るのは <code>PressureMatServer</code> です。<b>キーボードのWASDと常に合成(OR)</b>しているので、開発中も展示中も同じビルドで動きます。</p>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-how">方式1</span>Wi-Fi(UDP)</h3>
+          <p><code>esp32/pressure_mat</code>。50msごとに <code>"1,0,0,1"</code> のような文字をUDPでPCの5005番ポートへ送ります。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">方式2</span>USBシリアル</h3>
+          <p><code>esp32/controller</code>。踏み状態が変わった瞬間と200msごとに、1バイト(<code>0xA0</code>+ビット)を送ります。例: <code>0xA9</code> = 前+右。COMポートは自動で探し、抜き差しされても探し直します。</p></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>2つの形式を取り違えない</h3>
+          <p>1バイト形式は上位4ビットが必ず <code>1010</code> です。文字形式の <code>'0' '1' ',' 改行</code> は上位4ビットが <code>1010</code> にならないので、混ざって届いても区別できます(<code>ControllerStreamParser</code>)。</p></div>
+      </div>
+      <div class="grid" style="margin-top:var(--s2)">
+        <div class="card reveal"><h3><span class="label l-how">数値</span>判定の猶予</h3>
+          <dl class="kv"><dt>入力が切れたとみなす</dt><dd>500ms 受信なし</dd><dt>「接続中」表示</dt><dd>2,000ms 以内に受信(チラつき防止)</dd><dt>USB探索</dt><dd>開いて4秒待つ / 2秒ごとに探し直す</dd><dt>ESP32と判定</dt><dd>正しい形式を3回受信</dd></dl></div>
+        <div class="card reveal"><h3><span class="label l-hard">難しかった</span>押しても反応しない</h3>
+          <div class="pcf" style="grid-template-columns:1fr"><div class="p"><b>症状</b>マットを踏んでも動かない</div><div class="c"><b>原因</b>PCのWi-Fiが変わり、IPが <code>10.101.141.82</code> → <code>192.168.43.204</code> に変化。ESP32は古いIPへ送っていた</div><div class="f"><b>対策</b>HUDに「コントローラー: 接続中(USB/Wi-Fi)」を常時表示。IPに左右されないUSB方式も用意</div></div></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>実機なしでテスト</h3>
+          <p>自動テストでは、ゲーム自身が自分宛て(127.0.0.1:5005)に <code>"1,0,0,0"</code> を1秒送り、キー入力なしでプレイヤーが前に進むか、送るのをやめて0.7秒後に「入力なし」に戻るかを確かめています。</p></div>
+      </div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>PressureMatServer.cs</code><code>ControllerStreamParser.cs</code><code>esp32/pressure_mat/pressure_mat.ino</code><code>esp32/controller/controller.ino</code></div>
+    </section>
+
+    <!-- ================= 06 PHONE ================= -->
+    <section class="theme" id="phone" data-keywords="スマホ qr https 証明書 遅延 keep-alive 色 7人 接続 ip ファイアウォール 振動 wake lock">
+      <div class="theme-head reveal"><div class="num">06</div><h2>スマホ連携(灯り役)<span class="sub">アプリ不要・QRを読むだけで最大7人</span></h2></div>
+      <p class="summary reveal">PCの中に小さなWebサーバー(<code>PointerServer</code>)を立て、スマホのブラウザに操作用ページを配ります。スマホは指の位置(または傾き)を毎秒20回 <code>POST /pointer</code> で送ります。名前の入力は不要で、ページを開いた瞬間に色が割り当てられます。</p>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>管理者権限なしで動くサーバー</h3>
+          <p>Windowsの <code>HttpListener</code> は管理者権限やURL予約が必要なことがあります。そこで生の <code>TcpListener</code> でHTTPを自前で読み書きしています。展示用PCで設定なしに動かすためです。</p></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>傾き操作のためのHTTPS</h3>
+          <p>iPhoneは、傾きセンサーの許可(<code>DeviceOrientationEvent.requestPermission</code>)をHTTPSのページでしか出しません。HTTP(8787)とHTTPS(8788)を両方立て、自己署名の証明書はWindowsのPowerShell(<code>New-SelfSignedCertificate</code>)で作ります。Unityの実行環境では証明書の作成機能が使えなかったためです。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">仕組み</span>人ごとの色と人数</h3>
+          <ul><li>ページを開くたびに一意のIDを作り、サーバーが参加順に8色から割り当てる。</li><li>自分の色をスマホ画面に丸で表示。ゲーム画面にも色の丸と「接続中 N/7人」。</li><li>8人目は「満員です(最大7人)」と表示。抜けて10秒で枠が空く。</li></ul></div>
+      </div>
+
+      <h3 class="reveal" style="margin-top:var(--s4)">難しかったこと:ライトの遅延</h3>
+      <div class="card reveal"><div class="pcf"><div class="p"><b>症状</b>スマホを動かしてからライトが動くまで遅い</div><div class="c"><b>原因</b>送信のたびに接続を閉じていた(<code>Connection: close</code>)。毎秒20回、TCPの接続(HTTPSならTLSの暗号化の握手も)をやり直していた</div><div class="f"><b>対策</b>同じ接続を使い回す Keep-Alive に変更。小さいパケットを溜めない <code>NoDelay</code> も有効に</div></div>
+        <p style="margin-top:12px">さらにAndroidは、画面が消えるとWi-Fiが省電力になり、送信が数百ms単位で遅れることがあります。ページ側で <code>Screen Wake Lock</code> を取り、画面を点けたままにしました。スマホのテザリングを使うと、複数台接続で遅延がぶれやすいことも分かったので、展示では普通のWi-Fiルーターを推奨しています。</p></div>
+
+      <div class="grid" style="margin-top:var(--s2)">
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>指を止めても光が消えない</h3>
+          <p>スマホは触っていない間も0.25秒ごとに最後の状態を送り続けます(心拍)。指を止めると送信が止まって光が消える問題と、「接続中」が数えられない問題を同時に解決しました。</p></div>
+        <div class="card reveal"><h3><span class="label l-hard">難しかった</span>QRにアクセスできない</h3>
+          <p>QRの中身は <code>https://(PCのIP):8788/</code> です。Wi-Fiが変わるとIPが変わり、印刷したQRは使えなくなります。起動時に毎回IPを調べ、タイトル画面の左下にも表示。<code>make_qr.bat</code> で今のIPの印刷用QRを作れるようにしました。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">運用</span>ファイアウォール</h3>
+          <p>同じWi-Fiの別端末から入れるよう、受信の許可が必要です。</p>
+<pre>New-NetFirewallRule -DisplayName "ChameleonNight Unity" -Direction Inbound -Protocol TCP -LocalPort 8787,8788 -Action Allow
+New-NetFirewallRule -DisplayName "ChameleonNight UDP" -Direction Inbound -Protocol UDP -LocalPort 5005 -Action Allow</pre></div>
+      </div>
+      <details class="deep reveal"><summary>深掘り:傾き操作は「レーザーポインター」のように動く</summary><div class="body">
+        <p>傾き操作は、スマホの上端を懐中電灯の先と考えます。最初の姿勢(または「中心をリセット」)を真ん中とし、上下は前後の傾き(beta)、左右は水平に回す角度(alpha)で決めます。角度をそのまま比例させず <code>tan()</code> で変換しているので、中心付近はゆっくり、外側ほど速く動き、実際に光線を壁に当てているような感覚になります。alphaは0°と360°の境目で値が飛ぶため、差を必ず −180〜180° に直してから使っています。</p></div></details>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>PointerServer.cs</code><code>QRCodeGenerator.cs</code><code>make_qr.bat</code><code>tools/make_qr.py</code></div>
+    </section>
+
+    <!-- ================= 07 LIGHT ================= -->
+    <section class="theme" id="light" data-keywords="光 懐中電灯 発光 emission 黄色 当たり判定 半径 人数 火花 赤い輪 閃光">
+      <div class="theme-head reveal"><div class="num">07</div><h2>光と当たり判定・発光<span class="sub">いちばん苦労したテーマ</span></h2></div>
+      <p class="summary reveal">灯り役の光は、スマホが指した画面上の位置からカメラの光線を飛ばし、地形に当たった点を「照らしている場所」にします(<code>NightFlashlight</code>)。接続中の人数ぶん、スポットライトと照準リングが同時に出ます。</p>
+      <div class="grid">
+        <div class="tool reveal" aria-labelledby="rtool">
+          <h3 id="rtool" style="margin:0 0 6px">試してみる:人数と光の大きさ</h3>
+          <p style="margin:0;color:var(--text-2);font-size:14px">人数が増えるほど1人分の光は小さくなります(平方根で緩やかに)。</p>
+          <label for="nPlayers">灯り役の人数: <b id="nOut">1</b>人</label>
+          <input id="nPlayers" type="range" min="1" max="7" value="1">
+          <div class="kv" style="margin-top:8px"><dt>光の半径</dt><dd><b id="rOut">3.00</b> m</dd></div>
+          <div class="bar" aria-hidden="true"><i id="rBar" style="width:100%"></i></div>
+          <p class="mono" style="font-size:12px;color:var(--text-3);margin:10px 0 0">半径 = 3.0 × max(1.1/3.0, 1/√人数)</p>
+        </div>
+        <div class="card reveal"><h3><span class="label l-how">仕組み</span>敵へのダメージ</h3>
+          <ul><li>どれか1つの光の半径内で、高さの差が1.8未満なら当たり。</li><li>当たっている間、敵ごとの「光HP」が減り、0で倒れる。外れると回復する。</li><li>約12秒ごとの閃光(雷)で、半径26mの敵全員にダメージ。1.3秒前に雷鳴で予告。</li><li>以前はプレイヤーのすぐ近くに光が効かない「死角」があったが、重なった敵を倒せないため廃止。</li></ul></div>
+      </div>
+
+      <h3 class="reveal" style="margin-top:var(--s4)">難しかったこと:「光が当たったら光る」が画面に出ない</h3>
+      <div class="card reveal">
+        <p>Unityの「発光(Emission)」を使って、当たった物を黄色く光らせようとしました。しかし、ビルドしたexeでは何をしても画面が変わりませんでした。</p>
+        <ol class="timeline" style="margin-top:14px">
+          <li><b>1.</b> 発光色を専用の方法(MaterialPropertyBlock)で設定 → なぜか水色に。マテリアルを直接書き換えても同じ。</li>
+          <li><b>2.</b> 木や岩のモデルに発光の設定(キーワード)が無いことを発見 → 発光できるマテリアルに差し替え。それでも変わらない。</li>
+          <li><b>3.</b> カメラが別の場所を映している可能性 → カメラと照準を毎フレーム強制的に対象へ向けるテストを作成。</li>
+          <li><b>4.</b> ありえない色(マゼンタ)を発光に入れても白いまま → <b>発光そのものが描画されていない</b>と確定。敵が光って見えていたのは、元の色がたまたまオレンジ系だっただけだった。</li>
+          <li><b>5.</b> ビルドに含めるシェーダーの設定漏れも直したが、それでも描画されず。</li>
+          <li><b>6.</b> 発光をやめ、確実に描画される<b>通常の色(_Color)を直接黄色へ近づける方式</b>に変更 → 解決。</li>
+        </ol>
+        <div class="callout">学び:ログの数値(色の値)が正しくても、画面に出ているとは限らない。「ありえない色を入れて変化を見る」ように、結果がはっきり分かる実験で切り分けるのが近道でした。</div>
+      </div>
+      <div class="grid" style="margin-top:var(--s2)">
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>テクスチャ付きモデルも光らせる</h3>
+          <p>Meshyの敵はテクスチャ付きなので、色を黄色にしてもテクスチャの暗い部分は暗いままです。そこで「1を超える色(×2.4)」を掛けて、暗い部分まで明るく光らせています。</p></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>当たっていることが分かる演出</h3>
+          <ul><li>敵:赤く点滅+赤い火花。足元の赤い輪は、普段は毎秒5回、倒れる直前(光HP 30%未満)は太く毎秒16回点滅。</li><li>花・ランタン・光の球:光が当たっている間、色付きの火花。</li><li>木・岩:黄色(1, 0.92, 0.45)へなめらかに変化。</li></ul></div>
+        <div class="card reveal"><h3><span class="label l-how">判断</span>試して外した演出</h3>
+          <p>「ダメージ中に敵が小刻みに震える」演出も実装しましたが、見え方の好みで外しました。モックアップで先に見てもらい、実装後も好みに合わせて取捨選択しています。</p></div>
+      </div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightFlashlight.cs</code><code>NightEnemy.cs (ApplyGlow)</code><code>NightWorld.cs (UpdateGlow)</code><code>SurvivorBurst.cs</code></div>
+    </section>
+
+    <!-- ================= 08 ENEMY ================= -->
+    <section class="theme" id="enemy" data-keywords="敵 ai 経路探索 スタック 角 meshy blender glb fbx 狼 ゴーレム キノコ アニメーション">
+      <div class="theme-head reveal"><div class="num">08</div><h2>敵(AIと3Dモデル)<span class="sub">通路に沿って追いかけ、角で詰まらない</span></h2></div>
+      <div class="tablewrap reveal"><table>
+        <tr><th>種類</th><th>見た目(Meshy AI)</th><th>速さ</th><th>光HP</th><th>接触ダメージ/秒</th><th>特徴</th><th>出現率</th></tr>
+        <tr><td>群れ型</td><td>リーフバウンド・ウルフ(四足)</td><td>3.5</td><td>34</td><td>11</td><td>速くて弱い</td><td>45%</td></tr>
+        <tr><td>硬い型</td><td>エンバーウッド・コロッサス(ゴーレム)</td><td>2.05</td><td>115</td><td>24</td><td>高さ約5.5。通路をふさぐ大きさ</td><td>25%</td></tr>
+        <tr><td>遠距離型</td><td>マッシュルーム・ガーディアン</td><td>1.8</td><td>60</td><td>8</td><td>9m以内で見通せると立ち止まり、2.5秒ごとに弾を撃つ</td><td>30%</td></tr>
+      </table></div>
+      <p class="reveal" style="color:var(--text-2);margin-top:12px">出現はプレイヤーから12〜24m離れた通路上。間隔は最初2.4秒で、時間とともに最短0.7秒まで短くなります(門が開いた後はさらに15%速く)。同時に出るのは最大44体です。</p>
+
+      <h3 class="reveal" style="margin-top:var(--s3)">追いかけ方(3段構え)</h3>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-how">1</span>見通せるなら直進</h3><p><code>ClearSight</code> でプレイヤーまでの間が歩ける場所だけなら、まっすぐ向かいます。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">2</span>見通せないなら通路グラフ</h3><p>カーブや分岐の向こうにいるときは、ダイクストラ法で求めた経路の中継点をたどります。経路は0.4秒ごとに引き直します。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">3</span>壁に当たったら滑る</h3><p>進みたい方向が通路の外なら、0°→±20°→±40°→±65°→±90°→±125°と少しずつ曲げて、歩ける方向を探します。それでも0.3秒進めなければ、0.8秒だけ直進をやめて経路に従います。</p></div>
+      </div>
+      <div class="card reveal" style="margin-top:var(--s2)"><h3><span class="label l-hard">難しかった</span>近くの敵が角でスタックする</h3>
+        <div class="pcf"><div class="p"><b>症状</b>最短ルートで向かってくる敵が角で止まる</div><div class="c"><b>原因</b>まっすぐ進もうとして通路の外にはみ出し、「内側へ戻す」処理で元の位置に押し戻され続けていた</div><div class="f"><b>対策</b>はみ出す前に、通れる方向へ曲げて壁沿いに滑らせる(上の3)。詰まり検出で経路に切り替え</div></div></div>
+
+      <h3 class="reveal" style="margin-top:var(--s4)">3Dモデルの取り込み</h3>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-hard">難しかった</span>GLBはUnityで読めない</h3>
+          <p>キノコはGLB形式でした。Unityは標準でGLBを読めないため、インストール済みのBlender 5.2を画面なしで動かし、FBXに変換しました。中に余分な球(マテリアルなし・42頂点)が入っていたので除き、埋め込まれたテクスチャもPNGに書き出しています。</p></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>大きさを自動でそろえる</h3>
+          <p>モデルごとに単位がバラバラなので、読み込んだ後に見た目の高さを測り、目標の高さ(狼1.6・ゴーレム5.5・キノコ2.2)に自動で拡大縮小し、足元を地面に合わせます。</p></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>Animatorを作らずにアニメ再生</h3>
+          <p>アニメーションの状態遷移が不要なため、<code>PlayableGraph</code> で歩きクリップを直接ループ再生しています。<code>SetupEnemyModels</code> がループ設定とマテリアルの差し替え(アルベド+法線のStandard)を自動で行います。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">確認</span>正面の向きは本当に正しい?</h3>
+          <p>「敵がこちらを向いていない」という指摘を受け、骨のデータで確かめました。ゴーレムとキノコは顔の前の骨(<code>headfront</code>)が+Z側、狼は実行中に前脚が後脚より進行方向側(+0.46)にあり、3体とも正しいと判断できました。原因は向きではなく追跡の仕方でした。</p></div>
+      </div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightEnemy.cs</code><code>NightEnemyModels.cs</code><code>NightGame.cs (AdvanceEnemy)</code><code>Assets/Editor/SetupEnemyModels.cs</code><code>Assets/Models/Enemies/</code></div>
+    </section>
+
+    <!-- ================= 09 GIMMICK ================= -->
+    <section class="theme" id="gimmick" data-keywords="ランタン 導きの花 光の球 門 閃光 ギミック 範囲">
+      <div class="theme-head reveal"><div class="num">09</div><h2>ギミック<span class="sub">ランタン・導きの花・光の球・門・閃光</span></h2></div>
+      <div class="tablewrap reveal"><table>
+        <tr><th>ギミック</th><th>照らす時間</th><th>効果</th></tr>
+        <tr><td>ランタン</td><td>0.5秒</td><td>点灯の瞬間、半径9.5m・同じ高さ・見通せる敵を全滅。点灯後も半径8.5mに毎秒28のダメージ。範囲を輪で表示、明かりは16m</td></tr>
+        <tr><td>導きの花</td><td>2秒</td><td>最も近い未回収の光の球まで、葉っぱの形の光の道を約7秒表示。2つ集めた後は門へ案内</td></tr>
+        <tr><td>光の球</td><td>2秒</td><td>半透明の気配から実体化。触れると回収。2つで門が開く</td></tr>
+        <tr><td>入口の門</td><td>—</td><td>開いた門を正面から通り抜けるとクリア。帰り道は敵の出現が少し速い</td></tr>
+        <tr><td>閃光(雷)</td><td>—</td><td>約12秒ごと。森全体が一瞬明るくなり、範囲内の敵にダメージ</td></tr>
+      </table></div>
+      <div class="grid" style="margin-top:var(--s2)">
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>だれの光でも反応する</h3>
+          <p>灯り役が複数いるので、ランタン・花・球は「自分に一番近い光の点」(<code>NearestLightTargetTo</code>)で判定します。最初は1人目の光しか見ていなかったため、他の人が照らしても反応しない問題がありました。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">調整</span>遊びやすさの微調整</h3>
+          <p>ランタンは2秒→0.5秒、範囲は7m/6m→9.5m/8.5mへ。花と球はあえて2秒のまま残し、「急いで点けるもの」と「じっくり照らすもの」の役割を分けています。</p></div>
+      </div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightObjects.cs</code><code>NightGame.cs (IgniteLantern / ActivateGuidePlant / UpdateFlash)</code></div>
+    </section>
+
+    <!-- ================= 10 UI ================= -->
+    <section class="theme" id="ui" data-keywords="ui hud 画面 imgui モックアップ 結果画面 アニメーション 名前入力 ime">
+      <div class="theme-head reveal"><div class="num">10</div><h2>画面(UI/HUD)<span class="sub">HTMLモックアップをUnityで再現する</span></h2></div>
+      <p class="summary reveal">画面はすべて <code>NightHud</code> が Unity の IMGUI(<code>OnGUI</code>)で描いています。最初に受け取ったHTMLのモックアップと同じ配置になるよう、画面の高さ760pxを基準に全体を拡大縮小しています。角丸パネルやグラデーションの画像も、コードで生成しています。</p>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>作る前にモックアップで合意</h3>
+          <p>UI改善やランキングは、先にHTMLのモックアップ(<code>mockup/</code>)を作り、「現在/改善案」を切り替えて見比べてもらってから実装しました。手戻りを減らすためです。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">画面に出る情報</span>プレイ中</h3>
+          <ul><li>左上: マップ名、HP、擬態ゲージ、コントローラーの接続(USB/Wi-Fi)</li><li>中央上: 光の球 0/2 と進み具合</li><li>右上: 状態(擬態中/移動中/ゲージ切れ)、撃破数、時間、閃光までの秒数</li><li>右下: QRコード、URL、接続中の灯り役(色の丸と人数)</li></ul></div>
+        <div class="card reveal"><h3><span class="label l-hard">難しかった</span>名前入力と日本語IME</h3>
+          <p>自動テストでキーを送ると、日本語入力(IME)が文字を変換待ちにしてしまい、入力欄に入りませんでした。IMEの確定前のEnterでゲームが始まらないよう、開いた直後0.25秒はEnterを受け付けない工夫もしています。実機のキーボードでの確認が必要な部分です。</p></div>
+      </div>
+      <h3 class="reveal" style="margin-top:var(--s4)">結果画面のアニメーション(時間の流れ)</h3>
+      <ol class="timeline reveal">
+        <li><b>0.0秒</b> 画面が暗くなる(0.4秒)</li>
+        <li><b>0.15秒</b> 「門を抜けて脱出した！」が大きい状態から弾むように縮んで出る</li>
+        <li><b>0.9秒〜</b> スコアの内訳が1行ずつ右から流れ込む(0.3秒間隔)</li>
+        <li><b>その後</b> 合計スコアが0から1.3秒でカウントアップし、数えきれた瞬間にポンと弾む</li>
+        <li><b>さらに後</b> 順位が2.2倍から弾んで出る。10位以内なら効果音と紙吹雪、3位以内は金色に光る</li>
+        <li><b>最後</b> ボタンがふわっと出る。画面をクリックすれば全部飛ばせる</li>
+      </ol>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightHud.cs</code><code>mockup/night-ui-improvement.html</code><code>mockup/night-ranking.html</code></div>
+    </section>
+
+    <!-- ================= 11 RANKING ================= -->
+    <section class="theme" id="ranking" data-keywords="ランキング スコア csv excel 名前 計算式 マップ別">
+      <div class="theme-head reveal"><div class="num">11</div><h2>ランキングとスコア<span class="sub">マップ別・Excelで管理できるCSV</span></h2></div>
+      <div class="grid">
+        <div class="tool reveal" aria-labelledby="stool">
+          <h3 id="stool" style="margin:0 0 8px">試してみる:スコア計算</h3>
+          <div class="seg" role="group" aria-label="結果"><button id="bWin" aria-pressed="true">クリア</button><button id="bLose" aria-pressed="false">途中終了</button></div>
+          <label for="sec"><span id="secLabel">クリアタイム</span>: <b id="secOut">04:32</b></label>
+          <input id="sec" type="range" min="60" max="660" value="272">
+          <label for="kills">撃破数: <b id="killOut">28</b>体</label>
+          <input id="kills" type="range" min="0" max="80" value="28">
+          <div style="margin-top:12px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><span style="color:var(--text-3)">スコア</span><span class="bigscore" id="scoreOut" aria-live="polite">11,080</span></div>
+          <p class="mono" id="formula" style="font-size:12px;color:var(--text-3);margin:6px 0 0"></p>
+        </div>
+        <div class="card reveal"><h3><span class="label l-how">計算式</span>速さと倒す数のバランス</h3>
+          <ul><li>クリア: <code>5000 + 撃破×100 + max(0, 600−秒)×10</code></li><li>途中終了: <code>撃破×100 + 生存秒×5</code>(必ずクリアより低い)</li><li>1体 = 時間10秒ぶんの価値。速さと撃破のどちらかに偏らない。</li><li>同点はクリアタイムが短い方、さらに同じなら先に出した方が上。</li></ul></div>
+      </div>
+      <div class="grid" style="margin-top:var(--s2)">
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>Excelでそのまま管理</h3>
+          <p>記録はexeと同じフォルダの <code>ranking.csv</code> に保存します。列は「マップ, 名前, スコア, 秒数, 撃破数, 結果, 日時」。</p>
+          <ul><li>BOM付きUTF-8で保存し、Excelで開いても日本語が文字化けしない。</li><li>ファイルの更新日時が変わったら読み直すので、Excelで直した内容がタイトル画面に戻ると反映される。</li><li>カンマ入りの名前(引用符付きのセル)も読める。</li><li>画面には上位10件、ファイルには全記録を残す。</li></ul></div>
+        <div class="card reveal"><h3><span class="label l-hard">注意</span>Excelで開いたまま</h3>
+          <p>Excelがファイルを開いている間は、ゲームからの書き込みが失敗することがあります。失敗してもゲームは止まらず、ログに警告を出すだけにしています。読み込みは他のアプリが開いていても読める方法(<code>FileShare.ReadWrite</code>)にしました。</p></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>テストで本物を汚さない</h3>
+          <p>自動撮影テストは <code>ranking_test.csv</code> という別のファイルを使います。テスト中のプレイが本番のランキングに混ざらないようにするためです。</p></div>
+      </div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightRanking.cs</code><code>NightGame.cs (End)</code><code>NightHud.cs (DrawRankingPanel / DrawEndOverlay)</code></div>
+    </section>
+
+    <!-- ================= 12 AUDIO ================= -->
+    <section class="theme" id="audio" data-keywords="音 bgm 効果音 雨 雷">
+      <div class="theme-head reveal"><div class="num">12</div><h2>音<span class="sub">効果音はコードで合成、BGMはmp3</span></h2></div>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>効果音を波形から作る</h3>
+          <p>HTMLモックアップ(WebAudio)の音を再現するため、<code>NightAudio</code> がサイン波やノイズを組み合わせて効果音を作ります(照射のブザー、撃破のチャイム、被弾、衝撃波、雷鳴の予兆と落雷、クリア、ゲームオーバー、雨音)。音声ファイルが要りません。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">仕組み</span>ステージのBGM</h3>
+          <p>BGMは <code>Assets/Resources/Bgm/stage_bgm.mp3</code>(「残奇」)を読み込み、ゲーム開始からループ再生し、結果画面で止めます。BGMを邪魔しないよう、雨音は音量0.4に下げました。</p></div>
+        <div class="card reveal"><h3><span class="label l-hard">注意</span>保存された音量</h3>
+          <p>一時停止メニューの音量・明るさは保存されて次回も使われます。以前の設定(音量5%)が残っていて、BGMがほとんど聞こえないことがありました。メニューのスライダーで戻せます。</p></div>
+      </div>
+    </section>
+
+    <!-- ================= 13 BUILD ================= -->
+    <section class="theme" id="build" data-keywords="ビルド テスト 自動撮影 bat 文字化け git コミット 運用 起動">
+      <div class="theme-head reveal"><div class="num">13</div><h2>ビルド・テスト・運用<span class="sub">ダブルクリックで最新版、自動で画面確認</span></h2></div>
+      <div class="grid">
+        <div class="card reveal"><h3><span class="label l-how">起動</span>play_night.bat</h3>
+          <p>ダブルクリックすると、Unityエディタを開かずに最新のコードでビルドし(約1分)、exeを起動して前面に出します。</p>
+          <div class="pcf" style="grid-template-columns:1fr;margin-top:10px"><div class="p"><b>難しかった</b>batの日本語が文字化け</div><div class="c"><b>原因</b>ファイルはUTF-8、Windowsのコマンドプロンプトは Shift-JIS(CP932)で読む</div><div class="f"><b>対策</b>CP932・改行CRLFで保存し直す。「固まって見える」問題には進行メッセージと前面表示を追加</div></div></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>自動撮影テスト</h3>
+          <p>exeを <code>-nightAutoShot 保存先</code> で起動すると、次を順に実行して撮影し、自動で終了します。</p>
+          <ul style="columns:2;column-gap:18px"><li>タイトル(A/B/C)</li><li>プレイ開始</li><li>圧力マットの模擬入力</li><li>敵への照射</li><li>擬態</li><li>光の球の実体化</li><li>ランタン点灯</li><li>導きの花</li><li>木の発光</li><li>敵3体の並び</li><li>閃光</li><li>結果画面(3枚)</li></ul>
+          <p><code>-nightMap A</code> を付けると、そのマップの広場を巡回して撮影します(地形の確認用)。模擬のスマホ接続もテストから送れます。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">運用</span>Git</h3>
+          <ul><li>作業の保存先は <code>chameleon-night-demo-1005</code> の <code>feature/unity-survivor</code> ブランチ。</li><li><code>main</code> には直接コミット・プッシュしない(取り込むときはプルリクエスト)。</li><li>押し返されたら強制上書きせず、取り込んでから送る。</li><li>ビルドログ、印刷用QR(PCのIPが入る)はコミットしない。</li></ul></div>
+      </div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>play_night.bat</code><code>Assets/Editor/BuildScript.cs</code><code>NightAutoShot.cs</code></div>
+    </section>
+
+    <!-- ================= 14 FAQ ================= -->
+    <section class="theme" id="faq" data-keywords="質問 faq 発表 想定問答">
+      <div class="theme-head reveal"><div class="num">14</div><h2>想定される質問と答え<span class="sub">発表・展示で聞かれそうなこと</span></h2></div>
+      <div class="qa reveal">
+        <details><summary>スマホにアプリを入れる必要はありますか?</summary><div class="a">いりません。PCが小さなWebサーバーになり、QRを読むとブラウザで操作ページが開きます。名前の入力も不要です。</div></details>
+        <details><summary>何人まで遊べますか?</summary><div class="a">カメレオン役1人と、灯り役が最大7人です。人数が多いほど1人分の光は小さくなり、難しさのバランスを保ちます。</div></details>
+        <details><summary>なぜHTTPSも使っているのですか?</summary><div class="a">iPhoneは、傾きセンサーの使用許可をHTTPSのページでしか出さないためです。タッチ操作だけならHTTPでも動きます。自己署名の証明書なので、スマホに警告が出たら「続行」を選びます。</div></details>
+        <details><summary>ライトが遅れるのはなぜ?</summary><div class="a">以前は送信のたびに接続をやり直していたのが主因で、Keep-Aliveで解消しました。残る遅延は、Wi-Fiの混雑やスマホの省電力、テザリング経由の接続が主な原因です。展示では普通のWi-Fiルーターをおすすめします。</div></details>
+        <details><summary>Wi-Fiや会場が変わったら?</summary><div class="a">PCのIPが変わるので、QRコードの中身も変わります。ゲームは起動のたびにIPを調べ直し、画面左下に表示します。印刷したQRは、<code>make_qr.bat</code> で作り直してください。</div></details>
+        <details><summary>敵が光っていたのに、なぜ「発光が効いていなかった」と分かったのですか?</summary><div class="a">発光の色にマゼンタのような、ありえない色を入れても画面が変わらなかったからです。敵が光って見えたのは、もともとの色がオレンジ系だっただけでした。そこで発光をやめ、通常の色を直接変える方法にしました。</div></details>
+        <details><summary>ランキングを手で直したり消したりできますか?</summary><div class="a">できます。exeと同じフォルダの <code>ranking.csv</code> をExcelで開いて、名前の修正や行の削除をして保存すれば、次にタイトル画面に戻ったときに反映されます。</div></details>
+        <details><summary>敵の3Dモデルはどう作りましたか?</summary><div class="a">画像生成AIで作ったキャラ画像を Meshy AI で3D化・アニメーション付けしました。GLB形式のものはBlenderでFBXに変換し、Unity側では高さの自動調整とアニメのループ再生を自動化しています。</div></details>
+      </div>
+    </section>
+
+    <!-- ================= 15 GLOSSARY ================= -->
+    <section class="theme" id="glossary" data-keywords="用語 用語集">
+      <div class="theme-head reveal"><div class="num">15</div><h2>用語集</h2></div>
+      <div class="tablewrap reveal"><table>
+        <tr><th>用語</th><th>意味</th></tr>
+        <tr><td>Zファイティング</td><td>ほぼ同じ奥行きの面が重なり、どちらを描くか毎フレーム入れ替わってちらつく現象</td></tr>
+        <tr><td>深度バッファ / 手前クリップ</td><td>画素ごとの奥行きを記録する仕組み / カメラがこれより近い物を描かない距離</td></tr>
+        <tr><td>Emission(発光)</td><td>マテリアル自体が光って見える設定。このプロジェクトのビルドでは描画されなかった</td></tr>
+        <tr><td>MSAA / 異方性フィルタ</td><td>物の縁のギザギザを減らす処理 / 斜めから見たテクスチャをくっきり保つ処理</td></tr>
+        <tr><td>ダイクストラ法</td><td>グラフ上で最短経路を求める方法。敵の道案内に使用</td></tr>
+        <tr><td>UDP / TCP</td><td>通信の方式。UDPは送りっぱなしで軽い(圧力マット)、TCPは確実に届ける(スマホ)</td></tr>
+        <tr><td>Keep-Alive</td><td>1回の接続で複数のやり取りを続けること。毎回の接続のやり直しを防ぐ</td></tr>
+        <tr><td>自己署名証明書</td><td>認証局を通さず自分で作ったHTTPS用の証明書。ブラウザに警告が出る</td></tr>
+        <tr><td>IMGUI</td><td>Unityの、コードで毎フレーム画面を描くUIの仕組み(<code>OnGUI</code>)</td></tr>
+        <tr><td>PlayableGraph</td><td>Animatorの状態遷移を作らずに、アニメーションを直接再生できる仕組み</td></tr>
+        <tr><td>BOM付きUTF-8</td><td>先頭に目印を付けたUTF-8。Excelが日本語を正しく読める</td></tr>
+        <tr><td>CP932(Shift-JIS)</td><td>Windowsのコマンドプロンプトが日本語に使う文字コード</td></tr>
+      </table></div>
+    </section>
+
+    <div class="empty" id="empty">一致するテーマがありません。別のキーワードで試してください。</div>
+    <footer>カメレオンナイト ― 光の球収集版 / システム解説ガイド。数値はコード(2026年10月時点)から引用。</footer>
+  </main>
+</div>
+
+<button class="iconbtn totop" id="toTop" aria-label="ページの先頭へ戻る">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+</button>
+
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section.theme'));
+  var tocList = document.getElementById('tocList');
+
+  // ---- build TOC ----
+  sections.forEach(function (s) {
+    var h = s.querySelector('h2');
+    var title = h.childNodes[0].textContent.trim();
+    var li = document.createElement('li'); li.dataset.target = s.id;
+    var a = document.createElement('a'); a.href = '#' + s.id; a.textContent = title;
+    li.appendChild(a); tocList.appendChild(li);
+  });
+
+  // ---- scrollspy ----
+  var links = tocList.querySelectorAll('a');
+  var spy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) links.forEach(function (l) { l.setAttribute('aria-current', l.getAttribute('href') === '#' + e.target.id ? 'true' : 'false'); });
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  sections.forEach(function (s) { spy.observe(s); });
+
+  // ---- reveal on scroll ----
+  var reveals = document.querySelectorAll('.reveal');
+  if (reduce || !('IntersectionObserver' in window)) reveals.forEach(function (r) { r.classList.add('in'); });
+  else {
+    var ro = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); ro.unobserve(e.target); } });
+    }, { threshold: 0.08 });
+    reveals.forEach(function (r, i) { r.style.transitionDelay = (i % 4) * 40 + 'ms'; ro.observe(r); });
+  }
+
+  // ---- hero count-up ----
+  document.querySelectorAll('[data-count]').forEach(function (el) {
+    var target = +el.dataset.count;
+    if (reduce) { el.textContent = target.toLocaleString(); return; }
+    var t0 = null;
+    function step(t) { if (!t0) t0 = t; var p = Math.min(1, (t - t0) / 1200); var e = 1 - Math.pow(1 - p, 3); el.textContent = Math.round(target * e).toLocaleString(); if (p < 1) requestAnimationFrame(step); }
+    requestAnimationFrame(step);
+  });
+
+  // ---- progress + to top ----
+  var bar = document.getElementById('progress'), toTop = document.getElementById('toTop');
+  window.addEventListener('scroll', function () {
+    var h = document.documentElement; var p = h.scrollTop / Math.max(1, h.scrollHeight - h.clientHeight);
+    bar.style.width = (p * 100) + '%'; toTop.classList.toggle('show', h.scrollTop > 800);
+  }, { passive: true });
+  toTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' }); });
+
+  // ---- search filter ----
+  var q = document.getElementById('q'), empty = document.getElementById('empty');
+  q.addEventListener('input', function () {
+    var v = q.value.trim().toLowerCase(), shown = 0;
+    sections.forEach(function (s) {
+      var hit = !v || (s.dataset.keywords + ' ' + s.textContent).toLowerCase().indexOf(v) >= 0;
+      s.classList.toggle('hidden', !hit); if (hit) shown++;
+      var li = tocList.querySelector('li[data-target="' + s.id + '"]'); if (li) li.classList.toggle('hidden', !hit);
+      if (hit && v) s.querySelectorAll('.reveal').forEach(function (r) { r.classList.add('in'); });
+    });
+    empty.style.display = shown ? 'none' : 'block';
+  });
+
+  // ---- mobile menu ----
+  var menuBtn = document.getElementById('menuBtn'), toc = document.getElementById('toc');
+  menuBtn.addEventListener('click', function () { var o = toc.classList.toggle('open'); menuBtn.setAttribute('aria-expanded', o); });
+  toc.addEventListener('click', function (e) { if (e.target.tagName === 'A') { toc.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); } });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && toc.classList.contains('open')) { toc.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); menuBtn.focus(); } });
+
+  // ---- theme toggle (remembered) ----
+  var themeBtn = document.getElementById('themeBtn');
+  try { var saved = localStorage.getItem('cn-guide-theme'); if (saved) document.documentElement.dataset.theme = saved; } catch (e) {}
+  themeBtn.addEventListener('click', function () {
+    var next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('cn-guide-theme', next); } catch (e) {}
+  });
+
+  // ---- light radius tool ----
+  var n = document.getElementById('nPlayers');
+  function upR() { var k = +n.value; var s = Math.max(1.1 / 3, 1 / Math.sqrt(k)); var r = 3 * s;
+    document.getElementById('nOut').textContent = k; document.getElementById('rOut').textContent = r.toFixed(2);
+    document.getElementById('rBar').style.width = (r / 3 * 100) + '%'; }
+  n.addEventListener('input', upR); upR();
+
+  // ---- score tool ----
+  var win = true, sec = document.getElementById('sec'), kills = document.getElementById('kills');
+  var bWin = document.getElementById('bWin'), bLose = document.getElementById('bLose'), scoreOut = document.getElementById('scoreOut'), shownScore = 0, anim = null;
+  function mmss(s) { s = +s; return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+  function calc() {
+    var s = +sec.value, k = +kills.value, sc, f;
+    if (win) { sc = 5000 + k * 100 + Math.max(0, 600 - s) * 10; f = '5000 + ' + k + '×100 + ' + Math.max(0, 600 - s) + '×10'; }
+    else { sc = k * 100 + s * 5; f = k + '×100 + ' + s + '×5'; }
+    document.getElementById('secOut').textContent = mmss(s); document.getElementById('killOut').textContent = k;
+    document.getElementById('secLabel').textContent = win ? 'クリアタイム' : '生存時間';
+    document.getElementById('formula').textContent = f + ' = ' + sc.toLocaleString();
+    animateTo(sc);
+  }
+  function animateTo(target) {
+    if (reduce) { shownScore = target; scoreOut.textContent = target.toLocaleString(); return; }
+    var from = shownScore, t0 = null; cancelAnimationFrame(anim);
+    function step(t) { if (!t0) t0 = t; var p = Math.min(1, (t - t0) / 350); shownScore = Math.round(from + (target - from) * (1 - Math.pow(1 - p, 3)));
+      scoreOut.textContent = shownScore.toLocaleString(); if (p < 1) anim = requestAnimationFrame(step); }
+    anim = requestAnimationFrame(step);
+  }
+  bWin.addEventListener('click', function () { win = true; bWin.setAttribute('aria-pressed', 'true'); bLose.setAttribute('aria-pressed', 'false'); calc(); });
+  bLose.addEventListener('click', function () { win = false; bWin.setAttribute('aria-pressed', 'false'); bLose.setAttribute('aria-pressed', 'true'); calc(); });
+  sec.addEventListener('input', calc); kills.addEventListener('input', calc); calc();
+})();
+</script>
+</body>
+</html>
