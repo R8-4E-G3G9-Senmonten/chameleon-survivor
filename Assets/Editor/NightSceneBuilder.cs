@@ -91,9 +91,9 @@ public static class NightSceneBuilder
 
         // 敵の見た目: 群れ型=狼 / 硬い型=巨人 / 遠距離型=キノコの守り手(いずれもMeshy AI製)
         var models = gameGO.AddComponent<NightEnemyModels>();
-        models.moth = MakeEnemyModel(SetupEnemyModels.Wolf, 1.0f);
-        models.brute = MakeEnemyModel(SetupEnemyModels.Colossus, 3.6f);
-        models.shooter = MakeEnemyModel(SetupEnemyModels.Mushroom, 1.5f);
+        models.moth = MakeEnemyModel(SetupEnemyModels.Wolf, 1.6f);
+        models.brute = MakeEnemyModel(SetupEnemyModels.Colossus, 5.5f);
+        models.shooter = MakeEnemyModel(SetupEnemyModels.Mushroom, 2.2f);
 
         if (!Directory.Exists("Assets/Scenes")) Directory.CreateDirectory("Assets/Scenes");
         EditorSceneManager.SaveScene(scene, ScenePath);

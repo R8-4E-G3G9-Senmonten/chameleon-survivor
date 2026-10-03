@@ -123,7 +123,7 @@ public class NightHud : MonoBehaviour
         float preview = Mathf.Min(cardW - 24f, compact ? 180f : 235f);
         float cardH = 14f + preview + 12f + 22f + 7f + 14f + 16f;
 
-        string paragraph = "球や敵にマウスの光を当て続けます。すぐ近くの敵には光が効きません。止まると擬態して一時的に無敵になり、敵を押し返します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを約2秒連続で照らすと点灯し、半径7mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径6mの敵に継続ダメージを与えます。途中で光を外すと蓄光はリセットされます。球は約2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を約2秒連続で照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。";
+        string paragraph = "球や敵にマウスの光を当て続けます。止まると擬態して一時的に無敵になり、敵を押し返します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを約0.5秒照らすと点灯し、半径7mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径6mの敵に継続ダメージを与えます。途中で光を外すと蓄光はリセットされます。球は約2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を約2秒連続で照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。";
         var helpStyle = S("help", 11, C(0x8fada4), TextAnchor.UpperLeft, wrap: true);
         float helpW = Mathf.Min(650f, W - 48f);
         float helpH = helpOpen ? helpStyle.CalcHeight(new GUIContent(paragraph), helpW) + 8f : 0f;
@@ -194,7 +194,7 @@ public class NightHud : MonoBehaviour
             new KeyValuePair<string[], string>(new[] { "WASD", "↑↓←→" }, "移動"),
             new KeyValuePair<string[], string>(new string[0], "マウスで照らす"),
             new KeyValuePair<string[], string>(new string[0], "止まると擬態"),
-            new KeyValuePair<string[], string>(new string[0], "ランタンは約2秒照らして点灯・周囲の敵を撃退"),
+            new KeyValuePair<string[], string>(new string[0], "ランタンは照らすとすぐ点灯・周囲の敵を撃退"),
             new KeyValuePair<string[], string>(new string[0], "花を照らすと道案内"),
         };
         const float gap = 14f;

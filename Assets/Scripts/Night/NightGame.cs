@@ -84,6 +84,15 @@ public class NightGame : MonoBehaviour
     public List<Vector3> LightTargets => Flashlight.Targets; // 接続中の全スマホ(何人でも)の照準点
     public Vector3 PlayerPos => Player.transform.position;
 
+    // 光が当たっている間、一定間隔でだけ true を返す(当たり演出の火花を出す間隔の管理用)
+    public static bool FxTick(ref float timer, float dt, float interval)
+    {
+        timer -= dt;
+        if (timer > 0f) return false;
+        timer = interval;
+        return true;
+    }
+
     // pos から見て最も近い照準点を返す(どのスマホが照らしても反応させたい箇所向け)
     public Vector3 NearestLightTargetTo(Vector3 pos)
     {
@@ -419,7 +428,7 @@ public class NightGame : MonoBehaviour
             Vector3 ep = en.Position;
             Vector3 nearestTarget = NearestLightTargetTo(ep);
             float distToLight = Mathf.Sqrt((ep.x - nearestTarget.x) * (ep.x - nearestTarget.x) + (ep.z - nearestTarget.z) * (ep.z - nearestTarget.z));
-            bool spotHit = distToLight < Flashlight.LightRadius && dist > Flashlight.DeadZone && Mathf.Abs(ep.y - nearestTarget.y) < 1.8f;
+            bool spotHit = distToLight < Flashlight.LightRadius && Mathf.Abs(ep.y - nearestTarget.y) < 1.8f;
             bool flashHit = FlashLevel > 0.05f && dist < FlashRange;
             float lantern = LanternDamageAt(ep);
             bool lit = spotHit || flashHit || lantern > 0f;
@@ -432,24 +441,39 @@ public class NightGame : MonoBehaviour
             if (lantern > 0f) en.lightHp -= lantern * dt;
             if (!lit) en.lightHp = Mathf.Min(en.lightHpMax, en.lightHp + en.cfg.regen * dt);
             en.ApplyGlow(lit);
+            if (lit && FxTick(ref en.fxTimer, dt, 0.12f)) SurvivorBurst.Spawn(en.Position + Vector3.up * en.hitHeight, new Color(1f, 0.15f, 0.08f), 4);
             if (en.lightHp <= 0f) KillEnemy(en);
         }
         return contactDps;
     }
 
+    // プレイヤーを追う。通路が見通せるなら直進し、見通せない(カーブ・分岐の向こう)ときは通路グラフに沿って進む。
+    // 経路が空になったり壁際で詰まったりしても止まらないよう、必ず最終的にはプレイヤーの方向へ動かす。
     void AdvanceEnemy(NightEnemy en, float dt)
     {
-        en.navTimer -= dt;
         Vector3 pos = en.Position;
-        if (en.navTimer <= 0f || en.path == null || en.path.Count == 0)
+        Vector3 pp = PlayerPos;
+
+        Vector3 target;
+        if (Map.ClearSight(pos, pp))
         {
-            en.path = Map.NavigationPath(pos, PlayerPos);
-            en.navTimer = 0.65f;
+            target = pp;
+            en.path = null;
         }
-        while (en.path.Count > 1 && NightMap.Flat(pos, en.path[0]) < 0.7f) en.path.RemoveAt(0);
-        if (en.path.Count == 0) return;
-        Vector3 target = en.path[0];
+        else
+        {
+            en.navTimer -= dt;
+            if (en.navTimer <= 0f || en.path == null || en.path.Count == 0)
+            {
+                en.path = Map.NavigationPath(pos, pp);
+                en.navTimer = 0.4f;
+            }
+            while (en.path.Count > 1 && NightMap.Flat(pos, en.path[0]) < 0.7f) en.path.RemoveAt(0);
+            target = en.path.Count > 0 ? en.path[0] : pp;
+        }
+
         float dx = target.x - pos.x, dz = target.z - pos.z, d = Mathf.Sqrt(dx * dx + dz * dz);
+        if (d < 0.05f) { dx = pp.x - pos.x; dz = pp.z - pos.z; d = Mathf.Sqrt(dx * dx + dz * dz); }
         float step = Mathf.Min(d, en.cfg.speed * dt);
         if (d > 0.01f)
         {
@@ -457,8 +481,14 @@ public class NightGame : MonoBehaviour
             pos.z += dz / d * step;
             en.go.transform.rotation = Quaternion.Euler(0, Mathf.Atan2(dx, dz) * Mathf.Rad2Deg, 0);
         }
+        Vector3 before = en.Position;
         Map.ConstrainActor(ref pos, 0.35f);
         en.Position = pos;
+
+        // 壁際で押し戻されて進めていない状態が続いたら、経路を即座に引き直す
+        float moved = NightMap.Flat(before, pos);
+        en.stuckTimer = moved < step * 0.3f ? en.stuckTimer + dt : 0f;
+        if (en.stuckTimer > 0.4f) { en.navTimer = 0f; en.path = null; en.stuckTimer = 0f; }
     }
 
     void KillEnemy(NightEnemy en)
@@ -715,6 +745,7 @@ public class NightGame : MonoBehaviour
         State = GameState.Ended;
         Cleared = win;
         Player.SetAnimating(false);
+        Audio.StopBgm();
         if (win) Audio.PlayClear(); else Audio.PlayGameOver();
     }
 }

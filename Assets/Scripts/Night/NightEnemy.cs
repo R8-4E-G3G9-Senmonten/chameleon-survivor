@@ -34,7 +34,8 @@ public class NightEnemy
     public bool dying;
     public float dieTimer;
     public List<Vector3> path;
-    public float navTimer, shootTimer;
+    public float navTimer, shootTimer, fxTimer, stuckTimer;
+    public float hitHeight = 0.4f; // 被ダメージの火花を出す高さ(体の中心あたり)
 
     public Vector3 Position { get => go.transform.position; set => go.transform.position = value; }
 
@@ -47,6 +48,7 @@ public class NightEnemy
         go = new GameObject("Enemy_" + kind);
         go.transform.position = pos;
         float sc = cfg.scale;
+        hitHeight = 0.4f * sc;
 
         var model = NightEnemyModels.Instance != null ? NightEnemyModels.Instance.For(kind) : null;
         if (model != null)
@@ -77,8 +79,10 @@ public class NightEnemy
     public void ApplyGlow(bool lit)
     {
         float dmg = 1f - Mathf.Clamp01(lightHp / lightHpMax);
-        Color litColor = Color.Lerp(new Color(1f, 0.95f, 0.55f), new Color(1f, 0.35f, 0.1f), dmg);
-        float blend = lit ? Mathf.Lerp(0.75f, 1f, dmg) : dmg * 0.35f;
+        // ダメージを受けている間は赤く点滅させる(溜まるほど濃い赤)
+        float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 28f);
+        Color litColor = Color.Lerp(new Color(1f, 0.5f, 0.3f), new Color(1f, 0.08f, 0.04f), Mathf.Clamp01(dmg + pulse * 0.3f));
+        float blend = lit ? Mathf.Lerp(0.8f, 1f, dmg) : dmg * 0.35f;
         if (modelMats != null)
         {
             // テクスチャ付きモデルは「白 × テクスチャ」が元の見た目。光を浴びたら 1 を超える色を掛けて
@@ -114,6 +118,7 @@ public class NightEnemy
             inst.transform.localPosition = new Vector3(-center.x * k, -(b.min.y - go.transform.position.y) * k, -center.z * k);
         }
 
+        hitHeight = model.targetHeight * 0.55f;
         var mats = new System.Collections.Generic.List<Material>();
         foreach (var r in renderers) mats.AddRange(r.materials);
         modelMats = mats.ToArray();

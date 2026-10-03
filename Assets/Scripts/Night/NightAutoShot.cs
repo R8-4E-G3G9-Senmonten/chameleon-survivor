@@ -173,8 +173,9 @@ public class NightAutoShot : MonoBehaviour
         // 近くのランタンを点灯
         NightLamp lamp = g.World.Lamps[0];
         foreach (var l in g.World.Lamps) if (Vector3.Distance(new Vector3(l.x, 0, l.z), g.PlayerPos) < Vector3.Distance(new Vector3(lamp.x, 0, lamp.z), g.PlayerPos)) lamp = l;
-        yield return AimAt(() => new Vector3(lamp.x, lamp.height, lamp.z), 2.3f);
+        yield return AimAt(() => new Vector3(lamp.x, lamp.height, lamp.z), 0.9f);
         yield return new WaitForSeconds(0.4f);
+        Debug.Log("NightAutoShot: lamp lit=" + lamp.lit + " charge=" + lamp.charge.ToString("0.00"));
         yield return Shot("08_lantern_lit");
 
         // 導きの花
@@ -224,6 +225,14 @@ public class NightAutoShot : MonoBehaviour
             g.Enemies.Add(new NightEnemy(kinds[i], new Vector3(ex, g.Map.SurfaceAt(ex, ez), ez)));
         }
         yield return LockCameraOn(new Vector3(pc.x, pc.y, pc.z - 6f), 0.3f);
+        foreach (var e in g.Enemies)
+        {
+            if (e.kind != NightEnemy.Kind.Moth || e.go == null) continue;
+            Transform fl = null, bl = null;
+            foreach (var t in e.go.GetComponentsInChildren<Transform>()) { if (t.name == "frontleg0") fl = t; if (t.name == "backleg0") bl = t; }
+            if (fl != null && bl != null)
+                Debug.Log("NightAutoShot: wolf front-back along go.forward=" + Vector3.Dot(fl.position - bl.position, e.go.transform.forward).ToString("0.00"));
+        }
         yield return Shot("12a_enemy_models_colossus_lit");
         yield return LockCameraOn(new Vector3(pc.x - 2.6f, pc.y, pc.z - 6f), 0.4f);
         yield return Shot("12b_enemy_wolf_lit");

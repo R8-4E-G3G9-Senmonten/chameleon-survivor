@@ -7,7 +7,7 @@ public class NightAudio : MonoBehaviour
     const int SR = 44100;
     public const float FlashWarn = 1.3f;
 
-    AudioSource sfx, ambient;
+    AudioSource sfx, ambient, bgm;
     AudioClip hitBuzz, downChime, hurt, pulse, rumble, thunder, clear, gameOver;
 
     void Awake()
@@ -17,6 +17,13 @@ public class NightAudio : MonoBehaviour
         ambient = gameObject.AddComponent<AudioSource>();
         ambient.playOnAwake = false;
         ambient.loop = true;
+        ambient.volume = 0.4f; // BGMの邪魔にならないよう、雨音は控えめに
+        // ステージのBGM(Assets/Resources/Bgm/stage_bgm.mp3)
+        bgm = gameObject.AddComponent<AudioSource>();
+        bgm.playOnAwake = false;
+        bgm.loop = true;
+        bgm.volume = 0.7f;
+        bgm.clip = Resources.Load<AudioClip>("Bgm/stage_bgm");
 
         hitBuzz = Clip("hit", Tone(140, 0.08f, true, 0.05f, 0, 90));
         downChime = Clip("down", Mix(Tone(700, 0.1f, false, 0.09f), Tone(1000, 0.14f, false, 0.08f, 0.07f)));
@@ -37,7 +44,12 @@ public class NightAudio : MonoBehaviour
         ambient.clip = Clip("ambient", Ambient());
     }
 
-    public void StartAmbient() { if (!ambient.isPlaying) ambient.Play(); }
+    public void StartAmbient()
+    {
+        if (!ambient.isPlaying) ambient.Play();
+        if (bgm.clip != null && !bgm.isPlaying) bgm.Play();
+    }
+    public void StopBgm() { if (bgm.isPlaying) bgm.Stop(); }
     public void PlayHitBuzz() => sfx.PlayOneShot(hitBuzz);
     public void PlayDownChime() => sfx.PlayOneShot(downChime);
     public void PlayHurt() => sfx.PlayOneShot(hurt);

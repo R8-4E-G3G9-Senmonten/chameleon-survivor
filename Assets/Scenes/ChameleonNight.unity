@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &128738961
+--- !u!1 &57596164
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,38 +127,34 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 128738963}
-  - component: {fileID: 128738962}
+  - component: {fileID: 57596166}
+  - component: {fileID: 57596165}
   m_Layer: 0
-  m_Name: PressureMatServer
+  m_Name: Flashlight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &128738962
+--- !u!114 &57596165
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 128738961}
+  m_GameObject: {fileID: 57596164}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 76eda91337b51e441b6adecc96de5faf, type: 3}
+  m_Script: {fileID: 11500000, guid: cbac52dbe9538cf409fefbd867888a15, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PressureMatServer
-  port: 5005
-  useSerial: 1
-  serialPortName: 
-  baudRate: 115200
---- !u!4 &128738963
+  m_EditorClassIdentifier: Assembly-CSharp::NightFlashlight
+--- !u!4 &57596166
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 128738961}
+  m_GameObject: {fileID: 57596164}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -167,7 +163,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &691490397
+--- !u!1 &219228061
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -175,9 +171,125 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 691490400}
-  - component: {fileID: 691490398}
-  - component: {fileID: 691490399}
+  - component: {fileID: 219228063}
+  - component: {fileID: 219228062}
+  m_Layer: 0
+  m_Name: Player
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &219228062
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 219228061}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c98fe8cf847e0742a41d1e57d1975ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightPlayer
+  characterModelPrefab: {fileID: 919132149155446097, guid: b169d934fc496ac4d93bc7e75f2d2783, type: 3}
+  animatorController: {fileID: 9100000, guid: a1c36fc0aa6b3b84daf4338cf2638adb, type: 2}
+  modelScale: 1
+  modelYawOffset: 0
+  Velocity: {x: 0, y: 0, z: 0}
+--- !u!4 &219228063
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 219228061}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &351271880
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 351271882}
+  - component: {fileID: 351271881}
+  m_Layer: 0
+  m_Name: NightWorld
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &351271881
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 351271880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f85675452601ccc4a8f100618c49c3c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightWorld
+  treePrefabs:
+  - {fileID: 919132149155446097, guid: cd4f3e7af4c6df6448a8a678a500809c, type: 3}
+  - {fileID: 919132149155446097, guid: 23e0e93e2620b42489e7f5bffedb4fd9, type: 3}
+  - {fileID: 919132149155446097, guid: 447044da51e500944af82b5d400926ad, type: 3}
+  - {fileID: 919132149155446097, guid: fdcc505babeaff84e816534075c00bb5, type: 3}
+  - {fileID: 919132149155446097, guid: 21a230c0b35405d498a7fcc78751e70c, type: 3}
+  - {fileID: 919132149155446097, guid: 22c516dc63af37945a382f17814aa07b, type: 3}
+  - {fileID: 919132149155446097, guid: d5faec6ae3c305943baa5e90f244bda2, type: 3}
+  - {fileID: 919132149155446097, guid: 4047e0e4cc3ae5548b74901617bd48fb, type: 3}
+  - {fileID: 919132149155446097, guid: 19ef72b2fe2578e4b955ca1f480c9693, type: 3}
+  - {fileID: 919132149155446097, guid: c03832995d3638f41aca57c9274c0eeb, type: 3}
+  rockPrefabs:
+  - {fileID: 919132149155446097, guid: 8c03b7fa5073ba14b84277568a042927, type: 3}
+  - {fileID: 919132149155446097, guid: ef562ec6de0814046ae171478637fa4e, type: 3}
+  - {fileID: 919132149155446097, guid: 801e8db6b29530b448080bea645465af, type: 3}
+  - {fileID: 919132149155446097, guid: efe3f68f7dd1acc45af53037336dba91, type: 3}
+  - {fileID: 919132149155446097, guid: 50b3c13fe716db043a1a8b327c8961c3, type: 3}
+  - {fileID: 919132149155446097, guid: 02348e6a3badd92448c9d1345cd3fe24, type: 3}
+  PathMat: {fileID: 0}
+  StoneMat: {fileID: 0}
+  WoodMat: {fileID: 0}
+  MossMat: {fileID: 0}
+  LampMetal: {fileID: 0}
+--- !u!4 &351271882
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 351271880}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &432040508
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 432040511}
+  - component: {fileID: 432040509}
+  - component: {fileID: 432040510}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -185,13 +297,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!20 &691490398
+--- !u!20 &432040509
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 691490397}
+  m_GameObject: {fileID: 432040508}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -236,21 +348,21 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!81 &691490399
+--- !u!81 &432040510
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 691490397}
+  m_GameObject: {fileID: 432040508}
   m_Enabled: 1
---- !u!4 &691490400
+--- !u!4 &432040511
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 691490397}
+  m_GameObject: {fileID: 432040508}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 13, z: 12}
@@ -259,7 +371,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &858291732
+--- !u!1 &863322717
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -267,57 +379,38 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 858291734}
-  - component: {fileID: 858291733}
+  - component: {fileID: 863322719}
+  - component: {fileID: 863322718}
   m_Layer: 0
-  m_Name: NightWorld
+  m_Name: PressureMatServer
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &858291733
+--- !u!114 &863322718
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 858291732}
+  m_GameObject: {fileID: 863322717}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f85675452601ccc4a8f100618c49c3c5, type: 3}
+  m_Script: {fileID: 11500000, guid: 76eda91337b51e441b6adecc96de5faf, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NightWorld
-  treePrefabs:
-  - {fileID: 919132149155446097, guid: cd4f3e7af4c6df6448a8a678a500809c, type: 3}
-  - {fileID: 919132149155446097, guid: 23e0e93e2620b42489e7f5bffedb4fd9, type: 3}
-  - {fileID: 919132149155446097, guid: 447044da51e500944af82b5d400926ad, type: 3}
-  - {fileID: 919132149155446097, guid: fdcc505babeaff84e816534075c00bb5, type: 3}
-  - {fileID: 919132149155446097, guid: 21a230c0b35405d498a7fcc78751e70c, type: 3}
-  - {fileID: 919132149155446097, guid: 22c516dc63af37945a382f17814aa07b, type: 3}
-  - {fileID: 919132149155446097, guid: d5faec6ae3c305943baa5e90f244bda2, type: 3}
-  - {fileID: 919132149155446097, guid: 4047e0e4cc3ae5548b74901617bd48fb, type: 3}
-  - {fileID: 919132149155446097, guid: 19ef72b2fe2578e4b955ca1f480c9693, type: 3}
-  - {fileID: 919132149155446097, guid: c03832995d3638f41aca57c9274c0eeb, type: 3}
-  rockPrefabs:
-  - {fileID: 919132149155446097, guid: 8c03b7fa5073ba14b84277568a042927, type: 3}
-  - {fileID: 919132149155446097, guid: ef562ec6de0814046ae171478637fa4e, type: 3}
-  - {fileID: 919132149155446097, guid: 801e8db6b29530b448080bea645465af, type: 3}
-  - {fileID: 919132149155446097, guid: efe3f68f7dd1acc45af53037336dba91, type: 3}
-  - {fileID: 919132149155446097, guid: 50b3c13fe716db043a1a8b327c8961c3, type: 3}
-  - {fileID: 919132149155446097, guid: 02348e6a3badd92448c9d1345cd3fe24, type: 3}
-  PathMat: {fileID: 0}
-  StoneMat: {fileID: 0}
-  WoodMat: {fileID: 0}
-  MossMat: {fileID: 0}
-  LampMetal: {fileID: 0}
---- !u!4 &858291734
+  m_EditorClassIdentifier: Assembly-CSharp::PressureMatServer
+  port: 5005
+  useSerial: 1
+  serialPortName: 
+  baudRate: 115200
+--- !u!4 &863322719
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 858291732}
+  m_GameObject: {fileID: 863322717}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -326,7 +419,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &933983503
+--- !u!1 &1481295723
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -334,8 +427,115 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 933983505}
-  - component: {fileID: 933983504}
+  - component: {fileID: 1481295728}
+  - component: {fileID: 1481295727}
+  - component: {fileID: 1481295726}
+  - component: {fileID: 1481295725}
+  - component: {fileID: 1481295724}
+  m_Layer: 0
+  m_Name: NightGame
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1481295724
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1481295723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5afa9144537005a4b99cc67b5b4b37f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightEnemyModels
+  moth:
+    prefab: {fileID: 919132149155446097, guid: bbf56fbd45aab5f4897dcd880bb49ce0, type: 3}
+    walk: {fileID: 3107642468075168231, guid: bbf56fbd45aab5f4897dcd880bb49ce0, type: 3}
+    targetHeight: 1.6
+    yaw: 0
+    animSpeed: 1
+  brute:
+    prefab: {fileID: 919132149155446097, guid: 7391249c4b5298d428afce1bdfcea300, type: 3}
+    walk: {fileID: -1610863427237328480, guid: 7391249c4b5298d428afce1bdfcea300, type: 3}
+    targetHeight: 5.5
+    yaw: 0
+    animSpeed: 1
+  shooter:
+    prefab: {fileID: 919132149155446097, guid: 7b0ff986106b42648ae8cdd1d74a6093, type: 3}
+    walk: {fileID: 3993029467285542876, guid: 7b0ff986106b42648ae8cdd1d74a6093, type: 3}
+    targetHeight: 2.2
+    yaw: 0
+    animSpeed: 1
+--- !u!114 &1481295725
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1481295723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7e43c01a9c5f944d8e34722038650a8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightAutoShot
+--- !u!114 &1481295726
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1481295723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a365bc83a3d35542a2e7f4e8d934303, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightHud
+  game: {fileID: 1481295727}
+--- !u!114 &1481295727
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1481295723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8e337983adcc3c4b83d5b334fea5789, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NightGame
+  World: {fileID: 351271881}
+  Player: {fileID: 219228062}
+  Flashlight: {fileID: 57596165}
+  Cam: {fileID: 432040509}
+  Moon: {fileID: 1821587194}
+--- !u!4 &1481295728
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1481295723}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1821587193
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1821587195}
+  - component: {fileID: 1821587194}
   m_Layer: 0
   m_Name: Moonlight
   m_TagString: Untagged
@@ -343,13 +543,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!108 &933983504
+--- !u!108 &1821587194
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 933983503}
+  m_GameObject: {fileID: 1821587193}
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
@@ -408,13 +608,13 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!4 &933983505
+--- !u!4 &1821587195
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 933983503}
+  m_GameObject: {fileID: 1821587193}
   serializedVersion: 2
   m_LocalRotation: {x: 0.43347946, y: -0.4272181, z: 0.24543189, w: 0.7545485}
   m_LocalPosition: {x: 10, y: 20, z: -6}
@@ -423,7 +623,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &962919624
+--- !u!1 &1856795096
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -431,52 +631,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 962919626}
-  - component: {fileID: 962919625}
-  m_Layer: 0
-  m_Name: Flashlight
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &962919625
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 962919624}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cbac52dbe9538cf409fefbd867888a15, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NightFlashlight
---- !u!4 &962919626
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 962919624}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1415175055
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1415175057}
-  - component: {fileID: 1415175056}
+  - component: {fileID: 1856795098}
+  - component: {fileID: 1856795097}
   m_Layer: 0
   m_Name: PointerServer
   m_TagString: Untagged
@@ -484,13 +640,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1415175056
+--- !u!114 &1856795097
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1415175055}
+  m_GameObject: {fileID: 1856795096}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d4cdf61b118f3c247840d8c1750f3c13, type: 3}
@@ -498,169 +654,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PointerServer
   port: 8787
   httpsPort: 8788
---- !u!4 &1415175057
+--- !u!4 &1856795098
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1415175055}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1473516177
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1473516179}
-  - component: {fileID: 1473516178}
-  m_Layer: 0
-  m_Name: Player
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1473516178
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1473516177}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c98fe8cf847e0742a41d1e57d1975ba, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NightPlayer
-  characterModelPrefab: {fileID: 919132149155446097, guid: b169d934fc496ac4d93bc7e75f2d2783, type: 3}
-  animatorController: {fileID: 9100000, guid: a1c36fc0aa6b3b84daf4338cf2638adb, type: 2}
-  modelScale: 1
-  modelYawOffset: 0
-  Velocity: {x: 0, y: 0, z: 0}
---- !u!4 &1473516179
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1473516177}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1801496514
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1801496519}
-  - component: {fileID: 1801496518}
-  - component: {fileID: 1801496517}
-  - component: {fileID: 1801496516}
-  - component: {fileID: 1801496515}
-  m_Layer: 0
-  m_Name: NightGame
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1801496515
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1801496514}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5afa9144537005a4b99cc67b5b4b37f0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NightEnemyModels
-  moth:
-    prefab: {fileID: 919132149155446097, guid: bbf56fbd45aab5f4897dcd880bb49ce0, type: 3}
-    walk: {fileID: 3107642468075168231, guid: bbf56fbd45aab5f4897dcd880bb49ce0, type: 3}
-    targetHeight: 1
-    yaw: 0
-    animSpeed: 1
-  brute:
-    prefab: {fileID: 919132149155446097, guid: 7391249c4b5298d428afce1bdfcea300, type: 3}
-    walk: {fileID: -1610863427237328480, guid: 7391249c4b5298d428afce1bdfcea300, type: 3}
-    targetHeight: 3.6
-    yaw: 0
-    animSpeed: 1
-  shooter:
-    prefab: {fileID: 919132149155446097, guid: 7b0ff986106b42648ae8cdd1d74a6093, type: 3}
-    walk: {fileID: 3993029467285542876, guid: 7b0ff986106b42648ae8cdd1d74a6093, type: 3}
-    targetHeight: 1.5
-    yaw: 0
-    animSpeed: 1
---- !u!114 &1801496516
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1801496514}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a7e43c01a9c5f944d8e34722038650a8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NightAutoShot
---- !u!114 &1801496517
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1801496514}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0a365bc83a3d35542a2e7f4e8d934303, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NightHud
-  game: {fileID: 1801496518}
---- !u!114 &1801496518
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1801496514}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b8e337983adcc3c4b83d5b334fea5789, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NightGame
-  World: {fileID: 858291733}
-  Player: {fileID: 1473516178}
-  Flashlight: {fileID: 962919625}
-  Cam: {fileID: 691490398}
-  Moon: {fileID: 933983504}
---- !u!4 &1801496519
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1801496514}
+  m_GameObject: {fileID: 1856795096}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -673,11 +673,11 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 933983505}
-  - {fileID: 691490400}
-  - {fileID: 858291734}
-  - {fileID: 1473516179}
-  - {fileID: 962919626}
-  - {fileID: 1415175057}
-  - {fileID: 128738963}
-  - {fileID: 1801496519}
+  - {fileID: 1821587195}
+  - {fileID: 432040511}
+  - {fileID: 351271882}
+  - {fileID: 219228063}
+  - {fileID: 57596166}
+  - {fileID: 1856795098}
+  - {fileID: 863322719}
+  - {fileID: 1481295728}
