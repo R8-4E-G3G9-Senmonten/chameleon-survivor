@@ -34,7 +34,7 @@ public class NightEnemy
     public bool dying;
     public float dieTimer;
     public List<Vector3> path;
-    public float navTimer, shootTimer, fxTimer, stuckTimer;
+    public float navTimer, shootTimer, fxTimer, stuckTimer, noDirectTimer;
     public float hitHeight = 0.4f; // 被ダメージの火花を出す高さ(体の中心あたり)
 
     public Vector3 Position { get => go.transform.position; set => go.transform.position = value; }
@@ -71,13 +71,49 @@ public class NightEnemy
             eye.transform.localScale = Vector3.one * 0.14f * sc;
             eye.transform.localPosition = new Vector3(0.16f * s * sc, 0.55f * sc, 0.55f * sc);
         }
+        SetupHitFx(0.75f * sc);
     }
 
     // 光を受けている間は即座に光り、ダメージが溜まるほど赤みを帯びて強く光る。外れた後は残りダメージ分だけ薄く残光。
     // _EmissionColor(発光)はスタンドアロンビルドで描画に反映されないことが確認できたため、
     // 代わりに確実に描画される _Color(通常の色)を直接、明るい黄色〜赤へブレンドする方式にしている。
+    // ---- 光ダメージ中の演出: 足元の赤い輪(倒れる直前は太く速く点滅) ----
+    GameObject ringThin, ringThick;
+    Material ringMat;
+
+    void SetupHitFx(float radius)
+    {
+        ringMat = NightMeshes.Unlit(new Color(1f, 0.18f, 0.1f, 0.9f));
+        float thin = 0.05f + 0.02f * radius, thick = 0.18f + 0.07f * radius;
+        ringThin = NightMeshes.MeshObject("HitRingThin", NightMeshes.Ring(radius - thin, radius, 40), ringMat, go.transform);
+        ringThick = NightMeshes.MeshObject("HitRingThick", NightMeshes.Ring(radius - thick, radius, 40), ringMat, go.transform);
+        ringThin.transform.localPosition = ringThick.transform.localPosition = new Vector3(0, 0.12f, 0);
+        ringThin.SetActive(false);
+        ringThick.SetActive(false);
+    }
+
+    void UpdateHitFx(bool lit)
+    {
+        if (ringThin == null) return;
+        if (!lit)
+        {
+            if (ringThin.activeSelf) ringThin.SetActive(false);
+            if (ringThick.activeSelf) ringThick.SetActive(false);
+            return;
+        }
+        bool critical = lightHp / lightHpMax < 0.3f; // 倒れる直前
+        float freq = critical ? 16f : 5f;
+        float blink = 0.5f + 0.5f * Mathf.Sin(Time.time * freq * Mathf.PI * 2f);
+        Color c = ringMat.color;
+        c.a = critical ? 0.55f + 0.45f * blink : 0.35f + 0.55f * blink;
+        ringMat.color = c;
+        ringThin.SetActive(!critical);
+        ringThick.SetActive(critical);
+    }
+
     public void ApplyGlow(bool lit)
     {
+        UpdateHitFx(lit);
         float dmg = 1f - Mathf.Clamp01(lightHp / lightHpMax);
         // ダメージを受けている間は赤く点滅させる(溜まるほど濃い赤)
         float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 28f);
@@ -119,6 +155,7 @@ public class NightEnemy
         }
 
         hitHeight = model.targetHeight * 0.55f;
+        SetupHitFx(model.targetHeight * 0.45f);
         var mats = new System.Collections.Generic.List<Material>();
         foreach (var r in renderers) mats.AddRange(r.materials);
         modelMats = mats.ToArray();

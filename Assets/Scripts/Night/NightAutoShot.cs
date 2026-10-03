@@ -31,7 +31,7 @@ public class NightAutoShot : MonoBehaviour
         yield return new WaitForSeconds(1f);
         g.SelectMap(id);
         yield return new WaitForSeconds(0.5f);
-        g.StartGame();
+        g.BeginPlay("テスト");
         yield return new WaitForSeconds(1.5f);
         yield return Shot(id + "_00_start");
         var regions = g.Map.Regions;
@@ -117,6 +117,20 @@ public class NightAutoShot : MonoBehaviour
         Debug.Log("NightAutoShot: PressureMat idle hasMatInput=" + (PressureMatServer.Instance != null && PressureMatServer.Instance.HasMatInput));
     }
 
+    // スマホの接続を模擬する(本物のスマホと同じ /pointer への POST)。接続中の人数表示の確認用。
+    void PostFake(string id)
+    {
+        try
+        {
+            using (var wc = new System.Net.WebClient())
+            {
+                wc.Headers[System.Net.HttpRequestHeader.ContentType] = "application/json";
+                wc.UploadString("http://127.0.0.1:8787/pointer", "{\"id\":\"" + id + "\",\"x\":0.5,\"y\":0.5,\"active\":false}");
+            }
+        }
+        catch (System.Exception e) { Debug.Log("NightAutoShot: PostFake failed " + e.Message); }
+    }
+
     void Teleport(Vector3 p)
     {
         g.Player.transform.position = new Vector3(p.x, g.Map.SurfaceAt(p.x, p.z), p.z);
@@ -129,6 +143,8 @@ public class NightAutoShot : MonoBehaviour
         yield return Shot("01_title_A");
         g.SelectMap("B");
         yield return new WaitForSeconds(0.6f);
+        for (int k = 0; k < 4; k++) PostFake("fake" + k);
+        yield return new WaitForSeconds(0.3f);
         yield return Shot("02_title_B");
         g.SelectMap("C");
         yield return new WaitForSeconds(0.6f);
@@ -136,9 +152,11 @@ public class NightAutoShot : MonoBehaviour
         g.SelectMap("A");
         yield return new WaitForSeconds(0.6f);
 
-        g.StartGame();
+        g.BeginPlay("テスト");
         g.Flashlight.DebugAim = new Vector2(0.5f, 0.35f);
         yield return new WaitForSeconds(2.5f);
+        for (int k = 0; k < 4; k++) PostFake("fake" + k);
+        yield return new WaitForSeconds(0.3f);
         yield return Shot("04_play_start");
 
         yield return TestPressureMat();
@@ -243,8 +261,12 @@ public class NightAutoShot : MonoBehaviour
         yield return Shot("10_flash");
 
         g.SendMessage("End", false);
-        yield return new WaitForSeconds(0.5f);
-        yield return Shot("11_end");
+        yield return new WaitForSeconds(0.6f);
+        yield return Shot("11_end_a");
+        yield return new WaitForSeconds(2.0f);
+        yield return Shot("11_end_b");
+        yield return new WaitForSeconds(3.5f);
+        yield return Shot("11_end_c");
         yield return new WaitForSeconds(0.5f);
         Application.Quit();
     }

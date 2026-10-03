@@ -201,16 +201,21 @@ public class NightWorld : MonoBehaviour
 
     void BuildPaths()
     {
+        int segIndex = 0;
         foreach (var s in Map.Segments)
         {
+            // 曲がり角や分岐では隣の通路の帯と同じ高さで重なり、Zファイティング(ちかちか)が起きる。
+            // 通路ごとにごくわずか(2mm刻み)に高さをずらして、重なりでも必ず片方が手前になるようにする。
+            float bias = (segIndex++) * 0.002f;
             float dx = s.b.x - s.a.x, dz = s.b.z - s.a.z, len = Mathf.Sqrt(dx * dx + dz * dz);
             bool bridge = BridgeSegment(s);
             float rise = s.b.y - s.a.y;
             var mat = bridge ? WoodMat : PathMat;
 
-            NightMeshes.MeshObject("Path", NightMeshes.Strip(Map, s), mat, Root, true);
-            Circle(s.a.x, s.a.y + 0.17f, s.a.z, s.width / 2f, mat);
-            Circle(s.b.x, s.b.y + 0.17f, s.b.z, s.width / 2f, mat);
+            var strip = NightMeshes.MeshObject("Path", NightMeshes.Strip(Map, s), mat, Root, true);
+            strip.transform.localPosition = new Vector3(0, bias, 0);
+            Circle(s.a.x, s.a.y + 0.17f + bias, s.a.z, s.width / 2f, mat);
+            Circle(s.b.x, s.b.y + 0.17f + bias, s.b.z, s.width / 2f, mat);
 
             if (bridge || Mathf.Abs(rise) > 0.001f)
             {

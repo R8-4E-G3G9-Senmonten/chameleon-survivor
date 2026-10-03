@@ -21,7 +21,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [2/2] 起動します...
-start "" "%PROJECT_DIR%Build\NightForest\ChameleonNight.exe" -skipTitle
+start "" "%PROJECT_DIR%Build\NightForest\ChameleonNight.exe"
 
 REM ゲームウィンドウが別のウィンドウの裏に隠れて見えないことがあるため、
 REM 少し待ってから前面に出す。

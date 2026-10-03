@@ -37,3 +37,6 @@ sysinfo.txt
 
 # play_*.bat が毎回出力するビルドログ
 unity_build_*.log
+
+# make_qr.bat が出力する印刷用QR(PCのIPが入るのでコミットしない)
+qr_print/

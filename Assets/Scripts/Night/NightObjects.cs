@@ -3,7 +3,7 @@ using UnityEngine;
 // 蓄光ランタン。約2秒連続で照らすと点灯し、周囲の敵を撃退。点灯後も周囲に継続ダメージを与える。
 public class NightLamp
 {
-    public const float ChargeTime = 0.5f, BurstRadius = 7f, DamageRadius = 6f, Dps = 28f;
+    public const float ChargeTime = 0.5f, BurstRadius = 9.5f, DamageRadius = 8.5f, Dps = 28f;
     static readonly Color Glow = NightMeshes.Hex(0xffd390);
 
     public readonly float x, z, height;
@@ -14,6 +14,7 @@ public class NightLamp
     readonly Material housingMat, progressMat;
     readonly Transform progress;
     readonly Light light;
+    readonly GameObject rangeRing;
 
     public NightLamp(NightWorld w, float x, float z, float height)
     {
@@ -29,8 +30,11 @@ public class NightLamp
                 w.Box(x + sx * 0.28f, height + 1.43f, z + sz * 0.28f, 0.07f, 0.62f, 0.07f, w.LampMetal);
         progressMat = NightMeshes.Unlit(NightMeshes.Hex(0x9dc9bc, 0.2f));
         progress = w.RingObject(0.58f, 0.68f, progressMat, w.Root, new Vector3(x, height + 0.025f, z), 40).transform;
-        light = NightWorld.PointLight(w.Root, new Vector3(x, height + 1.6f, z), NightMeshes.Hex(0xffcf88), 0f, 12f);
+        light = NightWorld.PointLight(w.Root, new Vector3(x, height + 1.6f, z), NightMeshes.Hex(0xffcf88), 0f, 16f);
         light.enabled = false;
+        // 点灯後に、継続ダメージが届く範囲を細い輪で示す(どこまで安全か分かるように)
+        rangeRing = w.RingObject(DamageRadius - 0.1f, DamageRadius, NightMeshes.Unlit(NightMeshes.Hex(0xffd390, 0.4f)), w.Root, new Vector3(x, height + 0.12f, z), 72);
+        rangeRing.SetActive(false);
     }
 
     public bool InLight(NightMap map, Vector3 pos, float radius)
@@ -62,6 +66,7 @@ public class NightLamp
         {
             power = Mathf.Min(1f, power + dt * 2.5f);
             light.enabled = true;
+            rangeRing.SetActive(true);
             light.intensity = power * 2.25f;
             housingMat.SetColor("_EmissionColor", Glow * (0.9f + power * 1.2f));
             progressMat.color = NightMeshes.Hex(0xffd390, 0.45f);

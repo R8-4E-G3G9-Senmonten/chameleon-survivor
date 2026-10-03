@@ -22,7 +22,7 @@ public class NightGame : MonoBehaviour
 {
     public static NightGame Instance { get; private set; }
 
-    public enum GameState { Title, Playing, Paused, Ended }
+    public enum GameState { Title, NameEntry, Playing, Paused, Ended }
     public GameState State { get; private set; } = GameState.Title;
 
     public NightWorld World;
@@ -148,12 +148,11 @@ public class NightGame : MonoBehaviour
     {
         BuildMap();
         ApplyLighting(0f);
-        // ビルドした exe は、ダブルクリックしただけでタイトル画面を省いてすぐプレイ開始する
-        // (展示会場でそのままゲーム画面に飛べるようにするため)。
-        // タイトルを出したいときは -showTitle を付ける。自動撮影テスト(-nightAutoShot)は自分で画面を操作するので除外。
+        // exe は、起動したらまずマップ(コース)選択から始まる。-skipTitle を付けたときだけ、選択済みのマップで名前入力へ進む。
         var args = System.Environment.GetCommandLineArgs();
-        bool standalone = !Application.isEditor && System.Array.IndexOf(args, "-nightAutoShot") < 0;
-        if ((standalone && System.Array.IndexOf(args, "-showTitle") < 0) || System.Array.IndexOf(args, "-skipTitle") >= 0) StartGame();
+        bool backToTitle = returnToTitle;
+        returnToTitle = false;
+        if (System.Array.IndexOf(args, "-skipTitle") >= 0 && !backToTitle) StartGame();
     }
 
     void BuildMap()
@@ -179,12 +178,38 @@ public class NightGame : MonoBehaviour
         BuildMap();
     }
 
+    // コース(マップ)を決めたあと、ゲームを始める前に名前を入力する画面へ進む。
+    public string PlayerName { get; private set; } = NightRanking.DefaultName;
+    public float NameEntryTime { get; private set; }
     public void StartGame()
     {
         if (State != GameState.Title) return;
+        State = GameState.NameEntry;
+        NameEntryTime = Time.unscaledTime;
+    }
+
+    // 名前入力の画面から、タイトル(コース選択)へ戻る
+    public void CancelNameEntry() { if (State == GameState.NameEntry) State = GameState.Title; }
+
+    // 名前を確定してゲーム開始。名前が空なら「ゲスト」。灯り役(スマホ)は名前の入力なしで参加できる。
+    public void BeginPlay(string name)
+    {
+        if (State != GameState.Title && State != GameState.NameEntry) return;
+        name = (name ?? "").Trim();
+        if (name.Length > NightRanking.MaxNameLength) name = name.Substring(0, NightRanking.MaxNameLength);
+        PlayerName = name.Length == 0 ? NightRanking.DefaultName : name;
         State = GameState.Playing;
         Audio.StartAmbient();
         ShowToast(MapId + ". " + Map.Name + " — 球を2つ集め、入口の門から脱出しよう");
+    }
+
+    // ステージ選択(タイトル)画面へ戻る。次の起動では exe でもタイトルを飛ばさない。
+    static bool returnToTitle;
+    public void BackToTitle()
+    {
+        Time.timeScale = 1f;
+        returnToTitle = true;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     public void Restart()
@@ -224,11 +249,16 @@ public class NightGame : MonoBehaviour
                 for (int i = 0; i < NightMap.Ids.Length; i++)
                     if (Input.GetKeyDown(KeyCode.Alpha1 + i) || Input.GetKeyDown(KeyCode.Keypad1 + i)) SelectMap(NightMap.Ids[i]);
                 return;
+            case GameState.NameEntry:
+                if (Input.GetKeyDown(KeyCode.Escape)) CancelNameEntry();
+                return;
             case GameState.Paused:
                 if (Input.GetKeyDown(KeyCode.Escape)) Resume();
+                if (Input.GetKeyDown(KeyCode.T)) BackToTitle();
                 return;
             case GameState.Ended:
                 if (Input.GetKeyDown(KeyCode.R)) Restart();
+                if (Input.GetKeyDown(KeyCode.T)) BackToTitle();
                 return;
         }
 
@@ -336,7 +366,7 @@ public class NightGame : MonoBehaviour
 
     void LateUpdate()
     {
-        if (State == GameState.Title) PlaceCamera();
+        if (State == GameState.Title || State == GameState.NameEntry) PlaceCamera();
     }
 
     // ---- 敵 ----
@@ -448,14 +478,18 @@ public class NightGame : MonoBehaviour
     }
 
     // プレイヤーを追う。通路が見通せるなら直進し、見通せない(カーブ・分岐の向こう)ときは通路グラフに沿って進む。
-    // 経路が空になったり壁際で詰まったりしても止まらないよう、必ず最終的にはプレイヤーの方向へ動かす。
+    // 進みたい方向が壁(通路の外)で塞がれる角では、通れる方向へ少しずつ曲げて壁沿いに滑るので、角でスタックしない。
+    // それでも詰まったら、しばらく通路グラフの経路だけに従って回り込む。
+    static readonly float[] SlideAngles = { 0f, 20f, -20f, 40f, -40f, 65f, -65f, 90f, -90f, 125f, -125f };
+
     void AdvanceEnemy(NightEnemy en, float dt)
     {
         Vector3 pos = en.Position;
         Vector3 pp = PlayerPos;
+        en.noDirectTimer -= dt;
 
         Vector3 target;
-        if (Map.ClearSight(pos, pp))
+        if (en.noDirectTimer <= 0f && Map.ClearSight(pos, pp))
         {
             target = pp;
             en.path = null;
@@ -474,21 +508,29 @@ public class NightGame : MonoBehaviour
 
         float dx = target.x - pos.x, dz = target.z - pos.z, d = Mathf.Sqrt(dx * dx + dz * dz);
         if (d < 0.05f) { dx = pp.x - pos.x; dz = pp.z - pos.z; d = Mathf.Sqrt(dx * dx + dz * dz); }
-        float step = Mathf.Min(d, en.cfg.speed * dt);
+        float step = Mathf.Min(Mathf.Max(d, 0.0001f), en.cfg.speed * dt);
+        Vector3 before = pos;
         if (d > 0.01f)
         {
-            pos.x += dx / d * step;
-            pos.z += dz / d * step;
-            en.go.transform.rotation = Quaternion.Euler(0, Mathf.Atan2(dx, dz) * Mathf.Rad2Deg, 0);
+            float baseAngle = Mathf.Atan2(dx, dz);
+            // 進みたい方向から順に、歩ける方向を探す(正面→少し曲げる→大きく曲げる)
+            for (int i = 0; i < SlideAngles.Length; i++)
+            {
+                float a = baseAngle + SlideAngles[i] * Mathf.Deg2Rad;
+                float nx = pos.x + Mathf.Sin(a) * step, nz = pos.z + Mathf.Cos(a) * step;
+                if (!Map.Walkable(nx, nz, 0.3f)) continue;
+                pos.x = nx; pos.z = nz;
+                en.go.transform.rotation = Quaternion.Euler(0, a * Mathf.Rad2Deg, 0);
+                break;
+            }
         }
-        Vector3 before = en.Position;
         Map.ConstrainActor(ref pos, 0.35f);
         en.Position = pos;
 
-        // 壁際で押し戻されて進めていない状態が続いたら、経路を即座に引き直す
+        // それでも進めない状態が続いたら、0.8秒だけ直進をやめて通路の経路(中心線)に従う
         float moved = NightMap.Flat(before, pos);
         en.stuckTimer = moved < step * 0.3f ? en.stuckTimer + dt : 0f;
-        if (en.stuckTimer > 0.4f) { en.navTimer = 0f; en.path = null; en.stuckTimer = 0f; }
+        if (en.stuckTimer > 0.3f) { en.navTimer = 0f; en.path = null; en.noDirectTimer = 0.8f; en.stuckTimer = 0f; }
     }
 
     void KillEnemy(NightEnemy en)
@@ -739,11 +781,21 @@ public class NightGame : MonoBehaviour
         Cam.transform.LookAt(cameraFocus + Vector3.up * 0.6f);
     }
 
+    // ---- スコア・ランキング(結果画面用) ----
+    public int Score { get; private set; }
+    public int ScoreSeconds { get; private set; }
+    public int Rank { get; private set; }            // このマップでの順位(10位以内なら1〜10、圏外は0)
+    public NightRanking.Entry MyEntry { get; private set; }
+
     void End(bool win)
     {
         if (State == GameState.Ended) return;
         State = GameState.Ended;
         Cleared = win;
+        ScoreSeconds = Mathf.FloorToInt(Elapsed);
+        Score = NightRanking.ScoreOf(win, ScoreSeconds, KillCount);
+        Rank = NightRanking.Add(MapId, PlayerName, Score, ScoreSeconds, KillCount, win, out var entry);
+        MyEntry = entry;
         Player.SetAnimating(false);
         Audio.StopBgm();
         if (win) Audio.PlayClear(); else Audio.PlayGameOver();
