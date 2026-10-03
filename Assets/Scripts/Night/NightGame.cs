@@ -139,9 +139,12 @@ public class NightGame : MonoBehaviour
     {
         BuildMap();
         ApplyLighting(0f);
-        // play_night.bat から -skipTitle 付きで起動した場合は、タイトル画面を省いてすぐプレイ開始する
-        // (展示会場でダブルクリックしたらそのままゲーム画面に飛べるようにするため)。
-        if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-skipTitle") >= 0) StartGame();
+        // ビルドした exe は、ダブルクリックしただけでタイトル画面を省いてすぐプレイ開始する
+        // (展示会場でそのままゲーム画面に飛べるようにするため)。
+        // タイトルを出したいときは -showTitle を付ける。自動撮影テスト(-nightAutoShot)は自分で画面を操作するので除外。
+        var args = System.Environment.GetCommandLineArgs();
+        bool standalone = !Application.isEditor && System.Array.IndexOf(args, "-nightAutoShot") < 0;
+        if ((standalone && System.Array.IndexOf(args, "-showTitle") < 0) || System.Array.IndexOf(args, "-skipTitle") >= 0) StartGame();
     }
 
     void BuildMap()
