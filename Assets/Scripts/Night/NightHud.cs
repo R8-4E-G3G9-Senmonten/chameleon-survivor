@@ -113,6 +113,7 @@ public class NightHud : MonoBehaviour
         DrawGoalHud();
         DrawTopRight();
         DrawToast();
+        DrawThreatAlert();
         DrawHint();
         DrawConnectPanel(false);
 
@@ -303,6 +304,11 @@ public class NightHud : MonoBehaviour
         float hpRatio = game.Hp / NightGame.HpMax;
         bool low = hpRatio < 0.3f;
         Bar(new Rect(x, y, 190, 11), hpRatio, low ? "hpLow" : "hp", low ? C(0xff5a4a) : C(0x6fe08a), low ? C(0xff8f7a) : C(0x9dffb0), "HP");
+        if (game.HealFlash > 0f)
+        {
+            Fill(new Rect(x - 2, y - 2, 194, 15), new Color(0.6f, 1f, 0.65f, 0.55f * game.HealFlash));
+            Label(new Rect(x + 196, y - 4, 60, 18), "+" + game.LastHeal, S("hpHeal", 12, new Color(0.65f, 1f, 0.7f, game.HealFlash), TextAnchor.MiddleLeft, bold: true));
+        }
         y += 11 + 5;
         bool locked = game.CampLocked;
         Bar(new Rect(x, y, 190, 11), game.Camp / NightGame.CampMax, locked ? "campLocked" : "camp",
@@ -344,11 +350,13 @@ public class NightHud : MonoBehaviour
         var flashStyle = S(soon ? "flashSoon" : "flash", 13, soon ? Color.white : C(0xffe9a0), TextAnchor.MiddleRight, bold: soon);
 
         string kill = "撃破: " + game.KillCount;
+        string threat = "脅威 Lv." + game.Threat + (game.Threat >= NightGame.ThreatMax ? " (最大)" : "");
+        var threatStyle = S("threat" + Mathf.Min(game.Threat, 5), 13, Color.Lerp(C(0xffd9a0), C(0xff5a4a), (game.Threat - 1) / 4f), TextAnchor.MiddleRight, bold: true);
         string timer = FormatTime(game.Elapsed);
         float bw = badgeStyle.CalcSize(new GUIContent(badge)).x + 20f;
-        float contentW = Mathf.Max(bw, killStyle.CalcSize(new GUIContent(kill)).x, timerStyle.CalcSize(new GUIContent(timer)).x,
+        float contentW = Mathf.Max(bw, killStyle.CalcSize(new GUIContent(kill)).x, threatStyle.CalcSize(new GUIContent(threat)).x, timerStyle.CalcSize(new GUIContent(timer)).x,
             S("flashSoon", 13, Color.white, TextAnchor.MiddleRight, bold: true).CalcSize(new GUIContent("閃光まで 12s")).x);
-        Rect r = new Rect(W - 12 - (contentW + 24), 12, contentW + 24, 8 + 22 + 2 + 20 + 2 + 22 + 2 + 18 + 8);
+        Rect r = new Rect(W - 12 - (contentW + 24), 12, contentW + 24, 8 + 22 + 2 + 20 + 2 + 18 + 6 + 2 + 22 + 2 + 18 + 8);
         Panel(r, PanelTex(), 9);
         float x = r.x + 12, y = r.y + 8, w = contentW;
 
@@ -359,6 +367,14 @@ public class NightHud : MonoBehaviour
         y += 22 + 2;
         Shadowed(new Rect(x, y, w, 20), kill, killStyle);
         y += 20 + 2;
+        // 脅威レベル。下の細いバーは「あとどれだけ回復すると次のレベルか」
+        if (game.AlertTimer > 0f) // レベルが上がった直後は白く点滅
+            threatStyle.normal.textColor = Color.Lerp(threatStyle.normal.textColor, Color.white, Mathf.Abs(Mathf.Sin(Time.unscaledTime * 10f)));
+        Shadowed(new Rect(x, y, w, 18), threat, threatStyle);
+        y += 18 + 1;
+        Fill(new Rect(x + w - 90, y, 90, 4), new Color(1f, 1f, 1f, 0.12f));
+        Fill(new Rect(x + w - 90, y, 90 * Mathf.Clamp01(game.ThreatProgress), 4), new Color(1f, 0.45f, 0.3f, 0.85f));
+        y += 5 + 2;
         Shadowed(new Rect(x, y, w, 22), timer, timerStyle);
         y += 22 + 2;
         Shadowed(new Rect(x, y, w, 18), flash, flashStyle);
@@ -373,6 +389,34 @@ public class NightHud : MonoBehaviour
         GUI.color = new Color(1, 1, 1, toastAlpha);
         Shadowed(r, game.ToastText, style, 2f);
         GUI.color = old;
+    }
+
+    // 「敵が増えた！」の警告。ドンと拡大して出て、赤く脈打ち、最後にふわっと消える
+    void DrawThreatAlert()
+    {
+        if (game.AlertTimer <= 0f) return;
+        float t = NightGame.AlertDuration - game.AlertTimer;
+        float appear = EaseOutBack(t / 0.35f);
+        float alpha = Mathf.Clamp01(t / 0.12f) * Mathf.Clamp01(game.AlertTimer / 0.45f);
+        float pulse = 0.5f + 0.5f * Mathf.Sin(t * 14f);
+        float w = 420f, h = 78f;
+        Rect r = new Rect(W / 2f - w / 2f, H * 0.3f, w, h);
+
+        Matrix4x4 old = GUI.matrix;
+        Color oldC = GUI.color;
+        Vector2 c = r.center;
+        float sc = Mathf.Lerp(0.6f, 1f, appear);
+        GUI.matrix = old * Matrix4x4.TRS(new Vector3(c.x, c.y, 0), Quaternion.identity, new Vector3(sc, sc, 1f)) * Matrix4x4.TRS(new Vector3(-c.x, -c.y, 0), Quaternion.identity, Vector3.one);
+        GUI.color = new Color(0.55f + 0.25f * pulse, 0.06f, 0.04f, 0.78f * alpha);
+        Panel(r, Tex("pill", () => RoundedBox(32, 11, Color.white, Color.white, 0)), 11);
+        Color line = new Color(1f, 0.55f, 0.4f, (0.35f + 0.5f * pulse) * alpha);
+        Fill(new Rect(r.x + 18, r.y + 4, r.width - 36, 2), line);
+        Fill(new Rect(r.x + 18, r.yMax - 6, r.width - 36, 2), line);
+        GUI.color = new Color(1f, 1f, 1f, alpha);
+        Shadowed(new Rect(r.x, r.y + 10, r.width, 34), game.AlertText, S("alertMain", 28, C(0xfff0e0), TextAnchor.MiddleCenter, bold: true), 2f);
+        Shadowed(new Rect(r.x, r.y + 46, r.width, 20), game.AlertSub, S("alertSub", 13, C(0xffd0c0), TextAnchor.MiddleCenter), 1f);
+        GUI.color = oldC;
+        GUI.matrix = old;
     }
 
     void DrawHint()

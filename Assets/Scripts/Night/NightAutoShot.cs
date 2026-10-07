@@ -17,11 +17,13 @@ public class NightAutoShot : MonoBehaviour
     {
         var args = System.Environment.GetCommandLineArgs();
         int i = System.Array.IndexOf(args, "-nightAutoShot");
+        if (i >= 0) Application.runInBackground = true; // 撮影はウィンドウが裏にあっても進める
         if (i < 0 || i + 1 >= args.Length) { enabled = false; return; }
         dir = args[i + 1];
         Directory.CreateDirectory(dir);
         g = NightGame.Instance;
         int m = System.Array.IndexOf(args, "-nightMap");
+        if (System.Array.IndexOf(args, "-nightHealTest") >= 0) { StartCoroutine(HealTest()); return; }
         StartCoroutine(m >= 0 && m + 1 < args.Length ? Tour(args[m + 1]) : Run());
     }
 
@@ -43,6 +45,33 @@ public class NightAutoShot : MonoBehaviour
             yield return new WaitForSeconds(1.6f);
             yield return Shot(id + "_" + r.ToString("00") + "_region");
         }
+        Application.Quit();
+    }
+
+    // 回復オーブと「敵が増えた！」の警告の確認
+    IEnumerator HealTest()
+    {
+        yield return new WaitForSeconds(1f);
+        g.SelectMap("B");
+        yield return new WaitForSeconds(0.5f);
+        g.BeginPlay("テスト");
+        yield return new WaitForSeconds(1.5f);
+        g.DebugHealTest();
+        yield return new WaitForSeconds(0.6f);
+        yield return Shot("heal_01_orbs");
+        // 一番近いオーブへ歩かせる代わりに、オーブのある場所へ移動して拾わせる
+        Teleport(g.PlayerPos + new Vector3(3.2f, 0, 0));
+        yield return new WaitForSeconds(0.35f);
+        yield return Shot("heal_02_pickup");
+        Debug.Log("NightAutoShot: heal hp=" + g.Hp + " healed=" + g.HealedTotal + " threat=" + g.Threat);
+        g.DebugRaiseThreat();
+        yield return new WaitForSeconds(0.25f);
+        yield return Shot("heal_03_alert_in");
+        yield return new WaitForSeconds(0.8f);
+        yield return Shot("heal_04_alert");
+        Debug.Log("NightAutoShot: threat=" + g.Threat + " enemies=" + g.Enemies.Count);
+        yield return new WaitForSeconds(3f);
+        yield return Shot("heal_05_after");
         Application.Quit();
     }
 

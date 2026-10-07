@@ -55,6 +55,28 @@ public class NightGame : MonoBehaviour
     public bool HurtNow { get; private set; }
     public float Elapsed { get; private set; }
     public int KillCount { get; private set; }
+
+    // ---- 回復オーブと脅威レベル ----
+    // 敵を倒すと回復オーブを落とす(近づくと吸い寄せられ、触れるとHPが回復)。
+    // その代わり「回復した量」と「光の球の回収」で脅威レベルが上がり、敵の出る数・速さが増えていく。
+    public const int ThreatMax = 9;
+    const float HealPerThreat = 45f;          // これだけ回復するごとに脅威レベル+1
+    const float HealOrbLife = 14f, HealMagnet = 3.2f, HealPickup = 0.8f;
+    public int Threat { get; private set; } = 1;
+    public float HealedTotal { get; private set; }
+    float healedSinceThreat;
+    public float ThreatProgress => Threat >= ThreatMax ? 1f : healedSinceThreat / HealPerThreat; // 次のレベルまで(回復の分)
+    public float HealFlash; // HPが回復した瞬間に、HPバーを光らせる演出用(1→0)
+    public int LastHeal { get; private set; }
+    public string AlertText { get; private set; } = "";
+    public string AlertSub { get; private set; } = "";
+    public float AlertTimer { get; private set; }
+    public const float AlertDuration = 2.8f;
+    class HealOrb { public Transform t, halo; public float amount, age, baseY; public Vector3 vel; }
+    readonly List<HealOrb> healOrbs = new List<HealOrb>();
+    Material healCoreMat, healHaloMat;
+    float SpawnRateBoost => 1f + 0.16f * (Threat - 1);       // 出現ペースの倍率
+    int MaxEnemiesNow => Difficulty.maxEnemies + 5 * (Threat - 1);
     public int OrbCount { get; private set; }
     public bool Cleared { get; private set; }
     public bool GateOpened => World.Gate != null && World.Gate.opened;
@@ -117,7 +139,7 @@ public class NightGame : MonoBehaviour
     // ---- 表示用 ----
     public string ToastText { get; private set; } = "";
     public float ToastTimer { get; private set; }
-    public const string HintDefault = "花を約2秒照らすと、未回収の球まで光の道が現れます。ランタンは敵を撃退。";
+    public const string HintDefault = "花を約2秒照らすと、未回収の球まで光の道が現れます。ランタンは敵を撃退。倒した敵の緑のオーブでHP回復。";
     public string Hint { get; private set; } = HintDefault;
 
     // ---- カメラ(進行方向の少し先を狙い、遅れて追従する) ----
@@ -333,7 +355,7 @@ public class NightGame : MonoBehaviour
         if (spawnTimer <= 0f)
         {
             SpawnEnemy(PickType());
-            spawnTimer = Mathf.Max(0.7f, 2.4f - Elapsed * 0.012f) * (GateOpened ? 0.85f : 1f) * Difficulty.spawnInterval;
+            spawnTimer = Mathf.Max(0.7f, 2.4f - Elapsed * 0.012f) * (GateOpened ? 0.85f : 1f) * Difficulty.spawnInterval / SpawnRateBoost;
         }
 
         // --- 敵 ---
@@ -350,6 +372,9 @@ public class NightGame : MonoBehaviour
 
         UpdateBullets(dt);
         if (Hp <= 0f) { End(false); return; }
+        UpdateHealOrbs(dt);
+        if (HealFlash > 0f) HealFlash = Mathf.Max(0f, HealFlash - dt * 1.5f);
+        if (AlertTimer > 0f) AlertTimer -= dt;
 
         // --- 光の球・門 ---
         foreach (var orb in World.Orbs) orb.Tick(this, dt);
@@ -388,7 +413,7 @@ public class NightGame : MonoBehaviour
 
     void SpawnEnemy(NightEnemy.Kind kind)
     {
-        if (Enemies.Count >= Difficulty.maxEnemies) return;
+        if (Enemies.Count >= MaxEnemiesNow) return;
         var segs = Map.Segments;
         for (int attempt = 0; attempt < 30; attempt++)
         {
@@ -557,6 +582,122 @@ public class NightGame : MonoBehaviour
         }
         SurvivorBurst.Spawn(en.Position + Vector3.up * 0.4f * en.cfg.scale, new Color(1f, 0.85f, 0.45f),
             en.kind == NightEnemy.Kind.Brute ? 14 : 8);
+        DropHealOrb(en);
+    }
+
+    // ---- 回復オーブ ----
+    void DropHealOrb(NightEnemy en)
+    {
+        float amount = en.kind == NightEnemy.Kind.Brute ? 14f : en.kind == NightEnemy.Kind.Shooter ? 6f : 4f;
+        DropHealOrb(en.Position, amount);
+    }
+
+    void DropHealOrb(Vector3 p, float amount)
+    {
+        if (healCoreMat == null)
+        {
+            healCoreMat = NightMeshes.Unlit(new Color(0.55f, 1f, 0.6f, 1f));
+            healHaloMat = NightMeshes.Unlit(new Color(0.4f, 1f, 0.5f, 0.22f));
+        }
+        var core = NightMeshes.Primitive(PrimitiveType.Sphere, null, healCoreMat).transform;
+        core.name = "HealOrb";
+        float size = 0.22f + amount * 0.012f; // たくさん回復するオーブほど大きい
+        core.localScale = Vector3.one * size;
+        var halo = NightMeshes.Primitive(PrimitiveType.Sphere, core, healHaloMat).transform;
+        halo.localScale = Vector3.one * 2.2f;
+        float baseY = Map.SurfaceAt(p.x, p.z) + 0.45f;
+        core.position = new Vector3(p.x, baseY + 0.6f, p.z);
+        // 倒した場所から少し跳ねて落ちる
+        Vector2 dir = Random.insideUnitCircle.normalized * Random.Range(0.6f, 1.6f);
+        healOrbs.Add(new HealOrb { t = core, halo = halo, amount = amount, baseY = baseY, vel = new Vector3(dir.x, 3.2f, dir.y) });
+    }
+
+    void UpdateHealOrbs(float dt)
+    {
+        Vector3 pp = PlayerPos + Vector3.up * 0.4f;
+        for (int i = healOrbs.Count - 1; i >= 0; i--)
+        {
+            var o = healOrbs[i];
+            o.age += dt;
+            Vector3 pos = o.t.position;
+            float d = Vector3.Distance(pos, pp);
+            if (d < HealMagnet)
+            {
+                // 近づくと吸い寄せられる(近いほど速く)
+                float speed = Mathf.Lerp(9f, 3f, d / HealMagnet);
+                pos = Vector3.MoveTowards(pos, pp, speed * dt);
+                o.vel = Vector3.zero;
+            }
+            else if (o.vel.sqrMagnitude > 0f)
+            {
+                o.vel.y -= 12f * dt;
+                pos += o.vel * dt;
+                if (pos.y <= o.baseY) { pos.y = o.baseY; o.vel = Vector3.zero; }
+            }
+            else pos.y = o.baseY + Mathf.Sin((o.age + i) * 3f) * 0.08f; // 落ちた後はふわふわ浮く
+            o.t.position = pos;
+            o.halo.localScale = Vector3.one * (2.1f + 0.35f * Mathf.Sin(o.age * 6f));
+
+            // 消える3秒前から点滅
+            float left = HealOrbLife - o.age;
+            bool visible = left > 3f || Mathf.Repeat(o.age * (left > 1.2f ? 4f : 9f), 1f) < 0.6f;
+            if (o.t.gameObject.activeSelf != visible) o.t.gameObject.SetActive(visible);
+
+            if (Vector3.Distance(pos, pp) < HealPickup)
+            {
+                Heal(o.amount);
+                SurvivorBurst.Spawn(pos, new Color(0.55f, 1f, 0.6f), 6);
+                Object.Destroy(o.t.gameObject);
+                healOrbs.RemoveAt(i);
+            }
+            else if (left <= 0f)
+            {
+                Object.Destroy(o.t.gameObject);
+                healOrbs.RemoveAt(i);
+            }
+        }
+    }
+
+    void Heal(float amount)
+    {
+        float before = Hp;
+        Hp = Mathf.Min(HpMax, Hp + amount);
+        float healed = Hp - before;
+        LastHeal = Mathf.RoundToInt(amount);
+        HealFlash = 1f;
+        Audio.PlayPulse();
+        if (healed <= 0f) return; // HPが満タンのときは脅威レベルに数えない
+        HealedTotal += healed;
+        healedSinceThreat += healed;
+        if (healedSinceThreat >= HealPerThreat && Threat < ThreatMax)
+        {
+            healedSinceThreat -= HealPerThreat;
+            RaiseThreat("回復した分だけ、敵も集まってきた…", 2);
+        }
+    }
+
+    // 動作確認(NightAutoShot)用: HPを減らし、プレイヤーの周りに回復オーブを落とす / 脅威レベルを上げる
+    public void DebugHealTest()
+    {
+        Hp = 40f;
+        for (int i = 0; i < 4; i++)
+        {
+            float a = i * Mathf.PI * 0.5f;
+            DropHealOrb(PlayerPos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 4.5f, i == 0 ? 14f : 6f);
+        }
+    }
+    public void DebugRaiseThreat() => RaiseThreat("光の球を取った…森がざわめき出した", 4);
+
+    // ---- 脅威レベル(敵が増える) ----
+    void RaiseThreat(string reason, int wave)
+    {
+        if (Threat >= ThreatMax) return;
+        Threat++;
+        AlertText = "敵が増えた！";
+        AlertSub = reason + "  脅威レベル " + Threat;
+        AlertTimer = AlertDuration;
+        Audio.PlayRumble();
+        for (int i = 0; i < wave; i++) SpawnEnemy(PickType()); // その場で群れが押し寄せる
     }
 
     void SpawnBullet(Vector3 from, Vector3 target)
@@ -730,6 +871,7 @@ public class NightGame : MonoBehaviour
         World.Gate.UpdateSockets(World.Orbs);
         ShowToast("光の球を獲得！ " + OrbCount + " / " + OrbTotal);
         Audio.PlayDownChime();
+        RaiseThreat("光の球を取った…森がざわめき出した", 3 + Threat);
         if (OrbCount >= OrbTotal && !World.Gate.opened)
         {
             World.Gate.Open();
