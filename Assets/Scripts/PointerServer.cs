@@ -98,8 +98,14 @@ public class PointerServer : MonoBehaviour
         Instance = this;
     }
 
+    // スマホの画面でもゲームと同じ RocknRoll One を使うため、StreamingAssets のフォントを配る
+    static byte[] fontBytes;
+    const string FontFile = "RocknRollOne-Regular.ttf";
+
     void Start()
     {
+        try { fontBytes = File.ReadAllBytes(Path.Combine(Application.streamingAssetsPath, FontFile)); }
+        catch (Exception e) { Debug.LogWarning("PointerServer: フォントを読み込めませんでした(" + e.Message + ")。スマホは端末のフォントで表示します。"); }
         string ip = GetLocalIPv4();
         LocalIp = ip;
 
@@ -270,6 +276,10 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
                         {
                             WriteResponse(stream, "200 OK", "text/html; charset=utf-8", PhoneHtml);
                         }
+                        else if (method == "GET" && path == "/" + FontFile && fontBytes != null)
+                        {
+                            WriteResponse(stream, "200 OK", "font/ttf", fontBytes, "Cache-Control: max-age=86400\r\n");
+                        }
                         else
                         {
                             WriteResponse(stream, "404 Not Found", "text/plain", "not found");
@@ -384,12 +394,15 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
     }
 
     void WriteResponse(Stream stream, string status, string contentType, string content)
+        => WriteResponse(stream, status, contentType, Encoding.UTF8.GetBytes(content), "");
+
+    void WriteResponse(Stream stream, string status, string contentType, byte[] bodyBytes, string extraHeaders)
     {
-        byte[] bodyBytes = Encoding.UTF8.GetBytes(content);
         string header =
             $"HTTP/1.1 {status}\r\n" +
             $"Content-Type: {contentType}\r\n" +
             $"Content-Length: {bodyBytes.Length}\r\n" +
+            extraHeaders +
             "Access-Control-Allow-Origin: *\r\n" +
             "Connection: close\r\n\r\n";
         byte[] headerBytes = Encoding.UTF8.GetBytes(header);
@@ -479,17 +492,19 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
 <meta name=""viewport"" content=""width=device-width, initial-scale=1, user-scalable=no"">
 <title>カメレオンナイト - 灯り</title>
 <style>
+  @font-face { font-family:'RocknRoll One'; src:url('/RocknRollOne-Regular.ttf') format('truetype'); font-display:swap; }
   html,body { margin:0; padding:0; width:100%; height:100%; background:#111; overflow:hidden;
               touch-action:none; -webkit-user-select:none; user-select:none;
-              font-family:sans-serif; }
+              font-family:'RocknRoll One', sans-serif; }
+  button { font-family:inherit; }
   #msg { position:absolute; top:10px; left:0; right:0; text-align:center;
-         color:#8f8; font-size:13px; pointer-events:none; padding:0 8px; }
+         color:#8f8; font-size:16px; pointer-events:none; padding:0 8px; }
   #dot { position:absolute; width:40px; height:40px; margin:-20px 0 0 -20px;
          border-radius:50%; background:radial-gradient(circle, #ffdd88, transparent 70%);
          opacity:0; pointer-events:none; }
   #bar { position:absolute; bottom:16px; left:0; right:0; display:flex;
          justify-content:center; gap:10px; }
-  #bar button { padding:10px 16px; font-size:14px; border-radius:8px; border:1px solid #666;
+  #bar button { padding:12px 18px; font-size:16px; border-radius:8px; border:1px solid #666;
                 background:#222; color:#ccc; }
   #bar button.active { background:#3a8a4a; color:#fff; border-color:#3a8a4a; }
   #debug { position:absolute; top:34px; left:0; right:0; text-align:center;
@@ -499,7 +514,7 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
                 flex-direction:column; align-items:center; gap:4px; pointer-events:none; }
   #colorSwatch { width:34px; height:34px; border-radius:50%; border:2px solid rgba(255,255,255,0.8);
                  box-shadow:0 0 14px 2px currentColor; background:#fff2c0; transition:background .2s; }
-  #colorLabel { color:#ddd; font-size:11px; }
+  #colorLabel { color:#ddd; font-size:14px; }
 </style>
 </head>
 <body>

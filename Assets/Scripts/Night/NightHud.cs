@@ -8,11 +8,15 @@ public class NightHud : MonoBehaviour
     public NightGame game;
 
     float scale = 1f, W, H;
+    // 画面の高さをこの値として拡大縮小する(小さいほど文字やパネルが大きくなる)。
+    // タイトル・名前入力は左右にランキングと接続パネルが並び横幅が足りなくなるため、プレイ中より控えめにする
+    const float BaseHeight = 650f, TitleBaseHeight = 720f;
+    const float SidePanelSpace = 272f; // 左右のパネルの幅+余白(中央の内容がここに重ならないようにする)
     bool helpOpen;
     float toastAlpha;
     Color vignetteColor = new Color(1f, 0.16f, 0.08f, 0f);
 
-    Font serif;
+    Font uiFont; // 画面の文字はすべて RocknRoll One(太めで読みやすい手書き風ゴシック。SIL OFL)
     readonly Dictionary<string, GUIStyle> styles = new Dictionary<string, GUIStyle>();
     readonly Dictionary<string, Texture2D> texCache = new Dictionary<string, Texture2D>();
     readonly Dictionary<string, Texture2D> previews = new Dictionary<string, Texture2D>();
@@ -24,7 +28,8 @@ public class NightHud : MonoBehaviour
     void Awake()
     {
         if (game == null) game = GetComponent<NightGame>();
-        serif = Font.CreateDynamicFontFromOSFont(new[] { "Georgia", "Times New Roman", "Yu Mincho" }, 46);
+        uiFont = Resources.Load<Font>("Fonts/RocknRollOne-Regular");
+        if (uiFont == null) uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo" }, 16);
         whiteTex = Texture2D.whiteTexture;
         markTex = UITextureFactory.CreateChameleonMark(64, C(0xf5a623), C(0x22c55e), new Color(0.9f, 0.93f, 0.75f));
         foreach (var id in NightMap.Ids) previews[id] = DrawHabitatPreview(id);
@@ -85,10 +90,12 @@ public class NightHud : MonoBehaviour
 
     void OnGUI()
     {
-        scale = Mathf.Clamp(Screen.height / 760f, 0.7f, 3f);
+        bool menu = game.State == NightGame.GameState.Title || game.State == NightGame.GameState.NameEntry;
+        scale = Mathf.Clamp(Screen.height / (menu ? TitleBaseHeight : BaseHeight), 0.7f, 3f);
         W = Screen.width / scale;
         H = Screen.height / scale;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+        GUI.skin.font = uiFont;
 
         if (game.State == NightGame.GameState.Title)
         {
@@ -127,7 +134,8 @@ public class NightHud : MonoBehaviour
     {
         GUI.DrawTexture(new Rect(0, 0, W, H), Tex("startBg", () => RadialBackground()), ScaleMode.StretchToFill);
 
-        float maxW = Mathf.Min(810f, W - 48f);
+        bool sidePanels = W >= 1000f; // DrawRankingPanel と同じ条件
+        float maxW = Mathf.Min(810f, W - (sidePanels ? 2f * SidePanelSpace : 48f));
         float cardW = Mathf.Floor((maxW - 32f) / 3f);
         bool compact = H < 760f;
         float preview = Mathf.Min(cardW - 24f, compact ? 180f : 235f);
@@ -144,8 +152,12 @@ public class NightHud : MonoBehaviour
 
         Label(new Rect(0, y, W, 14), "光と影の森 / EXPLORATION", S("eyebrow", 10, C(0xb3d2c3), TextAnchor.MiddleCenter));
         y += 14 + 8;
-        var title = S("title", 46, C(0xe6f5e9), TextAnchor.MiddleCenter);
-        title.font = serif;
+        var title = S("title", 44, C(0xe6f5e9), TextAnchor.MiddleCenter);
+        // 左右のパネルに重ならない幅に収まるよう、タイトルの文字の大きさを調整する
+        float titleRoom = W - (sidePanels ? 2f * SidePanelSpace : 48f);
+        title.fontSize = 44;
+        float titleW = title.CalcSize(new GUIContent("C H A M E L E O N   N I G H T")).x;
+        if (titleW > titleRoom) title.fontSize = Mathf.Max(24, Mathf.FloorToInt(44 * titleRoom / titleW));
         Label(new Rect(0, y, W, 56), "C H A M E L E O N   N I G H T", title);
         y += 56 + 8;
         Label(new Rect(0, y, W, 18), "灯りを導きに、夜の向こうへ。", S("menuSub", 13, C(0xc8ded2), TextAnchor.MiddleCenter));
@@ -599,7 +611,7 @@ public class NightHud : MonoBehaviour
             S("neHint", 12, C(0xa9c4b8), TextAnchor.UpperCenter, wrap: true));
         y += 50;
 
-        var fieldStyle = new GUIStyle(GUI.skin.textField) { fontSize = 22, alignment = TextAnchor.MiddleCenter };
+        var fieldStyle = new GUIStyle(GUI.skin.textField) { font = uiFont, fontSize = 22, alignment = TextAnchor.MiddleCenter };
         fieldStyle.normal.textColor = Color.white; fieldStyle.focused.textColor = Color.white;
         GUI.SetNextControlName("playerName");
         nameText = GUI.TextField(new Rect(cx - 140, y, 280, 48), nameText, NightRanking.MaxNameLength, fieldStyle);
@@ -808,7 +820,7 @@ public class NightHud : MonoBehaviour
     {
         if (!styles.TryGetValue(key, out var s))
         {
-            s = new GUIStyle { fontSize = size, alignment = align, wordWrap = wrap, fontStyle = bold ? FontStyle.Bold : FontStyle.Normal, clipping = TextClipping.Overflow };
+            s = new GUIStyle { font = uiFont, fontSize = size, alignment = align, wordWrap = wrap, fontStyle = bold ? FontStyle.Bold : FontStyle.Normal, clipping = TextClipping.Overflow };
             styles[key] = s;
         }
         s.normal.textColor = color;
