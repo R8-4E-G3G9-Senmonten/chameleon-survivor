@@ -100,18 +100,24 @@ public class NightGame : MonoBehaviour
     }
 
     // pos から見て最も近い照準点を返す(どのスマホが照らしても反応させたい箇所向け)
-    public Vector3 NearestLightTargetTo(Vector3 pos)
+    public Vector3 NearestLightTargetTo(Vector3 pos) => NearestLightTargetTo(pos, out _);
+
+    // owner: その光を出しているスマホのid(マウスの光なら null)
+    public Vector3 NearestLightTargetTo(Vector3 pos, out string owner)
     {
         var targets = LightTargets;
+        owner = null;
         if (targets.Count == 0) return LightTarget;
-        Vector3 best = targets[0];
-        float bestD = (best - pos).sqrMagnitude;
+        int best = 0;
+        float bestD = (targets[0] - pos).sqrMagnitude;
         for (int i = 1; i < targets.Count; i++)
         {
             float d = (targets[i] - pos).sqrMagnitude;
-            if (d < bestD) { bestD = d; best = targets[i]; }
+            if (d < bestD) { bestD = d; best = i; }
         }
-        return best;
+        var owners = Flashlight.TargetOwners;
+        if (best < owners.Count) owner = owners[best];
+        return targets[best];
     }
 
     // ---- 表示用 ----
@@ -205,6 +211,7 @@ public class NightGame : MonoBehaviour
         if (name.Length > NightRanking.MaxNameLength) name = name.Substring(0, NightRanking.MaxNameLength);
         PlayerName = name.Length == 0 ? NightRanking.DefaultName : name;
         State = GameState.Playing;
+        if (PointerServer.Instance != null) PointerServer.Instance.ResetKills(); // スマホの撃破数はゲームごとに数え直す
         Audio.StartAmbient();
         ShowToast(MapId + ". " + Map.Name + " — 球を2つ集め、入口の門から脱出しよう");
     }
@@ -375,6 +382,12 @@ public class NightGame : MonoBehaviour
     void LateUpdate()
     {
         if (State == GameState.Title || State == GameState.NameEntry) PlaceCamera();
+        // スマホ画面のミニ画面に、カメレオンが今ゲーム画面のどこにいるかを出す
+        if (PointerServer.Instance != null && Cam != null && Player != null)
+        {
+            Vector3 v = Cam.WorldToViewportPoint(PlayerPos);
+            PointerServer.Instance.SetGameView(new Vector2(v.x, 1f - v.y), State == GameState.Playing || State == GameState.Paused);
+        }
     }
 
     // ---- 敵 ----
@@ -466,7 +479,7 @@ public class NightGame : MonoBehaviour
             // 光: 当て続けるとダウンゲージが減る。プレイヤーのすぐ近く(死角)には効かない。
             // 接続中のスマホは何人でも同時に照らせるので、どれか1つでも当たっていればヒット扱い。
             Vector3 ep = en.Position;
-            Vector3 nearestTarget = NearestLightTargetTo(ep);
+            Vector3 nearestTarget = NearestLightTargetTo(ep, out string lightOwner);
             float distToLight = Mathf.Sqrt((ep.x - nearestTarget.x) * (ep.x - nearestTarget.x) + (ep.z - nearestTarget.z) * (ep.z - nearestTarget.z));
             bool spotHit = distToLight < Flashlight.LightRadius && Mathf.Abs(ep.y - nearestTarget.y) < 1.8f;
             bool flashHit = FlashLevel > 0.05f && dist < FlashRange;
@@ -476,6 +489,7 @@ public class NightGame : MonoBehaviour
             {
                 en.lightHp -= en.cfg.drain * LightPower * (Camouflaged ? AmbushLightMultiplier : 1f) * dt;
                 if (Random.value < dt * 8f) Audio.PlayHitBuzz();
+                if (lightOwner != null) { en.litBy = lightOwner; en.litByTime = Time.time; }
             }
             if (flashHit) en.lightHp -= en.cfg.drain * FlashDamage * FlashLevel * dt;
             if (lantern > 0f) en.lightHp -= lantern * dt;
@@ -549,6 +563,9 @@ public class NightGame : MonoBehaviour
         en.dying = true;
         en.dieTimer = 0.4f;
         KillCount++;
+        // 直前(1.5秒以内)までスマホの光が当たっていたら、そのスマホの撃破として知らせる(閃光・ランタンでとどめを刺しても)
+        if (en.litBy != null && Time.time - en.litByTime < 1.5f && PointerServer.Instance != null)
+            PointerServer.Instance.AddKill(en.litBy);
         Audio.PlayDownChime();
         if (Camouflaged && !CampLocked)
         {
