@@ -132,7 +132,7 @@ public class NightHud : MonoBehaviour
         float preview = Mathf.Min(cardW - 24f, compact ? 180f : 235f);
         float cardH = 14f + preview + 12f + 22f + 7f + 14f + 16f;
 
-        string paragraph = "球や敵にマウスの光を当て続けます。止まると擬態して一時的に無敵になり、敵を押し返します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを約0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。途中で光を外すと蓄光はリセットされます。球は約2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を約2秒連続で照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。";
+        string paragraph = "球や敵にマウスの光を当て続けます。止まると擬態して一時的に無敵になり、敵を押し返します。擬態中は灯り役の光が2倍効き(待ち伏せ)、擬態中に敵を倒すと擬態ゲージが回復します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを約0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。途中で光を外すと蓄光はリセットされます。球は約2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を約2秒連続で照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。マップごとに難易度が違います(A やさしい / B ふつう / C むずかしい)。";
         var helpStyle = S("help", 11, C(0x8fada4), TextAnchor.UpperLeft, wrap: true);
         float helpW = Mathf.Min(650f, W - 48f);
         float helpH = helpOpen ? helpStyle.CalcHeight(new GUIContent(paragraph), helpW) + 8f : 0f;
@@ -257,6 +257,14 @@ public class NightHud : MonoBehaviour
         string info = id == "A" ? "分岐 / 導きの花 / 祠" : id == "B" ? "階段 / 高台 / 石造遺跡" : "周回 / 湖畔 / 小島";
         Label(new Rect(r.x + 12, pv.yMax + 41, r.width - 24, 14), info, S("cardInfo", 10, C(0x98b6a8), TextAnchor.MiddleLeft));
 
+        var diff = NightDifficulty.For(id);
+        var dStyle = S("cardDiff" + id, 11, diff.color, TextAnchor.MiddleCenter, bold: true);
+        string dText = diff.Stars + " " + diff.label;
+        float dw = dStyle.CalcSize(new GUIContent(dText)).x + 16f;
+        Rect db = new Rect(r.x + 12, r.y + 12, dw, 22);
+        Panel(db, Tex("diffBadgeBg", () => RoundedBox(24, 6, C(0x06131b, 0.88f), C(0x06131b, 0.88f), 0)), 6);
+        Label(db, dText, dStyle);
+
         if (selected)
         {
             var badgeStyle = S("selBadge", 10, C(0xeedda8), TextAnchor.MiddleCenter);
@@ -299,6 +307,11 @@ public class NightHud : MonoBehaviour
         bool locked = game.CampLocked;
         Bar(new Rect(x, y, 190, 11), game.Camp / NightGame.CampMax, locked ? "campLocked" : "camp",
             locked ? C(0x666666) : C(0x3fa0c8), locked ? C(0x999999) : C(0x8fe6ff), "擬態ゲージ");
+        if (game.AmbushRefillFlash > 0f)
+        {
+            Fill(new Rect(x - 2, y - 2, 194, 15), new Color(0.75f, 0.95f, 1f, 0.55f * game.AmbushRefillFlash));
+            Label(new Rect(x + 196, y - 4, 60, 18), "+回復", S("campRefill", 11, new Color(0.75f, 0.95f, 1f, game.AmbushRefillFlash), TextAnchor.MiddleLeft, bold: true));
+        }
         r.height = y + 11 + 10 - r.y;
     }
 
@@ -316,7 +329,7 @@ public class NightHud : MonoBehaviour
     void DrawTopRight()
     {
         string badge; Color badgeColor;
-        if (game.Camouflaged) { badge = "擬態中(無敵)"; badgeColor = new Color(60 / 255f, 160 / 255f, 200 / 255f, 0.9f); }
+        if (game.Camouflaged) { badge = "擬態中(無敵・光2倍)"; badgeColor = new Color(60 / 255f, 160 / 255f, 200 / 255f, 0.9f); }
         else if (game.CampLocked) { badge = "ゲージ切れ"; badgeColor = new Color(120 / 255f, 120 / 255f, 120 / 255f, 0.85f); }
         else { badge = "移動中"; badgeColor = new Color(190 / 255f, 110 / 255f, 50 / 255f, 0.9f); }
 
@@ -534,7 +547,7 @@ public class NightHud : MonoBehaviour
         Rect card = new Rect(cx - 270, cy - 190, 540, 380);
         Panel(card, Tex("pausePanel", () => RoundedBox(48, 12, C(0x06131b, 0.94f), C(0x739e90, 0.45f), 1)), 12);
         float y = card.y + 24;
-        Label(new Rect(card.x, y, card.width, 28), game.MapId + ". " + game.Map.Name, S("neMap", 20, C(0xdfc985), TextAnchor.MiddleCenter, bold: true));
+        Label(new Rect(card.x, y, card.width, 28), game.MapId + ". " + game.Map.Name + "   " + game.Difficulty.Stars + " " + game.Difficulty.label, S("neMap", 20, C(0xdfc985), TextAnchor.MiddleCenter, bold: true));
         y += 40;
         Label(new Rect(card.x, y, card.width, 34), "あなたの名前を入力してください", S("neTitle", 24, C(0xe6f5e9), TextAnchor.MiddleCenter, bold: true));
         y += 40;
@@ -591,6 +604,8 @@ public class NightHud : MonoBehaviour
         Rect r = new Rect(10, 16, w, h);
         Panel(r, PanelTex(), 9);
         Label(new Rect(r.x + 14, r.y + 10, w - 28, 24), game.MapId + ". " + game.Map.Name, S("rkHead", 17, C(0xdfffe0), TextAnchor.MiddleLeft, bold: true));
+        var rd = game.Difficulty;
+        Label(new Rect(r.x + 14, r.y + 34, w - 28, 18), rd.Stars + " " + rd.label, S("rkDiff" + game.MapId, 12, rd.color, TextAnchor.MiddleRight, bold: true));
         Label(new Rect(r.x + 14, r.y + 34, w - 28, 18), "TOP " + NightRanking.MaxEntries + " ランキング", S("rkSub", 13, C(0xdfc985), TextAnchor.MiddleLeft, bold: true));
         Label(new Rect(r.x + 14, r.y + 52, w - 28, 16), "スコア = クリアタイム + 撃破数", S("rkSub2", 11, C(0x9fbdb0), TextAnchor.MiddleLeft));
         float y = r.y + 74f;

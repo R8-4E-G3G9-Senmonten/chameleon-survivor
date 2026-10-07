@@ -34,6 +34,11 @@ public class NightGame : MonoBehaviour
 
     public string MapId { get; private set; } = "A";
     public NightMap Map => World.Map;
+    public NightDifficulty Difficulty => NightDifficulty.For(MapId);
+
+    // ---- 擬態の連携ルール ----
+    // 擬態中は「待ち伏せ」: 灯り役の光が敵に2倍効く。擬態中に敵を倒すと擬態ゲージが少し戻る。
+    public const float AmbushLightMultiplier = 2f, AmbushKillRefill = 25f;
 
     // ---- 能力値(レベルアップは無し。難易度は経過時間で上がる敵の出現ペースだけ) ----
     public const float HpMax = 100f, CampMax = 100f;
@@ -46,6 +51,7 @@ public class NightGame : MonoBehaviour
     public float Camp { get; private set; } = CampMax;
     public bool CampLocked { get; private set; }
     public bool Camouflaged { get; private set; }
+    public float AmbushRefillFlash; // 擬態ゲージが回復した瞬間に、ゲージを光らせる演出用(1→0)
     public bool HurtNow { get; private set; }
     public float Elapsed { get; private set; }
     public int KillCount { get; private set; }
@@ -327,7 +333,7 @@ public class NightGame : MonoBehaviour
         if (spawnTimer <= 0f)
         {
             SpawnEnemy(PickType());
-            spawnTimer = Mathf.Max(0.7f, 2.4f - Elapsed * 0.012f) * (GateOpened ? 0.85f : 1f);
+            spawnTimer = Mathf.Max(0.7f, 2.4f - Elapsed * 0.012f) * (GateOpened ? 0.85f : 1f) * Difficulty.spawnInterval;
         }
 
         // --- 敵 ---
@@ -337,7 +343,7 @@ public class NightGame : MonoBehaviour
         HurtNow = contactDps > 0f && !Camouflaged;
         if (HurtNow)
         {
-            Hp = Mathf.Max(0f, Hp - contactDps * dt);
+            Hp = Mathf.Max(0f, Hp - contactDps * Difficulty.damage * dt);
             if (Random.value < dt * 3f) Audio.PlayHurt();
         }
         if (Hp <= 0f) { End(false); return; }
@@ -357,7 +363,9 @@ public class NightGame : MonoBehaviour
             return;
         }
 
+        if (AmbushRefillFlash > 0f) AmbushRefillFlash = Mathf.Max(0f, AmbushRefillFlash - dt * 2f);
         Hint = CampLocked ? "擬態ゲージ切れ…動いてゲージを回復しよう"
+            : Camouflaged ? "擬態中(待ち伏せ):灯り役の光が2倍効く！ 倒すと擬態ゲージが回復"
             : GateOpened ? "入口の門が開いた！導きの花を照らすと、門への光の道が現れます。" : HintDefault;
 
         UpdatePulses(dt);
@@ -380,7 +388,7 @@ public class NightGame : MonoBehaviour
 
     void SpawnEnemy(NightEnemy.Kind kind)
     {
-        if (Enemies.Count >= 44) return;
+        if (Enemies.Count >= Difficulty.maxEnemies) return;
         var segs = Map.Segments;
         for (int attempt = 0; attempt < 30; attempt++)
         {
@@ -390,7 +398,9 @@ public class NightGame : MonoBehaviour
             float d = Mathf.Sqrt((x - PlayerPos.x) * (x - PlayerPos.x) + (z - PlayerPos.z) * (z - PlayerPos.z));
             if (d >= 12f && d <= 24f)
             {
-                Enemies.Add(new NightEnemy(kind, new Vector3(x, Map.SurfaceAt(x, z), z)));
+                var en = new NightEnemy(kind, new Vector3(x, Map.SurfaceAt(x, z), z));
+                en.lightHp = en.lightHpMax = en.cfg.lightHp * Difficulty.enemyHp;
+                Enemies.Add(en);
                 return;
             }
         }
@@ -464,7 +474,7 @@ public class NightGame : MonoBehaviour
             bool lit = spotHit || flashHit || lantern > 0f;
             if (spotHit)
             {
-                en.lightHp -= en.cfg.drain * LightPower * dt;
+                en.lightHp -= en.cfg.drain * LightPower * (Camouflaged ? AmbushLightMultiplier : 1f) * dt;
                 if (Random.value < dt * 8f) Audio.PlayHitBuzz();
             }
             if (flashHit) en.lightHp -= en.cfg.drain * FlashDamage * FlashLevel * dt;
@@ -508,7 +518,7 @@ public class NightGame : MonoBehaviour
 
         float dx = target.x - pos.x, dz = target.z - pos.z, d = Mathf.Sqrt(dx * dx + dz * dz);
         if (d < 0.05f) { dx = pp.x - pos.x; dz = pp.z - pos.z; d = Mathf.Sqrt(dx * dx + dz * dz); }
-        float step = Mathf.Min(Mathf.Max(d, 0.0001f), en.cfg.speed * dt);
+        float step = Mathf.Min(Mathf.Max(d, 0.0001f), en.cfg.speed * Difficulty.enemySpeed * dt);
         Vector3 before = pos;
         if (d > 0.01f)
         {
@@ -540,6 +550,11 @@ public class NightGame : MonoBehaviour
         en.dieTimer = 0.4f;
         KillCount++;
         Audio.PlayDownChime();
+        if (Camouflaged && !CampLocked)
+        {
+            Camp = Mathf.Min(CampMax, Camp + AmbushKillRefill);
+            AmbushRefillFlash = 1f;
+        }
         SurvivorBurst.Spawn(en.Position + Vector3.up * 0.4f * en.cfg.scale, new Color(1f, 0.85f, 0.45f),
             en.kind == NightEnemy.Kind.Brute ? 14 : 8);
     }
@@ -565,7 +580,7 @@ public class NightGame : MonoBehaviour
             float d = Mathf.Sqrt((p.x - pp.x) * (p.x - pp.x) + (p.z - pp.z) * (p.z - pp.z));
             if (d < 0.7f && Mathf.Abs(p.y - pp.y - 0.5f) < 0.8f)
             {
-                if (!Camouflaged) { Hp = Mathf.Max(0f, Hp - 12f); Audio.PlayHurt(); }
+                if (!Camouflaged) { Hp = Mathf.Max(0f, Hp - 12f * Difficulty.damage); Audio.PlayHurt(); }
                 Destroy(b.t.gameObject);
                 bullets.RemoveAt(i);
                 continue;
