@@ -40,3 +40,6 @@ unity_build_*.log
 
 # make_qr.bat が出力する印刷用QR(PCのIPが入るのでコミットしない)
 qr_print/
+
+# Cloudflare トンネルの実行ファイル(各自で入れる。大きいのでコミットしない)
+/tools/cloudflared.exe
