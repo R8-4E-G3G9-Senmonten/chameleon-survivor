@@ -21,9 +21,48 @@ public class NightPlayer : MonoBehaviour
 
     static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
 
+    // ---- トーチの灯火 ----
+    // 暗い森の中でも自分の位置を見失わないよう、カメレオンの背中に小さな炎を灯し、足元を暖色で照らす。
+    // 擬態中は炎を小さく青白くして、「隠れている」状態が一目で分かるようにする(位置は分かる明るさは残す)。
+    static readonly Color TorchColor = NightMeshes.Hex(0xffb15c), CamoTorchColor = new Color(0.45f, 0.75f, 1f);
+    const float TorchHeight = 1.25f;
+    Transform flame, halo;
+    Material flameMat, haloMat;
+    float torchScale = 1f;
+
+    void BuildTorch()
+    {
+        selfGlow = NightWorld.PointLight(transform, new Vector3(0, TorchHeight + 0.2f, 0), TorchColor, 1.9f, 7f);
+        flameMat = NightMeshes.Unlit(new Color(1f, 0.82f, 0.45f, 0.95f));
+        haloMat = NightMeshes.Unlit(new Color(1f, 0.6f, 0.25f, 0.28f));
+        flame = NightMeshes.Primitive(PrimitiveType.Sphere, transform, flameMat).transform;
+        flame.name = "TorchFlame";
+        flame.localPosition = new Vector3(0, TorchHeight, 0);
+        halo = NightMeshes.Primitive(PrimitiveType.Sphere, transform, haloMat).transform;
+        halo.name = "TorchHalo";
+        halo.localPosition = new Vector3(0, TorchHeight, 0);
+    }
+
+    void UpdateTorch(float dt, bool camouflaged)
+    {
+        if (selfGlow == null) return;
+        float t = Time.time;
+        // 炎のゆらぎ(2つの周期を重ねて、規則的に見えないようにする)
+        float flicker = 1f + 0.08f * Mathf.Sin(t * 13f) + 0.05f * Mathf.Sin(t * 29f + 1.3f);
+        torchScale = Mathf.Lerp(torchScale, camouflaged ? 0.6f : 1f, Mathf.Min(1f, dt * 6f));
+        selfGlow.intensity = (camouflaged ? 0.9f : 1.9f) * flicker;
+        selfGlow.range = camouflaged ? 5f : 7f;
+        selfGlow.color = Color.Lerp(selfGlow.color, camouflaged ? CamoTorchColor : TorchColor, Mathf.Min(1f, dt * 6f));
+        Color fc = camouflaged ? new Color(0.7f, 0.9f, 1f, 0.95f) : new Color(1f, 0.82f, 0.45f, 0.95f);
+        flameMat.color = Color.Lerp(flameMat.color, fc, Mathf.Min(1f, dt * 6f));
+        haloMat.color = Color.Lerp(haloMat.color, new Color(fc.r, fc.g * 0.75f, fc.b * 0.55f, 0.28f), Mathf.Min(1f, dt * 6f));
+        flame.localScale = Vector3.one * 0.22f * torchScale * flicker;
+        halo.localScale = Vector3.one * 0.62f * torchScale * (2f - flicker);
+    }
+
     void Awake()
     {
-        selfGlow = NightWorld.PointLight(transform, new Vector3(0, 0.8f, 0), NightMeshes.Hex(0x548c79), 0.7f, 3f);
+        BuildTorch();
 
         if (characterModelPrefab == null)
         {
@@ -151,11 +190,7 @@ public class NightPlayer : MonoBehaviour
         Color camo = terrainColor * 2.6f; camo.a = 1f;
         Color target = camouflaged ? Color.Lerp(camo, new Color(0.45f, 0.75f, 0.95f), 0.25f) : Color.white;
         tint = Color.Lerp(tint, target, Mathf.Min(1f, dt * (camouflaged ? 4f : 6f)));
-        if (selfGlow != null)
-        {
-            selfGlow.intensity = Mathf.Lerp(selfGlow.intensity, camouflaged ? 1.4f : 0.7f, Mathf.Min(1f, dt * 6f));
-            selfGlow.color = camouflaged ? new Color(0.35f, 0.7f, 1f) : NightMeshes.Hex(0x548c79);
-        }
+        UpdateTorch(dt, camouflaged);
         if (renderers == null) return;
         for (int i = 0; i < renderers.Length; i++)
         {

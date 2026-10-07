@@ -64,6 +64,26 @@ public class PointerServer : MonoBehaviour
 
     public struct PointerSample { public Vector2 pos; public Color color; }
 
+    public const int MaxPlayers = MaxParticipants;
+
+    // 接続中(直近2.5秒以内に何か受信した)のスマホの色を、参加順に返す。画面に参加者を表示するための一覧。
+    // スマホ側は触っていなくても定期的に送ってくるので、画面を触っていない人も「接続中」に数えられる。
+    public List<Color> GetConnectedColors()
+    {
+        var list = new List<KeyValuePair<int, Color>>();
+        int now = Environment.TickCount;
+        lock (dataLock)
+        {
+            foreach (var kv in pointers)
+                if (now - kv.Value.lastReceiveTimeMs < 2500)
+                    list.Add(new KeyValuePair<int, Color>(kv.Value.colorIndex, ColorOf(kv.Value.colorIndex)));
+        }
+        list.Sort((a, b) => a.Key.CompareTo(b.Key));
+        var result = new List<Color>();
+        foreach (var e in list) result.Add(e.Value);
+        return result;
+    }
+
     [Serializable]
     class PointerMsg
     {
@@ -406,7 +426,7 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
                 {
                     result.Add(new PointerSample { pos = new Vector2(kv.Value.x, kv.Value.y), color = ColorOf(kv.Value.colorIndex) });
                 }
-                if (age > 30000)
+                if (age > 10000)
                 {
                     if (stale == null) stale = new List<string>();
                     stale.Add(kv.Key);
@@ -552,11 +572,13 @@ function angleDiff(a, b) {
 }
 
 var last = 0;
+var lastMsg = {x:0.5, y:0.5, active:false};
 var sendCount = 0, okCount = 0, errCount = 0;
 function send(x, y, active) {
   var now = Date.now();
   if (now - last < 50) return; // throttle ~20Hz
   last = now;
+  lastMsg = {x:x, y:y, active:active};
   sendCount++;
   fetch('/pointer', {
     method: 'POST',
@@ -576,6 +598,13 @@ function send(x, y, active) {
     setDebug('送信エラー(' + errCount + '/' + sendCount + '): ' + err);
   });
 }
+
+// 触っていない間も、指を止めている間も、0.25秒ごとに最後の状態を送り続ける。
+// これでゲーム画面に「接続中」と表示され続け、指を止めても光が消えない。
+setInterval(function () {
+  if (Date.now() - last > 250) send(lastMsg.x, lastMsg.y, lastMsg.active);
+}, 250);
+send(0.5, 0.5, false); // ページを開いた時点で接続を知らせる
 
 function showAt(x, y, active) {
   dot.style.left = (x * window.innerWidth) + 'px';

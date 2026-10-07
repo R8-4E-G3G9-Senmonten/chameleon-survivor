@@ -31,7 +31,7 @@ public class NightAutoShot : MonoBehaviour
         yield return new WaitForSeconds(1f);
         g.SelectMap(id);
         yield return new WaitForSeconds(0.5f);
-        g.StartGame();
+        g.BeginPlay("テスト");
         yield return new WaitForSeconds(1.5f);
         yield return Shot(id + "_00_start");
         var regions = g.Map.Regions;
@@ -117,6 +117,20 @@ public class NightAutoShot : MonoBehaviour
         Debug.Log("NightAutoShot: PressureMat idle hasMatInput=" + (PressureMatServer.Instance != null && PressureMatServer.Instance.HasMatInput));
     }
 
+    // スマホの接続を模擬する(本物のスマホと同じ /pointer への POST)。接続中の人数表示の確認用。
+    void PostFake(string id)
+    {
+        try
+        {
+            using (var wc = new System.Net.WebClient())
+            {
+                wc.Headers[System.Net.HttpRequestHeader.ContentType] = "application/json";
+                wc.UploadString("http://127.0.0.1:8787/pointer", "{\"id\":\"" + id + "\",\"x\":0.5,\"y\":0.5,\"active\":false}");
+            }
+        }
+        catch (System.Exception e) { Debug.Log("NightAutoShot: PostFake failed " + e.Message); }
+    }
+
     void Teleport(Vector3 p)
     {
         g.Player.transform.position = new Vector3(p.x, g.Map.SurfaceAt(p.x, p.z), p.z);
@@ -129,6 +143,8 @@ public class NightAutoShot : MonoBehaviour
         yield return Shot("01_title_A");
         g.SelectMap("B");
         yield return new WaitForSeconds(0.6f);
+        for (int k = 0; k < 4; k++) PostFake("fake" + k);
+        yield return new WaitForSeconds(0.3f);
         yield return Shot("02_title_B");
         g.SelectMap("C");
         yield return new WaitForSeconds(0.6f);
@@ -136,9 +152,11 @@ public class NightAutoShot : MonoBehaviour
         g.SelectMap("A");
         yield return new WaitForSeconds(0.6f);
 
-        g.StartGame();
+        g.BeginPlay("テスト");
         g.Flashlight.DebugAim = new Vector2(0.5f, 0.35f);
         yield return new WaitForSeconds(2.5f);
+        for (int k = 0; k < 4; k++) PostFake("fake" + k);
+        yield return new WaitForSeconds(0.3f);
         yield return Shot("04_play_start");
 
         yield return TestPressureMat();
@@ -152,7 +170,7 @@ public class NightAutoShot : MonoBehaviour
             yield return AimAt(() => target.go != null ? target.Position : g.PlayerPos, 0.5f);
             if (target.go != null)
             {
-                var mr = target.go.GetComponentInChildren<MeshRenderer>();
+                var mr = target.go.GetComponentInChildren<Renderer>();
                 Debug.Log("NightAutoShot: lit enemy " + target.kind + " color=" + mr.sharedMaterial.color + " lightHp=" + target.lightHp.ToString("0.0") + "/" + target.lightHpMax);
             }
             yield return Shot("05_enemy_lit");
@@ -173,8 +191,9 @@ public class NightAutoShot : MonoBehaviour
         // 近くのランタンを点灯
         NightLamp lamp = g.World.Lamps[0];
         foreach (var l in g.World.Lamps) if (Vector3.Distance(new Vector3(l.x, 0, l.z), g.PlayerPos) < Vector3.Distance(new Vector3(lamp.x, 0, lamp.z), g.PlayerPos)) lamp = l;
-        yield return AimAt(() => new Vector3(lamp.x, lamp.height, lamp.z), 2.3f);
+        yield return AimAt(() => new Vector3(lamp.x, lamp.height, lamp.z), 0.9f);
         yield return new WaitForSeconds(0.4f);
+        Debug.Log("NightAutoShot: lamp lit=" + lamp.lit + " charge=" + lamp.charge.ToString("0.00"));
         yield return Shot("08_lantern_lit");
 
         // 導きの花
@@ -215,14 +234,39 @@ public class NightAutoShot : MonoBehaviour
             yield return Shot("09b_prop_glow");
         }
 
+        // 敵の3Dモデル(狼・巨人・キノコ)を並べて確認する。1枚は光を当て、1枚は当てない
+        Vector3 pc = g.PlayerPos;
+        var kinds = new[] { NightEnemy.Kind.Moth, NightEnemy.Kind.Brute, NightEnemy.Kind.Shooter };
+        for (int i = 0; i < kinds.Length; i++)
+        {
+            float ex = pc.x + (i - 1) * 2.6f, ez = pc.z - 6f;
+            g.Enemies.Add(new NightEnemy(kinds[i], new Vector3(ex, g.Map.SurfaceAt(ex, ez), ez)));
+        }
+        yield return LockCameraOn(new Vector3(pc.x, pc.y, pc.z - 6f), 0.3f);
+        foreach (var e in g.Enemies)
+        {
+            if (e.kind != NightEnemy.Kind.Moth || e.go == null) continue;
+            Transform fl = null, bl = null;
+            foreach (var t in e.go.GetComponentsInChildren<Transform>()) { if (t.name == "frontleg0") fl = t; if (t.name == "backleg0") bl = t; }
+            if (fl != null && bl != null)
+                Debug.Log("NightAutoShot: wolf front-back along go.forward=" + Vector3.Dot(fl.position - bl.position, e.go.transform.forward).ToString("0.00"));
+        }
+        yield return Shot("12a_enemy_models_colossus_lit");
+        yield return LockCameraOn(new Vector3(pc.x - 2.6f, pc.y, pc.z - 6f), 0.4f);
+        yield return Shot("12b_enemy_wolf_lit");
+
         // 閃光
         wait = 0f;
         while (wait < 14f && g.FlashT < 0.25f) { wait += Time.deltaTime; yield return null; }
         yield return Shot("10_flash");
 
         g.SendMessage("End", false);
-        yield return new WaitForSeconds(0.5f);
-        yield return Shot("11_end");
+        yield return new WaitForSeconds(0.6f);
+        yield return Shot("11_end_a");
+        yield return new WaitForSeconds(2.0f);
+        yield return Shot("11_end_b");
+        yield return new WaitForSeconds(3.5f);
+        yield return Shot("11_end_c");
         yield return new WaitForSeconds(0.5f);
         Application.Quit();
     }

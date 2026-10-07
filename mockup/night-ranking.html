@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カメレオンナイト ランキング案モックアップ</title>
+<style>
+  :root {
+    --bg:#04090d; --surface:#0a1a20; --surface-2:#10262d; --line:#2c4b49; --text:#e6f5e9; --muted:#a9c4b8;
+    --accent:#9dffb0; --gold:#ffd76a; --silver:#cfd8dc; --bronze:#e0a070; --info:#6bdfff; --danger:#ff8a7a;
+    --radius:12px; --s1:8px; --s2:16px; --s3:24px; --s4:32px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);line-height:1.6;font-family:"Yu Gothic UI","Hiragino Sans","Meiryo",system-ui,sans-serif}
+  .wrap{max-width:1120px;margin:0 auto;padding:var(--s3) var(--s2) 64px}
+  h1{font-size:26px;margin:0 0 4px}
+  h2{font-size:20px;margin:var(--s4) 0 var(--s2);display:flex;align-items:center;gap:10px}
+  h2::before{content:"";width:4px;height:20px;background:var(--accent);border-radius:2px}
+  p.lead,.muted{color:var(--muted)}
+  .grid{display:grid;gap:var(--s2);grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--s2)}
+  .card h3{margin:0 0 8px;font-size:16px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:0 8px 12px 0}
+  .seg button{background:transparent;color:var(--muted);border:0;padding:10px 16px;min-height:44px;font:inherit;cursor:pointer}
+  .seg button[aria-selected="true"]{background:var(--accent);color:#062014;font-weight:700}
+  button:focus-visible{outline:3px solid var(--info);outline-offset:2px}
+
+  /* ranking table */
+  table{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:13px}
+  td.rank{width:64px;font-weight:800;font-size:18px}
+  tr.me{background:rgba(157,255,176,.14);outline:2px solid var(--accent);outline-offset:-2px}
+  .medal{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;color:#1b1400;font-size:15px;font-weight:800}
+  .m1{background:var(--gold)} .m2{background:var(--silver)} .m3{background:var(--bronze)}
+  .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:-1px;border:1px solid rgba(255,255,255,.4)}
+  .new{background:var(--accent);color:#062014;font-size:12px;font-weight:800;padding:2px 8px;border-radius:999px;margin-left:8px}
+
+  /* game screen frames */
+  .screen{position:relative;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+          background:radial-gradient(ellipse at 50% 0,#204b49,#07161d 60%,#03090d);padding:var(--s3)}
+  .screen .big{font-size:30px;font-weight:800;text-align:center;margin:0}
+  .screen .sub{text-align:center;color:var(--muted);margin:4px 0 var(--s2)}
+  .rankbadge{display:flex;justify-content:center;align-items:baseline;gap:10px;margin:var(--s2) 0}
+  .rankbadge b{font-size:56px;color:var(--gold);line-height:1}
+  .btnrow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:var(--s2)}
+  .btn{min-height:44px;padding:10px 20px;border-radius:10px;border:1px solid #8ddccb;background:#246257;color:#fff;font:inherit;cursor:pointer}
+  .btn.sec{background:transparent;border-color:var(--line);color:var(--muted)}
+
+  /* phone */
+  .phone{width:300px;margin:0 auto;border:8px solid #1a2b30;border-radius:34px;background:#111;padding:20px 16px;min-height:520px}
+  .phone label{display:block;font-size:14px;margin:12px 0 6px;color:var(--muted)}
+  .phone input{width:100%;min-height:48px;border-radius:10px;border:1px solid var(--line);background:#0a1a20;color:var(--text);padding:0 12px;font:inherit;font-size:18px}
+  .phone input:focus-visible{outline:3px solid var(--info)}
+  .stamps{display:flex;gap:8px;flex-wrap:wrap}
+  .stamps button{min-width:48px;min-height:48px;border-radius:10px;border:1px solid var(--line);background:#0a1a20;font-size:22px;cursor:pointer}
+  .stamps button[aria-pressed="true"]{border-color:var(--accent);background:#14382c}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .flow{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin:var(--s2) 0}
+  .step{flex:1 1 180px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+  .step b{color:var(--accent)}
+  ul{margin:6px 0 0;padding-left:20px;color:var(--muted);font-size:14px}
+  .tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;margin-right:6px}
+  .t1{background:var(--accent);color:#062014}.t2{background:var(--info);color:#02222a}.t3{background:var(--gold);color:#2a2100}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>カメレオンナイト ランキング案モックアップ</h1>
+  <p class="lead">実装前の確認用です。表の数字はすべてサンプルです。ランキングは<b>マップごと</b>に分かれ、順位は「クリアタイム」と「撃破数」を合わせた<b>スコア</b>で決まります。</p>
+
+  <h2>1. 全体の流れ</h2>
+  <div class="flow">
+    <div class="step"><b>① クリア / 終了</b><br>結果画面に、今回のタイムと順位を表示</div>
+    <div class="step"><b>② ニックネーム登録</b><br>スマホ画面で入力(任意)。入力しなければ「ゲスト」</div>
+    <div class="step"><b>③ ランキング更新</b><br>上位10位まで保存(PC内のファイル)</div>
+    <div class="step"><b>④ タイトルに表示</b><br>次の人が見て「自分も入りたい」と思える</div>
+  </div>
+
+  <h2>2. スコアの計算(クリアタイム × 撃破数)</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>計算式(案)</h3>
+      <table>
+        <tr><th>項目</th><th>計算</th><th>最大の目安</th></tr>
+        <tr><td>クリアボーナス</td><td>クリアしたら +5,000</td><td>5,000</td></tr>
+        <tr><td>撃破</td><td>1体ごとに +100</td><td>50体で 5,000</td></tr>
+        <tr><td>時間ボーナス</td><td>(600秒 − クリア秒数) × 10(0未満は0)</td><td>6,000</td></tr>
+      </table>
+      <p class="muted" style="margin:12px 0 0">力尽きた場合: クリアボーナスと時間ボーナスはなし。<b>撃破 × 100 + 生き延びた秒数 × 5</b> で、クリアした人より低くなるようにします。</p>
+    </div>
+    <div class="card">
+      <h3>計算例</h3>
+      <table>
+        <tr><th>プレイ</th><th>タイム</th><th>撃破</th><th>スコア</th></tr>
+        <tr><td>速く走り抜ける</td><td>03:00</td><td>10</td><td class="rank" style="font-size:16px">10,200</td></tr>
+        <tr><td>倒しながら進む</td><td>05:30</td><td>40</td><td class="rank" style="font-size:16px">11,700</td></tr>
+        <tr><td>じっくり(遅い)</td><td>09:30</td><td>25</td><td class="rank" style="font-size:16px">7,800</td></tr>
+        <tr><td>途中で力尽きた</td><td>生存 04:00</td><td>20</td><td class="rank" style="font-size:16px">3,200</td></tr>
+      </table>
+      <ul>
+        <li>「1体 = 時間10秒ぶん」の価値にしてあるので、<b>速さと倒す数のどちらかに偏らない</b>のが狙いです。</li>
+        <li>同点のときは、クリアタイムが短い方が上位。</li>
+        <li>倍率(100・10・5000)は、実際に遊んでから調整します。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>3. タイトル画面のランキング(マップ別)</h2>
+  <div class="screen">
+    <p class="big">TOP 10 ランキング</p>
+    <p class="sub">マップを選ぶと、そのマップのランキングが見られます</p>
+    <div style="text-align:center">
+      <div class="seg" role="tablist" aria-label="マップ" id="mapTabs"></div>
+      <div class="seg" role="tablist" aria-label="期間" id="periodTabs"></div>
+    </div>
+    <div style="max-width:720px;margin:0 auto"><table id="board" aria-live="polite"></table></div>
+  </div>
+
+  <h2>4. 結果画面(クリア時)</h2>
+  <div class="grid">
+    <div class="screen">
+      <p class="big">門を抜けて脱出した!</p>
+      <div class="rankbadge" aria-label="今回は3位"><span class="muted">Aマップ 今回の順位</span><b>3</b><span style="font-size:22px">位 / 10</span><span class="new">NEW</span></div>
+      <p class="sub">マップ A 森の迷路</p>
+      <table aria-label="スコアの内訳">
+        <tr><td>クリアボーナス</td><td style="text-align:right">5,000</td></tr>
+        <tr><td>撃破 28体 × 100</td><td style="text-align:right">2,800</td></tr>
+        <tr><td>時間 04:32(あと328秒) × 10</td><td style="text-align:right">3,280</td></tr>
+        <tr><td><b>合計スコア</b></td><td style="text-align:right;color:var(--gold);font-size:22px"><b>11,080</b></td></tr>
+      </table>
+      <table>
+        <tr><th>灯り役</th><th>撃破</th><th>貢献</th></tr>
+        <tr><td><span class="dot" style="background:#ff6b6b"></span>1 たろう</td><td>12</td><td>43%</td></tr>
+        <tr><td><span class="dot" style="background:#6bdfff"></span>2 ゲスト</td><td>8</td><td>29%</td></tr>
+        <tr><td><span class="dot" style="background:#ffe066"></span>3 みく</td><td>5</td><td>18%</td></tr>
+        <tr><td><span class="dot" style="background:#b388ff"></span>4 ゲスト</td><td>3</td><td>10%</td></tr>
+      </table>
+      <div class="btnrow"><button class="btn">もう一度やり直す (R)</button><button class="btn sec">ステージ選択へ (T)</button></div>
+    </div>
+    <div class="card">
+      <h3>ポイント</h3>
+      <ul>
+        <li>順位は<b>色だけでなく数字とメダル</b>でも分かるようにします。</li>
+        <li>ランク外でも「あと 12秒で10位」のように、次の目標を表示します。</li>
+        <li>灯り役ごとの貢献(撃破数)も表示。みんなで遊ぶ楽しさが増えます。</li>
+        <li>力尽きた場合もスコアは出ます(クリアより低くなる計算)。ランキングには載るが「途中終了」と表示。</li>
+      </ul>
+      <h3 style="margin-top:16px">順位の決め方</h3>
+      <ul>
+        <li>マップ(A・B・C)ごとに、<span class="tag t1">スコア</span>が高い順に上位10位。</li>
+        <li>同点は、クリアタイムが短い方が上。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>5. スマホ側のニックネーム入力</h2>
+  <div class="grid">
+    <div class="phone" aria-label="スマホの入力画面の例">
+      <b style="font-size:18px">3位に入りました!</b>
+      <p class="hint" style="margin-top:6px">ランキングに載せる名前を入力してください(あとで変更できません)</p>
+      <label for="nick">ニックネーム(8文字まで)</label>
+      <input id="nick" value="みく" maxlength="8" autocomplete="nickname">
+      <label>スタンプ(1つ選択)</label>
+      <div class="stamps" role="group" aria-label="スタンプ">
+        <button aria-pressed="true" aria-label="ほし">★</button><button aria-pressed="false" aria-label="つき">☾</button>
+        <button aria-pressed="false" aria-label="はな">✿</button><button aria-pressed="false" aria-label="ひかり">✦</button>
+      </div>
+      <button class="btn" style="width:100%;margin-top:20px">登録する</button>
+      <button class="btn sec" style="width:100%;margin-top:10px">名前を出さない(ゲスト)</button>
+      <p class="hint">不適切な言葉は自動的に「ゲスト」に置き換えます。</p>
+    </div>
+    <div class="card">
+      <h3>実装の考え方</h3>
+      <ul>
+        <li><b>保存先:</b> PC内の <code>ranking.json</code>(ゲームを閉じても残る)</li>
+        <li><b>入力:</b> いまのスマホ接続を使うので、追加のアプリや登録は不要です。</li>
+        <li><b>色との対応:</b> 入力はその人のライトの色に紐づけます(誰が誰か分かる)。</li>
+        <li><b>展示向け:</b> 管理用キー(例: Ctrl+Shift+R)で、全消去・「今日だけ」リセットができます。</li>
+        <li><b>ずるの防止:</b> 登録できるのは、そのプレイで接続していたスマホだけ。</li>
+        <li><b>個人情報:</b> 名前以外は保存しません。ニックネームのみ(実名は入力しないよう注意書き)。</li>
+      </ul>
+      <h3 style="margin-top:16px">決めてほしいこと</h3>
+      <ul>
+        <li>スコアの倍率(撃破100・時間10・クリア5000)でよいか。速さと撃破のどちらを重く見るか</li>
+        <li>期間は「今日」と「全期間」の両方を出すか(展示1日だけなら不要)</li>
+        <li>ニックネーム入力は必須にするか、任意(ゲスト可)にするか</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  var maps = ['A 森の迷路','B 遺跡攻略','C 中央湖の周回'];
+  var periods = ['今日','全期間'];
+  var st = {map:0, period:1};
+  var names = ['ソラ','たろう','みく','りん','ゲスト','ハル','ゲスト','ナナ','ケン','ゲスト'];
+  var colors = ['#ff6b6b','#6bdfff','#ffe066','#b388ff','#6bff95','#ff9f6b','#ff6bd6','#8c8cff'];
+  function score(sec, kills) { return 5000 + kills * 100 + Math.max(0, 600 - sec) * 10; }
+  function sample(map, period) {
+    var rows = [], seed = map * 7 + period * 5;
+    for (var i = 0; i < 10; i++) {
+      var sec = 190 + ((seed + i * 37) % 160) + i * 6, kills = 46 - i * 2 - (seed % 4);
+      rows.push({n: names[(i + seed) % names.length], sec: sec, k: kills, sc: score(sec, kills), p: 2 + (i * 3 + seed) % 5, c: colors[(i + seed) % colors.length]});
+    }
+    rows.sort(function (a, b) { return b.sc - a.sc || a.sec - b.sec; });
+    return rows;
+  }
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function mmss(s){ return pad(Math.floor(s / 60)) + ':' + pad(s % 60); }
+  function seg(id, items, key) {
+    var el = document.getElementById(id); el.innerHTML = '';
+    items.forEach(function (t, i) {
+      var b = document.createElement('button'); b.textContent = t; b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', st[key] === i);
+      b.onclick = function () { st[key] = i; render(); };
+      el.appendChild(b);
+    });
+  }
+  function render() {
+    seg('mapTabs', maps, 'map'); seg('periodTabs', periods, 'period');
+    var rows = sample(st.map, st.period);
+    var html = '<tr><th>順位</th><th>名前</th><th>スコア</th><th>タイム</th><th>撃破</th><th>人数</th></tr>';
+    rows.forEach(function (r, i) {
+      var me = (i === 2 && st.map === 0 && st.period === 1);
+      var rank = i < 3 ? '<span class="medal m' + (i + 1) + '" aria-label="' + (i + 1) + '位">' + (i + 1) + '</span>' : (i + 1);
+      html += '<tr class="' + (me ? 'me' : '') + '"><td class="rank">' + rank + '</td><td><span class="dot" style="background:' + r.c + '"></span>' + r.n + (me ? '<span class="new">今回</span>' : '') +
+              '</td><td><b>' + r.sc.toLocaleString() + '</b></td><td>' + mmss(r.sec) + '</td><td>' + r.k + '体</td><td>' + r.p + '人</td></tr>';
+    });
+    document.getElementById('board').innerHTML = html;
+  }
+  render();
+</script>
+</body>
+</html>

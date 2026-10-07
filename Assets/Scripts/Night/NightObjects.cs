@@ -3,16 +3,18 @@ using UnityEngine;
 // 蓄光ランタン。約2秒連続で照らすと点灯し、周囲の敵を撃退。点灯後も周囲に継続ダメージを与える。
 public class NightLamp
 {
-    public const float ChargeTime = 2f, BurstRadius = 7f, DamageRadius = 6f, Dps = 28f;
+    public const float ChargeTime = 0.5f, BurstRadius = 9.5f, DamageRadius = 8.5f, Dps = 28f;
     static readonly Color Glow = NightMeshes.Hex(0xffd390);
 
     public readonly float x, z, height;
     public float charge, power;
     public bool lit;
+    float fxTimer;
 
     readonly Material housingMat, progressMat;
     readonly Transform progress;
     readonly Light light;
+    readonly GameObject rangeRing;
 
     public NightLamp(NightWorld w, float x, float z, float height)
     {
@@ -28,8 +30,11 @@ public class NightLamp
                 w.Box(x + sx * 0.28f, height + 1.43f, z + sz * 0.28f, 0.07f, 0.62f, 0.07f, w.LampMetal);
         progressMat = NightMeshes.Unlit(NightMeshes.Hex(0x9dc9bc, 0.2f));
         progress = w.RingObject(0.58f, 0.68f, progressMat, w.Root, new Vector3(x, height + 0.025f, z), 40).transform;
-        light = NightWorld.PointLight(w.Root, new Vector3(x, height + 1.6f, z), NightMeshes.Hex(0xffcf88), 0f, 12f);
+        light = NightWorld.PointLight(w.Root, new Vector3(x, height + 1.6f, z), NightMeshes.Hex(0xffcf88), 0f, 16f);
         light.enabled = false;
+        // 点灯後に、継続ダメージが届く範囲を細い輪で示す(どこまで安全か分かるように)
+        rangeRing = w.RingObject(DamageRadius - 0.1f, DamageRadius, NightMeshes.Unlit(NightMeshes.Hex(0xffd390, 0.4f)), w.Root, new Vector3(x, height + 0.12f, z), 72);
+        rangeRing.SetActive(false);
     }
 
     public bool InLight(NightMap map, Vector3 pos, float radius)
@@ -45,6 +50,7 @@ public class NightLamp
             Vector3 lt = g.NearestLightTargetTo(new Vector3(x, height, z));
             bool aimed = Mathf.Sqrt((x - lt.x) * (x - lt.x) + (z - lt.z) * (z - lt.z)) < 1.25f && Mathf.Abs(lt.y - height) < 2.15f;
             charge = aimed ? Mathf.Min(ChargeTime, charge + dt) : 0f;
+            if (aimed && NightGame.FxTick(ref fxTimer, dt, 0.1f)) SurvivorBurst.Spawn(new Vector3(x, height + 1.4f, z), NightMeshes.Hex(0xfff0a0), 3);
             float p = charge / ChargeTime;
             housingMat.SetColor("_EmissionColor", Glow * (0.025f + p * 0.9f));
             progressMat.color = NightMeshes.Hex(0x9dc9bc, 0.2f + p * 0.65f);
@@ -60,6 +66,7 @@ public class NightLamp
         {
             power = Mathf.Min(1f, power + dt * 2.5f);
             light.enabled = true;
+            rangeRing.SetActive(true);
             light.intensity = power * 2.25f;
             housingMat.SetColor("_EmissionColor", Glow * (0.9f + power * 1.2f));
             progressMat.color = NightMeshes.Hex(0xffd390, 0.45f);
@@ -76,6 +83,7 @@ public class NightGuidePlant
     public readonly float x, z, height;
     public float charge;
     public bool latched;
+    float fxTimer;
 
     readonly Material coreMat, petalMat, ringMat;
     readonly Transform ring;
@@ -122,6 +130,7 @@ public class NightGuidePlant
     {
         Vector3 lt = g.NearestLightTargetTo(new Vector3(x, height, z));
         bool aimed = Mathf.Sqrt((x - lt.x) * (x - lt.x) + (z - lt.z) * (z - lt.z)) < 1.05f && Mathf.Abs(lt.y - height) < 1.5f;
+        if (aimed && NightGame.FxTick(ref fxTimer, dt, 0.14f)) SurvivorBurst.Spawn(new Vector3(x, height + 0.8f, z), NightMeshes.Hex(0xc9ffe2), 3);
         if (!aimed) { charge = 0f; latched = false; }
         else if (!latched)
         {
@@ -149,7 +158,7 @@ public class NightOrb
     public readonly float baseY;
     public bool collected, materialized;
     public float reveal;
-    float phase;
+    float phase, fxTimer;
 
     public readonly Transform root;
     readonly Transform halo, ring;
@@ -189,6 +198,7 @@ public class NightOrb
 
         if (!materialized)
         {
+            if (beingLit && NightGame.FxTick(ref fxTimer, dt, 0.14f)) SurvivorBurst.Spawn(p0 + Vector3.up * 1.1f, Color.Lerp(color, Color.white, 0.5f), 3);
             reveal = beingLit ? Mathf.Min(RevealTime, reveal + dt) : Mathf.Max(0f, reveal - dt * 0.45f);
             float p = reveal / RevealTime;
             Apply(0.16f + p * 0.84f, 0.08f + p * 0.28f, 0.2f + p * 0.65f, 0.45f + p * 0.75f, 0.25f + p * 2f);

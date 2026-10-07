@@ -209,6 +209,9 @@ public static class NightMeshes
                 for (int xx = x; xx < Mathf.Min(S, x + w); xx++)
                     px[yy * S + xx] = Blend(px[yy * S + xx], over);
         }
+        // 高コントラストの細かい斑点は拡大・移動時にブロック状にちらついて「ガビガビ」に見えるため、
+        // タイリングを保ったまま軽くぼかして滑らかにする(石畳の目地はこの後に描くので鮮明なまま)。
+        for (int pass = 0; pass < 2; pass++) px = BlurWrapped(px, S);
         if (stone)
         {
             Color32 line = new Color32(0x26, 0x35, 0x38, 0x88);
@@ -225,8 +228,28 @@ public static class NightMeshes
         var tex = new Texture2D(S, S, TextureFormat.RGBA32, true);
         tex.SetPixels32(px);
         tex.wrapMode = TextureWrapMode.Repeat;
+        tex.filterMode = FilterMode.Trilinear;
+        tex.anisoLevel = 8; // 斜めから見た地面がぼやけたりちらついたりしないように
         tex.Apply();
         return tex;
+    }
+
+    static Color32[] BlurWrapped(Color32[] src, int S)
+    {
+        var dst = new Color32[src.Length];
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                int r = 0, g = 0, b = 0;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        var c = src[((y + dy + S) % S) * S + (x + dx + S) % S];
+                        r += c.r; g += c.g; b += c.b;
+                    }
+                dst[y * S + x] = new Color32((byte)(r / 9), (byte)(g / 9), (byte)(b / 9), 255);
+            }
+        return dst;
     }
 
     public static Color32 Blend(Color32 dst, Color32 src)
