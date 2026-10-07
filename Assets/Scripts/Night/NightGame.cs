@@ -15,7 +15,7 @@ public class NightGuidance
 
 // カメレオンナイト ― 光の球収集版(モックアップ)のゲーム進行。
 //  - メインプレイヤーは上下左右の移動だけ。攻撃は協力者の光(スマホ or マウス)が担う。
-//  - 止まると擬態: ゲージがある間は無敵。擬態に入った瞬間に周囲をノックバックする。
+//  - 止まると擬態: 地面や物の色に変わり、敵はプレイヤーを見失って「？」を出しながらうろうろする。最大3秒(ゲージ)。
 //  - 球を2つ集めて入口の門を開き、帰還して脱出する。
 //  - 十数秒に1回、雷鳴の予兆のあとに森全体が一瞬明るくなる(閃光)。範囲内の敵は光を浴びる。
 public class NightGame : MonoBehaviour
@@ -42,9 +42,10 @@ public class NightGame : MonoBehaviour
 
     // ---- 能力値(レベルアップは無し。難易度は経過時間で上がる敵の出現ペースだけ) ----
     public const float HpMax = 100f, CampMax = 100f;
-    const float CampUnlock = 35f, CampDrain = 40f, CampRecharge = 22f, CampEnterMin = 30f;
-    const float LightPower = 1.25f;
-    const float KnockRadius = 5f, KnockSpeed = 11f;
+    // 擬態ゲージは移動中に空→満タンまで約10秒で戻る(速すぎると擬態に頼りきりで簡単になるため)
+    public const float CampSeconds = 3f; // 擬態できるのは最大3秒(ゲージ満タンから空になるまで)
+    const float CampUnlock = 35f, CampDrain = CampMax / CampSeconds, CampRecharge = 10f, CampEnterMin = 30f;
+    const float LightPower = 0.8f; // 灯り役の光が敵に与えるダメージの倍率(1.25 では強すぎて簡単だったため下げた)
     public const int OrbTotal = 2;
 
     public float Hp { get; private set; } = HpMax;
@@ -139,7 +140,7 @@ public class NightGame : MonoBehaviour
     // ---- 表示用 ----
     public string ToastText { get; private set; } = "";
     public float ToastTimer { get; private set; }
-    public const string HintDefault = "花を約2秒照らすと、未回収の球まで光の道が現れます。ランタンは敵を撃退。倒した敵の緑のオーブでHP回復。";
+    public const string HintDefault = "花を合計2秒照らすと、未回収の球まで光の道が現れます。ランタンは敵を撃退。倒した敵の緑のオーブでHP回復。";
     public string Hint { get; private set; } = HintDefault;
 
     // ---- カメラ(進行方向の少し先を狙い、遅れて追従する) ----
@@ -310,7 +311,7 @@ public class NightGame : MonoBehaviour
         bool isMoving = Player.Velocity.magnitude > 0.35f;
         if (isMoving) idleTimer = 0f; else idleTimer += dt;
 
-        // --- 擬態(止まる=ギミック): ゲージがある間は無敵。入った瞬間にノックバック ---
+        // --- 擬態(止まる=ギミック): ゲージがある間(最大3秒)は無敵で、敵はプレイヤーを見失う ---
         bool wasCamouflaged = Camouflaged;
         if (isMoving)
         {
@@ -320,7 +321,7 @@ public class NightGame : MonoBehaviour
         }
         else if (idleTimer > 0.3f && !CampLocked)
         {
-            if (!wasCamouflaged && Camp >= CampEnterMin) { Camouflaged = true; KnockbackPulse(); }
+            if (!wasCamouflaged && Camp >= CampEnterMin) { Camouflaged = true; OnCamouflageStart(); }
             else if (wasCamouflaged) Camouflaged = true;
 
             if (Camouflaged)
@@ -336,7 +337,9 @@ public class NightGame : MonoBehaviour
             Camp = Mathf.Min(CampMax, Camp + CampRecharge * 0.5f * dt);
             if (CampLocked && Camp >= CampUnlock) CampLocked = false;
         }
-        Player.UpdateLook(dt, Camouflaged, World.NearestTerrainColor(PlayerPos), HurtNow);
+        if (wasCamouflaged && !Camouflaged) OnCamouflageEnd();
+        Color camoColor = World.CamouflageColorAt(PlayerPos, out var camoTexture);
+        Player.UpdateLook(dt, Camouflaged, camoColor, camoTexture, HurtNow);
 
         // --- 灯り ---
         Flashlight.Aim(Cam, Map, PlayerPos.y);
@@ -390,7 +393,7 @@ public class NightGame : MonoBehaviour
 
         if (AmbushRefillFlash > 0f) AmbushRefillFlash = Mathf.Max(0f, AmbushRefillFlash - dt * 2f);
         Hint = CampLocked ? "擬態ゲージ切れ…動いてゲージを回復しよう"
-            : Camouflaged ? "擬態中(待ち伏せ):灯り役の光が2倍効く！ 倒すと擬態ゲージが回復"
+            : Camouflaged ? "擬態中(最大3秒):敵はあなたを見失っている！ 灯り役の光が2倍効く"
             : GateOpened ? "入口の門が開いた！導きの花を照らすと、門への光の道が現れます。" : HintDefault;
 
         UpdatePulses(dt);
@@ -475,7 +478,14 @@ public class NightGame : MonoBehaviour
 
             Vector3 toPlayer = pp - pos; toPlayer.y = 0;
             float dist = toPlayer.magnitude;
-            if (en.cfg.ranged && dist < 9f && Map.ClearSight(pos, pp))
+            en.confused = Mathf.MoveTowards(en.confused, Camouflaged ? 1f : 0f, dt * 4f);
+            if (en.foundTimer > 0f) en.foundTimer -= dt;
+            if (Camouflaged)
+            {
+                // 擬態中はプレイヤーを見失い、その場の近くをうろうろする(弾も撃たない)
+                WanderEnemy(en, dt);
+            }
+            else if (en.cfg.ranged && dist < 9f && Map.ClearSight(pos, pp))
             {
                 // 遠距離型は一定距離で立ち止まって弾を撃つ
                 en.go.transform.rotation = Quaternion.Euler(0, Mathf.Atan2(toPlayer.x, toPlayer.z) * Mathf.Rad2Deg, 0);
@@ -686,6 +696,35 @@ public class NightGame : MonoBehaviour
             DropHealOrb(PlayerPos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 4.5f, i == 0 ? 14f : 6f);
         }
     }
+    // 動作確認(NightAutoShot)用: プレイヤーの近く(4〜7m)に敵を出す
+    public void DebugSpawnNear(int count) => DebugSpawnNear(count, 50f); // 撮影中に倒れないように硬くする
+
+    public void DebugSpawnNear(int count, float hpScale)
+    {
+        int made = 0;
+        for (int attempt = 0; attempt < 200 && made < count; attempt++)
+        {
+            Vector2 r = Random.insideUnitCircle.normalized * Random.Range(4f, 7f);
+            float x = PlayerPos.x + r.x, z = PlayerPos.z + r.y;
+            if (!Map.Walkable(x, z, 0.5f)) continue;
+            var en = new NightEnemy(PickType(), new Vector3(x, Map.SurfaceAt(x, z), z));
+            en.lightHp = en.lightHpMax = en.cfg.lightHp * Difficulty.enemyHp * hpScale;
+            Enemies.Add(en);
+            made++;
+        }
+    }
+
+    // 紹介動画の撮影(NightDemoVideo)用
+    public void DebugSetHp(float hp) => Hp = Mathf.Clamp(hp, 0f, HpMax);
+    public void DebugFlashIn(float seconds) { if (FlashT < 0f) FlashWait = seconds; }
+    public int DebugHealOrbCount => healOrbs.Count;
+    public Vector3 DebugNearestHealOrb()
+    {
+        Vector3 best = PlayerPos; float bd = float.MaxValue;
+        foreach (var o in healOrbs) { float d = NightMap.Flat(o.t.position, PlayerPos); if (d < bd) { bd = d; best = o.t.position; } }
+        return best;
+    }
+
     public void DebugRaiseThreat() => RaiseThreat("光の球を取った…森がざわめき出した", 4);
 
     // ---- 脅威レベル(敵が増える) ----
@@ -734,21 +773,63 @@ public class NightGame : MonoBehaviour
         }
     }
 
-    // ---- 擬態に入った瞬間のノックバック ----
-    void KnockbackPulse()
+    // ---- 擬態の始まり・終わり ----
+    void OnCamouflageStart()
     {
         Audio.PlayPulse();
-        AddPulse(PlayerPos + Vector3.up * 0.15f, 0.4f, 0.6f, NightMeshes.Hex(0x8fe6ff, 0.9f), 0.45f, 1f + KnockRadius * 1.6f);
+        // 周りの色に溶け込む合図の、小さく静かな波紋(敵を押し返す力は無い)
+        AddPulse(PlayerPos + Vector3.up * 0.15f, 0.4f, 0.6f, NightMeshes.Hex(0x8fe6ff, 0.5f), 0.5f, 3.5f);
+        foreach (var en in Enemies)
+        {
+            en.wanderTimer = 0f; // すぐに新しい行き先を選ばせる
+            en.path = null;
+        }
+    }
+
+    // 擬態が解けたら、近くの敵はプレイヤーに気づいて「！」を出し、また追いかけ始める
+    void OnCamouflageEnd()
+    {
         foreach (var en in Enemies)
         {
             if (en.dying) continue;
-            Vector3 d = en.Position - PlayerPos; d.y = 0;
-            float dist = d.magnitude;
-            if (dist >= KnockRadius) continue;
-            d = dist < 0.01f ? Vector3.right : d / dist;
-            float w = 1f - dist / KnockRadius * 0.5f; // 近いほど強く飛ぶ
-            en.knock = d * KnockSpeed * w;
+            if (NightMap.Flat(en.Position, PlayerPos) < 16f) en.foundTimer = 0.8f;
+            en.path = null;
+            en.navTimer = 0f;
         }
+    }
+
+    // 見失った敵: 近くの通路の上で、行き先を選んで歩く → 立ち止まって辺りを見回す、を繰り返す
+    void WanderEnemy(NightEnemy en, float dt)
+    {
+        Vector3 pos = en.Position;
+        en.wanderTimer -= dt;
+        if (en.wanderTimer <= 0f)
+        {
+            en.wanderTarget = pos;
+            for (int k = 0; k < 6; k++)
+            {
+                Vector2 r = Random.insideUnitCircle.normalized * Random.Range(1.2f, 3.2f);
+                Vector3 t = pos + new Vector3(r.x, 0, r.y);
+                if (Map.Walkable(t.x, t.z, 0.4f)) { en.wanderTarget = t; break; }
+            }
+            en.wanderPause = Random.value < 0.35f ? Random.Range(0.4f, 0.9f) : 0f; // ときどき立ち止まる
+            en.wanderTimer = en.wanderPause + Random.Range(0.8f, 1.6f);
+        }
+        if (en.wanderPause > 0f)
+        {
+            en.wanderPause -= dt;
+            // 立ち止まって左右を見回す
+            en.go.transform.rotation *= Quaternion.Euler(0, Mathf.Sin(Time.time * 3f + en.go.GetInstanceID()) * 90f * dt, 0);
+            return;
+        }
+        Vector3 to = en.wanderTarget - pos; to.y = 0;
+        if (to.magnitude < 0.2f) return;
+        float speed = en.cfg.speed * Difficulty.enemySpeed * 0.35f;
+        Vector3 next = pos + to.normalized * Mathf.Min(to.magnitude, speed * dt);
+        Map.ConstrainActor(ref next, 0.35f);
+        en.Position = next;
+        Quaternion face = Quaternion.Euler(0, Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, 0);
+        en.go.transform.rotation = Quaternion.Slerp(en.go.transform.rotation, face, Mathf.Min(1f, dt * 6f));
     }
 
     void AddPulse(Vector3 pos, float inner, float outer, Color color, float duration, float maxScale)

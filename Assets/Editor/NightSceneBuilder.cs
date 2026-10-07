@@ -88,6 +88,7 @@ public static class NightSceneBuilder
         game.Moon = moon;
         gameGO.AddComponent<NightHud>().game = game;
         gameGO.AddComponent<NightAutoShot>();
+        gameGO.AddComponent<NightDemoVideo>();
 
         // 敵の見た目: 群れ型=狼 / 硬い型=巨人 / 遠距離型=キノコの守り手(いずれもMeshy AI製)
         var models = gameGO.AddComponent<NightEnemyModels>();

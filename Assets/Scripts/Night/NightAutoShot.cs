@@ -23,7 +23,10 @@ public class NightAutoShot : MonoBehaviour
         Directory.CreateDirectory(dir);
         g = NightGame.Instance;
         int m = System.Array.IndexOf(args, "-nightMap");
+        if (System.Array.IndexOf(args, "-nightDemoVideo") >= 0) { enabled = false; return; } // 紹介動画の撮影は NightDemoVideo が行う
         if (System.Array.IndexOf(args, "-nightHealTest") >= 0) { StartCoroutine(HealTest()); return; }
+        if (System.Array.IndexOf(args, "-nightCamoTest") >= 0) { StartCoroutine(CamoTest()); return; }
+        if (System.Array.IndexOf(args, "-nightGaugeTest") >= 0) { StartCoroutine(GaugeTest()); return; }
         StartCoroutine(m >= 0 && m + 1 < args.Length ? Tour(args[m + 1]) : Run());
     }
 
@@ -45,6 +48,55 @@ public class NightAutoShot : MonoBehaviour
             yield return new WaitForSeconds(1.6f);
             yield return Shot(id + "_" + r.ToString("00") + "_region");
         }
+        Application.Quit();
+    }
+
+    // 光で動くもののゲージの確認: ランタンを少し照らして外す → 減らずに残るか、もう一度照らすと続きから貯まるか
+    IEnumerator GaugeTest()
+    {
+        yield return new WaitForSeconds(1f);
+        g.SelectMap("A");
+        yield return new WaitForSeconds(0.5f);
+        g.BeginPlay("テスト");
+        yield return new WaitForSeconds(0.5f);
+        // いちばん近いランタンと花の近くへ移動
+        NightLamp lamp = null; float best = float.MaxValue;
+        foreach (var l in g.World.Lamps) { float d = Mathf.Abs(l.x) + Mathf.Abs(l.z - g.PlayerPos.z); if (d < best) { best = d; lamp = l; } }
+        Teleport(new Vector3(lamp.x + 2.5f, 0, lamp.z + 2.5f));
+        yield return new WaitForSeconds(0.8f);
+        Vector3 lampPos = new Vector3(lamp.x, lamp.height, lamp.z);
+        yield return AimAt(() => lampPos, 0.2f);
+        g.Flashlight.DebugAim = new Vector2(0.95f, 0.95f); // 光を外す
+        yield return new WaitForSeconds(1.0f);
+        Debug.Log("NightAutoShot: lamp charge after release=" + lamp.charge.ToString("0.00") + " (外しても残っていればOK)");
+        yield return Shot("gauge_01_lamp_partial");
+        yield return AimAt(() => lampPos, 0.15f);
+        g.Flashlight.DebugAim = new Vector2(0.95f, 0.95f);
+        yield return new WaitForSeconds(0.1f);
+        Debug.Log("NightAutoShot: lamp charge after 2nd=" + lamp.charge.ToString("0.00"));
+        yield return Shot("gauge_02_lamp_more");
+        Application.Quit();
+    }
+
+    // 擬態の確認: 止まると敵が見失って「？」→ 3秒で擬態が解けて「！」
+    IEnumerator CamoTest()
+    {
+        yield return new WaitForSeconds(1f);
+        g.SelectMap("A");
+        yield return new WaitForSeconds(0.5f);
+        g.BeginPlay("テスト");
+        g.Flashlight.DebugAim = new Vector2(0.9f, 0.1f); // 敵に光を当てない
+        yield return new WaitForSeconds(0.2f);
+        g.DebugSpawnNear(5);
+        yield return new WaitForSeconds(0.7f);
+        yield return Shot("camo_01_confused");
+        yield return new WaitForSeconds(1.6f);
+        yield return Shot("camo_02_low");
+        Debug.Log("NightAutoShot: camo=" + g.Camouflaged + " camp=" + g.Camp);
+        while (g.Camouflaged) yield return null;
+        yield return new WaitForSeconds(0.15f);
+        yield return Shot("camo_03_found");
+        Debug.Log("NightAutoShot: after camo=" + g.Camouflaged + " hp=" + g.Hp);
         Application.Quit();
     }
 

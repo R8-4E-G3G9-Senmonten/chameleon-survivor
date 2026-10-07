@@ -1,6 +1,7 @@
 using UnityEngine;
 
-// 蓄光ランタン。約2秒連続で照らすと点灯し、周囲の敵を撃退。点灯後も周囲に継続ダメージを与える。
+// 蓄光ランタン。合計0.5秒照らすと点灯し、周囲の敵を撃退。点灯後も周囲に継続ダメージを与える。
+// 照らした時間はたまっていく(途中で光を外しても減らない)。進み具合はランタンの上のゲージで分かる。
 public class NightLamp
 {
     public const float ChargeTime = 0.5f, BurstRadius = 9.5f, DamageRadius = 8.5f, Dps = 28f;
@@ -49,7 +50,7 @@ public class NightLamp
         {
             Vector3 lt = g.NearestLightTargetTo(new Vector3(x, height, z));
             bool aimed = Mathf.Sqrt((x - lt.x) * (x - lt.x) + (z - lt.z) * (z - lt.z)) < 1.25f && Mathf.Abs(lt.y - height) < 2.15f;
-            charge = aimed ? Mathf.Min(ChargeTime, charge + dt) : 0f;
+            if (aimed) charge = Mathf.Min(ChargeTime, charge + dt); // 外しても減らない(蓄積)
             if (aimed && NightGame.FxTick(ref fxTimer, dt, 0.1f)) SurvivorBurst.Spawn(new Vector3(x, height + 1.4f, z), NightMeshes.Hex(0xfff0a0), 3);
             float p = charge / ChargeTime;
             housingMat.SetColor("_EmissionColor", Glow * (0.025f + p * 0.9f));
@@ -75,7 +76,8 @@ public class NightLamp
     }
 }
 
-// 導きの植物。約2秒連続で照らすと、最も近い未回収の球(全部集めた後は入口の門)までの光の道を約7秒示す。
+// 導きの植物。合計2秒照らすと、最も近い未回収の球(全部集めた後は入口の門)までの光の道を約7秒示す。
+// 照らした時間はたまっていく(途中で光を外しても減らない)。道を示したらゲージは空に戻り、また貯めれば使える。
 public class NightGuidePlant
 {
     public const float ChargeTime = 2f;
@@ -131,12 +133,13 @@ public class NightGuidePlant
         Vector3 lt = g.NearestLightTargetTo(new Vector3(x, height, z));
         bool aimed = Mathf.Sqrt((x - lt.x) * (x - lt.x) + (z - lt.z) * (z - lt.z)) < 1.05f && Mathf.Abs(lt.y - height) < 1.5f;
         if (aimed && NightGame.FxTick(ref fxTimer, dt, 0.14f)) SurvivorBurst.Spawn(new Vector3(x, height + 0.8f, z), NightMeshes.Hex(0xc9ffe2), 3);
-        if (!aimed) { charge = 0f; latched = false; }
+        if (!aimed) latched = false;
         else if (!latched)
         {
             charge = Mathf.Min(ChargeTime, charge + dt);
             if (charge >= ChargeTime) { latched = true; g.ActivateGuidePlant(this); }
         }
+        if (latched && charge >= ChargeTime) charge = 0f; // 道を示したら空に戻す(照らし続けている間は道が延長される)
         float p = charge / ChargeTime;
         bool active = g.Guidance != null && g.Guidance.plant == this;
         coreMat.SetColor("_EmissionColor", NightMeshes.Hex(0x8ceeb7) * (0.25f + p * 1.5f + (active ? 0.5f : 0f)));
@@ -148,7 +151,7 @@ public class NightGuidePlant
     }
 }
 
-// 光の球。最初は気配だけの半透明 → 約2秒照らすと実体化 → 触れると回収。
+// 光の球。最初は気配だけの半透明 → 合計2秒照らすと実体化 → 触れると回収。照らした時間はたまっていく。
 public class NightOrb
 {
     public const float RevealTime = 2f, LightRadius = 3.2f;
@@ -199,7 +202,7 @@ public class NightOrb
         if (!materialized)
         {
             if (beingLit && NightGame.FxTick(ref fxTimer, dt, 0.14f)) SurvivorBurst.Spawn(p0 + Vector3.up * 1.1f, Color.Lerp(color, Color.white, 0.5f), 3);
-            reveal = beingLit ? Mathf.Min(RevealTime, reveal + dt) : Mathf.Max(0f, reveal - dt * 0.45f);
+            if (beingLit) reveal = Mathf.Min(RevealTime, reveal + dt); // 外しても減らない(蓄積)
             float p = reveal / RevealTime;
             Apply(0.16f + p * 0.84f, 0.08f + p * 0.28f, 0.2f + p * 0.65f, 0.45f + p * 0.75f, 0.25f + p * 2f);
             if (beingLit && Random.value < dt * 4f) g.Audio.PlayHitBuzz();

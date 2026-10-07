@@ -40,3 +40,6 @@ unity_build_*.log
 
 # make_qr.bat が出力する印刷用QR(PCのIPが入るのでコミットしない)
 qr_print/
+
+# 紹介動画(デモ撮影モードで作る動画・連番画像。ファイルが大きいのでコミットしない)
+demo_video/

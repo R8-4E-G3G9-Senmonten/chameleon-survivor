@@ -10,7 +10,7 @@ public class NightHud : MonoBehaviour
     float scale = 1f, W, H;
     // 画面の高さをこの値として拡大縮小する(小さいほど文字やパネルが大きくなる)。
     // タイトル・名前入力は左右にランキングと接続パネルが並び横幅が足りなくなるため、プレイ中より控えめにする
-    const float BaseHeight = 650f, TitleBaseHeight = 720f;
+    const float BaseHeight = 580f, TitleBaseHeight = 700f;
     const float SidePanelSpace = 272f; // 左右のパネルの幅+余白(中央の内容がここに重ならないようにする)
     bool helpOpen;
     float toastAlpha;
@@ -116,12 +116,20 @@ public class NightHud : MonoBehaviour
         if (game.FlashLevel > 0f) Fill(new Rect(0, 0, W, H), C(0xeaf2ff, game.FlashLevel * 0.5f));
         DrawEdgeGlow();
 
-        DrawHud();
-        DrawGoalHud();
-        DrawTopRight();
-        DrawToast();
-        DrawThreatAlert();
-        DrawHint();
+        // 結果画面ではプレイ中の表示を出さない(結果の文字と重なるため)
+        bool playing = game.State != NightGame.GameState.Ended;
+        if (playing)
+        {
+            DrawEnemyMarks();
+            DrawObjectGauges();
+            DrawPlayerBars();
+            DrawHud();
+            DrawGoalHud();
+            DrawTopRight();
+            DrawToast();
+            DrawThreatAlert();
+            DrawHint();
+        }
         DrawConnectPanel(false);
 
         if (game.State != NightGame.GameState.Ended) endStart = -1f;
@@ -141,7 +149,7 @@ public class NightHud : MonoBehaviour
         float preview = Mathf.Min(cardW - 24f, compact ? 180f : 235f);
         float cardH = 14f + preview + 12f + 22f + 7f + 14f + 16f;
 
-        string paragraph = "球や敵にマウスの光を当て続けます。止まると擬態して一時的に無敵になり、敵を押し返します。擬態中は灯り役の光が2倍効き(待ち伏せ)、擬態中に敵を倒すと擬態ゲージが回復します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを約0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。途中で光を外すと蓄光はリセットされます。球は約2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を約2秒連続で照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。マップごとに難易度が違います(A やさしい / B ふつう / C むずかしい)。";
+        string paragraph = "球や敵にマウスの光を当て続けます。止まると地面や物の色に擬態し、最大3秒間、無敵になって敵があなたを見失います(敵は「？」を出してうろうろします)。擬態中は灯り役の光が2倍効き(待ち伏せ)、擬態中に敵を倒すと擬態ゲージが回復します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを合計0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。照らした時間はたまっていくので、途中で光を外しても続きから貯められます(進み具合は物の上のゲージで分かります)。球は合計2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を合計2秒照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。マップごとに難易度が違います(A やさしい / B ふつう / C むずかしい)。";
         var helpStyle = S("help", 11, C(0x8fada4), TextAnchor.UpperLeft, wrap: true);
         float helpW = Mathf.Min(650f, W - 48f);
         float helpH = helpOpen ? helpStyle.CalcHeight(new GUIContent(paragraph), helpW) + 8f : 0f;
@@ -291,7 +299,8 @@ public class NightHud : MonoBehaviour
     // ================= HUD =================
     void DrawHud()
     {
-        Rect r = new Rect(12, 12, 248, 120);
+        // HPバー・擬態ゲージは主人公の頭上に出す(DrawPlayerBars)。ここはマップ名・操作・接続状態だけ
+        Rect r = new Rect(12, 12, 248, 84);
         Panel(r, PanelTex(), 9);
         float x = r.x + 14, y = r.y + 10;
         GUI.DrawTexture(new Rect(x, y + 1, 16, 16), markTex);
@@ -309,28 +318,10 @@ public class NightHud : MonoBehaviour
         var matStyle = S(matConnected ? "matOn" : "matOff", 10, matConnected ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleLeft);
         string matText = matConnected
             ? (mat.Source.Length > 0 ? "接続中(" + mat.Source + ")" : "接続中")
-            : "未接続" + (mat != null && mat.SerialStatus.Length > 0 ? "  USB: " + mat.SerialStatus : "");
+            : "未接続"; // 詳しい理由(USBの状態など)は出さず、画面の情報を少なくする
         Shadowed(new Rect(x, y, 220, 14), (matConnected ? "● " : "○ ") + "コントローラー: " + matText, matStyle);
         y += 14 + 4;
 
-        float hpRatio = game.Hp / NightGame.HpMax;
-        bool low = hpRatio < 0.3f;
-        Bar(new Rect(x, y, 190, 11), hpRatio, low ? "hpLow" : "hp", low ? C(0xff5a4a) : C(0x6fe08a), low ? C(0xff8f7a) : C(0x9dffb0), "HP");
-        if (game.HealFlash > 0f)
-        {
-            Fill(new Rect(x - 2, y - 2, 194, 15), new Color(0.6f, 1f, 0.65f, 0.55f * game.HealFlash));
-            Label(new Rect(x + 196, y - 4, 60, 18), "+" + game.LastHeal, S("hpHeal", 12, new Color(0.65f, 1f, 0.7f, game.HealFlash), TextAnchor.MiddleLeft, bold: true));
-        }
-        y += 11 + 5;
-        bool locked = game.CampLocked;
-        Bar(new Rect(x, y, 190, 11), game.Camp / NightGame.CampMax, locked ? "campLocked" : "camp",
-            locked ? C(0x666666) : C(0x3fa0c8), locked ? C(0x999999) : C(0x8fe6ff), "擬態ゲージ");
-        if (game.AmbushRefillFlash > 0f)
-        {
-            Fill(new Rect(x - 2, y - 2, 194, 15), new Color(0.75f, 0.95f, 1f, 0.55f * game.AmbushRefillFlash));
-            Label(new Rect(x + 196, y - 4, 60, 18), "+回復", S("campRefill", 11, new Color(0.75f, 0.95f, 1f, game.AmbushRefillFlash), TextAnchor.MiddleLeft, bold: true));
-        }
-        r.height = y + 11 + 10 - r.y;
     }
 
     void DrawGoalHud()
@@ -403,6 +394,99 @@ public class NightHud : MonoBehaviour
         GUI.color = old;
     }
 
+    // ワールド座標を、この HUD の座標(拡大縮小後)に変換する。カメラの後ろなら false
+    bool ToHud(Vector3 world, out Vector2 p)
+    {
+        Vector3 s = game.Cam.WorldToScreenPoint(world);
+        p = new Vector2(s.x / scale, (Screen.height - s.y) / scale);
+        return s.z > 0f;
+    }
+
+    // 擬態中、敵の頭の上に「？」(見失っている)。擬態が解けた直後は「！」(見つけた)。
+    void DrawEnemyMarks()
+    {
+        var q = S("markQ", 26, C(0xffe27a), TextAnchor.MiddleCenter, bold: true);
+        var ex = S("markEx", 28, C(0xff6a4a), TextAnchor.MiddleCenter, bold: true);
+        Color old = GUI.color;
+        foreach (var en in game.Enemies)
+        {
+            if (en.dying) continue;
+            bool found = en.foundTimer > 0f;
+            if (en.confused <= 0.01f && !found) continue;
+            if (!ToHud(en.Position + Vector3.up * (en.hitHeight * 1.9f + 0.35f), out var p)) continue;
+            if (p.x < -40 || p.x > W + 40 || p.y < -40 || p.y > H + 40) continue;
+            float bob = Mathf.Sin(Time.time * 4f + en.go.GetInstanceID() * 0.37f) * 3f;
+            if (found)
+            {
+                float t = 1f - en.foundTimer / 0.8f;
+                float pop = 1f + 0.5f * Mathf.Max(0f, 1f - t * 4f); // 出た瞬間にぽんと大きく
+                GUI.color = new Color(1, 1, 1, Mathf.Clamp01(en.foundTimer / 0.25f));
+                LabelFx(new Rect(p.x - 20, p.y - 20, 40, 40), "！", ex, pop, 1f);
+            }
+            else
+            {
+                GUI.color = new Color(1, 1, 1, en.confused);
+                Shadowed(new Rect(p.x - 20, p.y - 20 + bob, 40, 40), "？", q, 2f);
+            }
+        }
+        GUI.color = old;
+    }
+
+    // 主人公の頭上に HPバー(太い・緑) と 擬態ゲージ(細い・水色)。文字は出さず、色と長さだけで伝える。
+    // 回復したときはHPバーが、擬態ゲージが戻ったときは擬態ゲージが一瞬光る。擬態の残りが1秒を切ると赤く点滅。
+    void DrawPlayerBars()
+    {
+        if (!ToHud(game.PlayerPos + Vector3.up * 1.45f, out var p)) return;
+        const float w = 104f, hpH = 12f, campH = 7f, gap = 4f;
+        float x = p.x - w / 2f, y = p.y - 18f;
+
+        Fill(new Rect(x - 3, y - 3, w + 6, hpH + gap + campH + 6), new Color(0f, 0f, 0f, 0.5f));
+
+        // HP
+        float hpRatio = game.Hp / NightGame.HpMax;
+        bool low = hpRatio < 0.3f;
+        Bar(new Rect(x, y, w, hpH), hpRatio, low ? "hpLow" : "hp", low ? C(0xff5a4a) : C(0x6fe08a), low ? C(0xff8f7a) : C(0x9dffb0), null, 0.18f);
+        if (game.HealFlash > 0f) Fill(new Rect(x - 3, y - 3, w + 6, hpH + 6), new Color(0.6f, 1f, 0.65f, 0.55f * game.HealFlash));
+
+        // 擬態ゲージ
+        y += hpH + gap;
+        float camp = game.Camp / NightGame.CampMax;
+        Color campColor;
+        if (game.CampLocked) campColor = C(0x8a8a8a);
+        else if (game.Camouflaged && camp * NightGame.CampSeconds < 1f) campColor = Mathf.Repeat(Time.time * 6f, 1f) < 0.5f ? C(0xff6a4a) : C(0xffb0a0);
+        else campColor = C(0x8fe6ff);
+        Fill(new Rect(x, y, w, campH), new Color(1f, 1f, 1f, 0.15f));
+        Fill(new Rect(x, y, w * camp, campH), campColor);
+        if (game.AmbushRefillFlash > 0f) Fill(new Rect(x - 3, y - 3, w + 6, campH + 6), new Color(0.75f, 0.95f, 1f, 0.55f * game.AmbushRefillFlash));
+    }
+
+    // 光で動くもの(ランタン・導きの花・光の球)の上に、照らした時間のたまり具合のゲージを出す
+    void DrawObjectGauges()
+    {
+        var world = game.World;
+        foreach (var lamp in world.Lamps)
+            if (!lamp.lit) ObjectGauge(new Vector3(lamp.x, lamp.height + 2.2f, lamp.z), lamp.charge / NightLamp.ChargeTime, C(0xffd390), "ランタン");
+        foreach (var plant in world.Plants)
+        {
+            bool active = game.Guidance != null && game.Guidance.plant == plant;
+            if (!active) ObjectGauge(new Vector3(plant.x, plant.height + 1.35f, plant.z), plant.charge / NightGuidePlant.ChargeTime, C(0x98efbd), "導きの花");
+        }
+        foreach (var orb in world.Orbs)
+            if (!orb.collected && !orb.materialized) ObjectGauge(orb.Position + Vector3.up * 2.2f, orb.reveal / NightOrb.RevealTime, orb.color, "光の球");
+    }
+
+    void ObjectGauge(Vector3 world, float ratio, Color color, string name)
+    {
+        if (ratio <= 0.001f) return; // まだ一度も照らしていないものには出さない
+        if (!ToHud(world, out var p)) return;
+        if (p.x < -60 || p.x > W + 60 || p.y < -30 || p.y > H + 30) return;
+        const float w = 76f, h = 9f;
+        Rect bar = new Rect(p.x - w / 2f, p.y, w, h);
+        Fill(new Rect(bar.x - 2, bar.y - 2, w + 4, h + 4), new Color(0f, 0f, 0f, 0.55f));
+        Fill(bar, new Color(1f, 1f, 1f, 0.15f));
+        Fill(new Rect(bar.x, bar.y, w * Mathf.Clamp01(ratio), h), color);
+    }
+
     // 「敵が増えた！」の警告。ドンと拡大して出て、赤く脈打ち、最後にふわっと消える
     void DrawThreatAlert()
     {
@@ -412,7 +496,8 @@ public class NightHud : MonoBehaviour
         float alpha = Mathf.Clamp01(t / 0.12f) * Mathf.Clamp01(game.AlertTimer / 0.45f);
         float pulse = 0.5f + 0.5f * Mathf.Sin(t * 14f);
         float w = 420f, h = 78f;
-        Rect r = new Rect(W / 2f - w / 2f, H * 0.3f, w, h);
+        // 画面の中央をふさがないよう、上の「光の球」パネルのすぐ下に出す
+        Rect r = new Rect(W / 2f - w / 2f, 66f, w, h);
 
         Matrix4x4 old = GUI.matrix;
         Color oldC = GUI.color;
