@@ -224,8 +224,7 @@ public class PointerServer : MonoBehaviour
 
         try
         {
-            listener = new TcpListener(IPAddress.Any, port);
-            listener.Start();
+            listener = ListenFree(ref port, "HTTP");
             running = true;
             acceptThread = new Thread(() => AcceptLoop(listener, false));
             acceptThread.IsBackground = true;
@@ -242,8 +241,7 @@ public class PointerServer : MonoBehaviour
         try
         {
             serverCert = CreateSelfSignedCert(ip);
-            httpsListener = new TcpListener(IPAddress.Any, httpsPort);
-            httpsListener.Start();
+            httpsListener = ListenFree(ref httpsPort, "HTTPS");
             httpsAcceptThread = new Thread(() => AcceptLoop(httpsListener, true));
             httpsAcceptThread.IsBackground = true;
             httpsAcceptThread.Start();
@@ -262,6 +260,30 @@ public class PointerServer : MonoBehaviour
             TunnelRequested = true;
             int i = Array.IndexOf(args, "-cloudflared");
             StartTunnel(i >= 0 && i + 1 < args.Length ? args[i + 1] : null);
+        }
+    }
+
+    // 指定のポートで待ち受ける。ゲームがもう1つ起動していてポートが使われているときは、
+    // 2つずつずらした番号(8787 → 8789 → 8791 …)で起動し直す。QRには実際に使ったポートが入るので、
+    // 2つ目のゲームにも、そのゲーム用のQRでスマホを参加させられる。
+    static TcpListener ListenFree(ref int p, string label)
+    {
+        const int Tries = 10;
+        for (int i = 0; ; i++)
+        {
+            int candidate = p + i * 2;
+            var l = new TcpListener(IPAddress.Any, candidate);
+            try
+            {
+                l.Start();
+                if (i > 0) Debug.LogWarning("PointerServer (" + label + "): ポート " + p + " は使用中(ゲームがもう1つ起動している?)のため、" + candidate + " で起動しました。");
+                p = candidate;
+                return l;
+            }
+            catch (SocketException) when (i < Tries - 1)
+            {
+                // 使用中なので次の番号を試す
+            }
         }
     }
 
