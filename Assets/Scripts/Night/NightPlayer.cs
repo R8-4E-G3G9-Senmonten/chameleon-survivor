@@ -7,9 +7,9 @@ public class NightPlayer : MonoBehaviour
 {
     public GameObject characterModelPrefab;              // Assets/Models/ChameleonMeshy/Chameleon.fbx
     public RuntimeAnimatorController animatorController; // Assets/Models/ChameleonMeshy/ChameleonAnimator.controller
-    // 見た目の大きさ(1 = 元の大きさ)。画面の中で主人公がよく見えるよう 1.5倍にしている。
+    // 見た目の大きさ(1 = 元の大きさ)。画面の中で主人公がよく見えるよう 1.7倍にしている。
     // 背中の炎・頭上のゲージの高さもこれに合わせて上がる。当たり判定(CollisionRadius)は変えないので、狭い通路も今まで通り通れる。
-    public float modelScale = 1.5f;
+    public float modelScale = 1.7f;
     public float modelYawOffset = 0f;
 
     // 頭上のHP・擬態ゲージを出す高さ(HUD が使う)
@@ -35,7 +35,7 @@ public class NightPlayer : MonoBehaviour
     // 暗い森の中でも自分の位置を見失わないよう、カメレオンの背中に小さな炎を灯し、足元を暖色で照らす。
     // 擬態中は炎を小さく青白くして、「隠れている」状態が一目で分かるようにする(位置は分かる明るさは残す)。
     static readonly Color TorchColor = NightMeshes.Hex(0xffb15c), CamoTorchColor = new Color(0.45f, 0.75f, 1f);
-    const float TorchHeight = 1.25f;
+    const float TorchHeight = 1.25f; // modelScale = 1 のときの高さ。大きさに合わせて上げる
     Transform flame, halo;
     Material flameMat, haloMat;
     float torchScale = 1f;

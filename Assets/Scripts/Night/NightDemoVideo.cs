@@ -4,7 +4,7 @@ using System.IO;
 using UnityEngine;
 
 // ゲーム全体の仕組みを紹介する動画の撮影モード。exe を「-nightAutoShot <フォルダ> -nightDemoVideo」付きで起動したときだけ動く。
-// 主人公を自動で動かして、マップ選択 → 移動 → 灯り役の光 → 回復オーブ → 擬態 → ランタン → 導きの花 → 光の球 → 雷 → 脱出 → ランキング
+// 主人公を自動で動かして、マップ選択 → 移動 → 灯り役の光 → 回復オーブ → 擬態 → ランタン → 導きの花 → 蛍の石 → 雷 → 脱出 → ランキング
 // の順に実演し、画面の下に説明の字幕を出す。1フレームずつ JPG に保存するので(30fps固定)、PCの速さに関係なく滑らかな動画になる。
 // 保存した連番画像は tools/make_demo_video.py で動画(WebM)にまとめる。
 public class NightDemoVideo : MonoBehaviour
@@ -174,7 +174,7 @@ public class NightDemoVideo : MonoBehaviour
         yield return Wait(1.0f);
 
         // 2. 移動
-        Caption("移動する", "主人公は圧力マット(足踏み)で移動。トーチの灯りで足元だけが見える。目的は光の球を2つ集めて門から脱出");
+        Caption("移動する", "主人公は圧力マット(足踏み)で移動。トーチの灯りで足元だけが見える。目的は2つの石で蛍を集めて門から脱出");
         Vector3 start = g.PlayerPos;
         yield return WalkTo(start + new Vector3(0, 0, -7f), 3.5f);
         yield return WalkTo(start + new Vector3(0, 0, -2f), 2.5f);
@@ -240,25 +240,25 @@ public class NightDemoVideo : MonoBehaviour
         {
             Vector3 pp = new Vector3(plant.x, plant.height, plant.z);
             yield return Cut(() => Teleport(StandNear(pp, 3f)));
-            Caption("導きの花", "花に合計2秒光を当てると、まだ取っていない光の球までの道が光る。迷ったら花を探そう");
+            Caption("導きの花", "花に合計2秒光を当てると、まだ蛍のいる石までの道が光る。迷ったら花を探そう");
             yield return Wait(0.6f);
             yield return AimAt(() => pp, 2.3f);
             AimAway();
             yield return Wait(3.2f);
         }
 
-        // 8. 光の球(1つ目)
+        // 8. 蛍の石(1つ目)
         var orbs = g.World.Orbs;
         if (orbs.Count > 0)
         {
             var o = orbs[0];
             yield return Cut(() => Teleport(StandNear(o.Position, 3.2f)));
-            Caption("光の球を実体化させる", "光の球は最初は半透明。光を合計2秒当てると実体化して、触れると取れる");
+            Caption("石を照らして蛍を集める", "石に光を合計2秒当てると、石の色が変わって蛍が集まってくる。触れると蛍を捕まえられる");
             yield return Wait(0.6f);
             yield return AimAt(() => o.Position, 2.4f, () => o.materialized);
             AimAway();
             yield return Wait(0.4f);
-            Caption("球を取ると敵が増える", "球を取ったり回復したりすると「脅威レベル」が上がり、敵が増えて速く出てくる。後半ほど難しくなる");
+            Caption("蛍を捕まえると敵が増える", "蛍を捕まえたり回復したりすると「脅威レベル」が上がり、敵が増えて速く出てくる。後半ほど難しくなる");
             yield return WalkTo(o.Position, 3f, 0.4f);
             yield return Wait(3.0f);
         }
@@ -269,12 +269,12 @@ public class NightDemoVideo : MonoBehaviour
         g.DebugFlashIn(1.6f);
         yield return Wait(4.2f);
 
-        // 10. 光の球(2つ目) → 門が開く
+        // 10. 蛍の石(2つ目) → 門が開く
         if (orbs.Count > 1)
         {
             var o = orbs[1];
             yield return Cut(() => Teleport(StandNear(o.Position, 3.2f)));
-            Caption("2つ目の球で門が開く", "光の球を2つ集めると、スタート地点の門が開く");
+            Caption("2つ目の蛍で門が開く", "2つの石の蛍を捕まえると、スタート地点の門が開く");
             yield return AimAt(() => o.Position, 2.4f, () => o.materialized);
             AimAway();
             yield return WalkTo(o.Position, 3f, 0.4f);

@@ -6,7 +6,7 @@ using System.Text;
 using UnityEngine;
 
 // 動作確認用の自動撮影。exe を「-nightAutoShot <保存先フォルダ>」付きで起動した時だけ動き、
-// タイトル画面(各マップ)・プレイ中・敵への照射・擬態・光の球・ランタン・閃光・結果画面を順に撮影して終了する。
+// タイトル画面(各マップ)・プレイ中・敵への照射・擬態・蛍の石・ランタン・閃光・結果画面を順に撮影して終了する。
 // 通常の起動では何もしない。
 public class NightAutoShot : MonoBehaviour
 {
@@ -221,12 +221,19 @@ public class NightAutoShot : MonoBehaviour
     IEnumerator Run()
     {
         yield return new WaitForSeconds(1.5f);
+        NightHud.DebugQrWaiting = true;
+        yield return Shot("00_qr_waiting");
+        NightHud.DebugQrWaiting = false;
         yield return Shot("01_title_A");
         g.SelectMap("B");
         yield return new WaitForSeconds(0.6f);
         for (int k = 0; k < 4; k++) PostFake("fake" + k);
         yield return new WaitForSeconds(0.3f);
         yield return Shot("02_title_B");
+        NightHud.DebugOpenQrZoom();
+        yield return new WaitForSeconds(0.2f);
+        yield return Shot("02b_qr_zoom");
+        NightHud.DebugCloseQrZoom();
         g.SelectMap("C");
         yield return new WaitForSeconds(0.6f);
         yield return Shot("03_title_C");
@@ -262,12 +269,20 @@ public class NightAutoShot : MonoBehaviour
         yield return new WaitForSeconds(0.2f);
         yield return Shot("06_camo");
 
-        // 光の球を照らして実体化させる
+        // 蛍の石を照らして蛍を集める
         var orb = g.World.Orbs[0];
         Teleport(orb.Position + new Vector3(0, 0, 4f));
         yield return new WaitForSeconds(1.2f);
-        yield return AimAt(() => orb.Position, 2.3f);
+        yield return AimAt(() => orb.Position, 1.1f);
+        yield return Shot("07a_stone_half");
+        yield return AimAt(() => orb.Position, 1.4f);
+        yield return new WaitForSeconds(0.8f);
         yield return Shot("07_orb_materialized");
+        // 触れて蛍を捕まえる
+        Teleport(orb.Position + new Vector3(0, 0, 0.6f));
+        yield return new WaitForSeconds(0.25f);
+        yield return Shot("07b_firefly_caught");
+        Debug.Log("[AutoShot] 蛍の回収: collected=" + orb.collected + " OrbCount=" + g.OrbCount);
 
         // 近くのランタンを点灯
         NightLamp lamp = g.World.Lamps[0];
@@ -321,7 +336,7 @@ public class NightAutoShot : MonoBehaviour
         for (int i = 0; i < kinds.Length; i++)
         {
             float ex = pc.x + (i - 1) * 2.6f, ez = pc.z - 6f;
-            g.Enemies.Add(new NightEnemy(kinds[i], new Vector3(ex, g.Map.SurfaceAt(ex, ez), ez)));
+            g.Enemies.Add(NightEnemy.Spawn(kinds[i], new Vector3(ex, g.Map.SurfaceAt(ex, ez), ez)));
         }
         yield return LockCameraOn(new Vector3(pc.x, pc.y, pc.z - 6f), 0.3f);
         foreach (var e in g.Enemies)

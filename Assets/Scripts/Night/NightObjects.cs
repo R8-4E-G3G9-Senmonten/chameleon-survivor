@@ -151,22 +151,34 @@ public class NightGuidePlant
     }
 }
 
-// 光の球。最初は気配だけの半透明 → 合計2秒照らすと実体化 → 触れると回収。照らした時間はたまっていく。
+// 蛍の石。光を当てた時間がたまるほど石が灰色から石の色(青/金)に変わり、まわりから蛍が1匹ずつ飛んでくる。
+// 合計2秒照らすと蛍の群れがそろい(materialized)、主人公が触れると蛍が主人公に飛び込んで捕まえられる(collected)。
+// 照らした時間はたまっていく(光を外しても減らない)。
 public class NightOrb
 {
     public const float RevealTime = 2f, LightRadius = 3.2f;
+    const int FireflyCount = 14;
+    const float StoneHeight = 1.15f, SwarmY = 1.9f, PickupRadius = 1.6f;
+    static readonly Color StoneGray = NightMeshes.Hex(0x4a5352), FireflyGreen = NightMeshes.Hex(0xe4ff7a);
 
     public readonly int index;
     public readonly Color color;
     public readonly float baseY;
     public bool collected, materialized;
     public float reveal;
-    float phase, fxTimer;
+    float phase, fxTimer, flyAway;
 
     public readonly Transform root;
-    readonly Transform halo, ring;
-    readonly Material sphereMat, haloMat, ringMat;
+    readonly Transform swarm;
+    readonly Material stoneMat, fireflyMat, glowMat, ringMat;
+    readonly Transform ring;
     readonly Light light;
+
+    // 蛍1匹ずつの動き
+    readonly Transform[] flies = new Transform[FireflyCount];
+    readonly Vector3[] fromPos = new Vector3[FireflyCount];
+    readonly float[] arrive = new float[FireflyCount], orbitR = new float[FireflyCount], orbitH = new float[FireflyCount],
+                     orbitSpeed = new float[FireflyCount], orbitPhase = new float[FireflyCount], blinkPhase = new float[FireflyCount];
 
     public Vector3 Position => root.position;
 
@@ -174,26 +186,89 @@ public class NightOrb
     {
         this.index = index; this.color = color; this.baseY = baseY;
         phase = Random.value * Mathf.PI * 2f;
-        root = new GameObject("LightOrb").transform;
+        root = new GameObject("FireflyStone").transform;
         root.SetParent(w.Root, false);
         root.localPosition = new Vector3(x, baseY, z);
 
-        sphereMat = NightMeshes.Unlit(new Color(color.r, color.g, color.b, 0.16f));
-        w.Sphere(0, 1.1f, 0, 0.55f, sphereMat, root);
-        haloMat = NightMeshes.Unlit(new Color(color.r, color.g, color.b, 0.08f));
-        halo = w.Sphere(0, 1.1f, 0, 0.9f, haloMat, root).transform;
+        // 石: 森の岩モデルを使い、色を変えられる専用の素材に差し替える(モデルが無いときは潰した球)
+        stoneMat = NightMeshes.Emissive(StoneGray, Color.black, 0.15f);
+        var prefab = w.rockPrefabs != null && w.rockPrefabs.Length > 0 ? w.rockPrefabs[w.rockPrefabs.Length - 1] : null;
+        if (prefab != null)
+        {
+            var go = Object.Instantiate(prefab, root);
+            go.name = "Stone";
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localRotation = Quaternion.Euler(0, Random.value * 360f, 0);
+            var rs = go.GetComponentsInChildren<Renderer>();
+            if (rs.Length > 0)
+            {
+                Bounds bb = rs[0].bounds;
+                for (int i = 1; i < rs.Length; i++) bb.Encapsulate(rs[i].bounds);
+                if (bb.size.y > 0.01f) go.transform.localScale = Vector3.one * (StoneHeight / bb.size.y);
+            }
+            foreach (var r in rs)
+            {
+                var mats = new Material[r.sharedMaterials.Length];
+                for (int i = 0; i < mats.Length; i++) mats[i] = stoneMat;
+                r.sharedMaterials = mats;
+            }
+        }
+        else
+        {
+            var st = w.Sphere(0, StoneHeight * 0.45f, 0, 0.7f, stoneMat, root).transform;
+            st.localScale = new Vector3(1.5f, StoneHeight, 1.3f);
+        }
+
         ringMat = NightMeshes.Unlit(new Color(color.r, color.g, color.b, 0.25f));
-        ring = w.RingObject(0.72f, 0.84f, ringMat, root, new Vector3(0, 0.08f, 0), 40).transform;
-        light = NightWorld.PointLight(root, new Vector3(0, 1.3f, 0), color, 0.25f, 4f);
+        ring = w.RingObject(0.95f, 1.08f, ringMat, root, new Vector3(0, 0.08f, 0), 40).transform;
+        light = NightWorld.PointLight(root, new Vector3(0, SwarmY, 0), Color.Lerp(FireflyGreen, color, 0.3f), 0f, 5f);
+
+        // 蛍(光る小さな粒 + ぼんやりした光の輪)。最初は遠くにいて見えない
+        swarm = new GameObject("Fireflies").transform;
+        swarm.SetParent(root, false);
+        fireflyMat = NightMeshes.Unlit(new Color(1f, 1f, 0.75f, 1f));
+        glowMat = NightMeshes.Unlit(new Color(FireflyGreen.r, FireflyGreen.g, FireflyGreen.b, 0.35f));
+        for (int i = 0; i < FireflyCount; i++)
+        {
+            var fly = new GameObject("Firefly").transform;
+            fly.SetParent(swarm, false);
+            w.Sphere(0, 0, 0, 0.06f, fireflyMat, fly);
+            w.Sphere(0, 0, 0, 0.2f, glowMat, fly);
+            float ang = Random.value * Mathf.PI * 2f, dist = Random.Range(6f, 9f);
+            fromPos[i] = new Vector3(Mathf.Cos(ang) * dist, Random.Range(2.5f, 4.5f), Mathf.Sin(ang) * dist);
+            orbitR[i] = Random.Range(0.45f, 1.25f);
+            orbitH[i] = SwarmY + Random.Range(-0.5f, 0.6f);
+            orbitSpeed[i] = Random.Range(0.7f, 1.4f) * (Random.value < 0.5f ? -1f : 1f);
+            orbitPhase[i] = Random.value * Mathf.PI * 2f;
+            blinkPhase[i] = Random.value * Mathf.PI * 2f;
+            fly.localPosition = fromPos[i];
+            fly.gameObject.SetActive(false);
+            flies[i] = fly;
+        }
+        ApplyStone(0f);
     }
 
     public void Tick(NightGame g, float dt)
     {
-        if (collected) return;
-        phase += dt * 2.2f;
-        root.Rotate(0, dt * 1.2f * Mathf.Rad2Deg, 0);
+        phase += dt;
         Vector3 p0 = root.position;
-        root.position = new Vector3(p0.x, baseY + Mathf.Sin(phase) * 0.18f, p0.z);
+
+        if (collected)
+        {
+            // 捕まえた蛍が主人公に吸い込まれていく
+            if (flyAway >= 1f) return;
+            flyAway = Mathf.Min(1f, flyAway + dt * 1.6f);
+            Vector3 target = g.PlayerPos + Vector3.up * 1.2f - p0;
+            for (int i = 0; i < FireflyCount; i++)
+            {
+                float t = Mathf.Clamp01(flyAway * 1.3f - i * 0.02f);
+                flies[i].localPosition = Vector3.Lerp(flies[i].localPosition, target, t);
+                flies[i].localScale = Vector3.one * (1f - t * 0.8f);
+            }
+            light.intensity = 1.2f * (1f - flyAway);
+            if (flyAway >= 1f) swarm.gameObject.SetActive(false);
+            return;
+        }
 
         Vector3 lt = g.NearestLightTargetTo(p0);
         float distToLight = Mathf.Sqrt((p0.x - lt.x) * (p0.x - lt.x) + (p0.z - lt.z) * (p0.z - lt.z));
@@ -201,45 +276,59 @@ public class NightOrb
 
         if (!materialized)
         {
-            if (beingLit && NightGame.FxTick(ref fxTimer, dt, 0.14f)) SurvivorBurst.Spawn(p0 + Vector3.up * 1.1f, Color.Lerp(color, Color.white, 0.5f), 3);
             if (beingLit) reveal = Mathf.Min(RevealTime, reveal + dt); // 外しても減らない(蓄積)
-            float p = reveal / RevealTime;
-            Apply(0.16f + p * 0.84f, 0.08f + p * 0.28f, 0.2f + p * 0.65f, 0.45f + p * 0.75f, 0.25f + p * 2f);
-            if (beingLit && Random.value < dt * 4f) g.Audio.PlayHitBuzz();
+            if (beingLit && NightGame.FxTick(ref fxTimer, dt, 0.16f)) SurvivorBurst.Spawn(p0 + Vector3.up * 0.9f, Color.Lerp(color, Color.white, 0.4f), 2);
+            if (beingLit && Random.value < dt * 3f) g.Audio.PlayHitBuzz();
             if (reveal >= RevealTime)
             {
                 materialized = true;
-                Apply(1f, 0.32f, 0.75f, 1.2f, 2.5f);
-                g.ShowToast("光の球が実体化した！");
+                g.ShowToast("蛍が集まった！触れて捕まえよう");
                 g.Audio.PlayDownChime();
             }
         }
-        else
-        {
-            float pulse = 1f + Mathf.Sin(phase * 1.8f) * 0.08f;
-            halo.localScale = Vector3.one * 1.8f * pulse;
-            light.intensity = 2.2f + Mathf.Sin(phase * 2f) * 0.35f;
+        float p = reveal / RevealTime;
+        ApplyStone(p);
 
+        // 照らした分だけ蛍が飛んでくる(14匹を順番に呼ぶ)
+        for (int i = 0; i < FireflyCount; i++)
+        {
+            bool called = p >= (i + 0.5f) / FireflyCount || materialized;
+            if (called && !flies[i].gameObject.activeSelf) flies[i].gameObject.SetActive(true);
+            if (!called) continue;
+            arrive[i] = Mathf.Min(1f, arrive[i] + dt * 0.9f);
+            float a = orbitPhase[i] + phase * orbitSpeed[i];
+            var orbit = new Vector3(Mathf.Cos(a) * orbitR[i], orbitH[i] + Mathf.Sin(phase * 2.3f + i) * 0.15f, Mathf.Sin(a) * orbitR[i]);
+            float e = 1f - (1f - arrive[i]) * (1f - arrive[i]);
+            Vector3 pos = Vector3.Lerp(fromPos[i], orbit, e);
+            pos.y += Mathf.Sin(e * Mathf.PI) * 0.8f; // ふわっと弧を描いて飛んでくる
+            flies[i].localPosition = pos;
+            // 蛍らしく、ゆっくり明滅する
+            float blink = 0.55f + 0.45f * Mathf.Sin(phase * 3.1f + blinkPhase[i]);
+            flies[i].localScale = Vector3.one * (0.6f + 0.6f * blink);
+        }
+
+        if (materialized)
+        {
+            light.intensity = 1.2f + Mathf.Sin(phase * 2.5f) * 0.25f;
+            ring.localScale = Vector3.one * (1f + Mathf.Sin(phase * 3f) * 0.06f);
             Vector3 pp = g.PlayerPos;
             float d = Mathf.Sqrt((pp.x - p0.x) * (pp.x - p0.x) + (pp.z - p0.z) * (pp.z - p0.z));
-            if (d < 1.35f && Mathf.Abs(pp.y - baseY) < 1.1f)
+            if (d < PickupRadius && Mathf.Abs(pp.y - baseY) < 1.1f)
             {
                 collected = true;
-                root.gameObject.SetActive(false);
+                ApplyStone(1f, 0.35f);
                 g.OnOrbCollected(this);
             }
         }
+        else light.intensity = p * 0.9f;
     }
 
-    void Apply(float sphereA, float haloA, float ringA, float ringScale, float lightIntensity)
+    // 石の色: 照らすほど灰色 → 石の色。光り方は glow 倍
+    void ApplyStone(float p, float glow = 1f)
     {
-        // 実体化が進むほど白っぽく明るく(発光の強さの代わり)
-        Color bright = Color.Lerp(color * 0.75f, Color.Lerp(color, Color.white, 0.35f), sphereA);
-        sphereMat.color = new Color(bright.r, bright.g, bright.b, sphereA);
-        haloMat.color = new Color(color.r, color.g, color.b, haloA);
-        ringMat.color = new Color(color.r, color.g, color.b, ringA);
-        ring.localScale = Vector3.one * ringScale;
-        light.intensity = lightIntensity;
+        stoneMat.color = Color.Lerp(StoneGray, Color.Lerp(color, Color.white, 0.15f), p);
+        stoneMat.SetColor("_EmissionColor", color * (p * p * 0.9f * glow));
+        ringMat.color = new Color(color.r, color.g, color.b, 0.2f + p * 0.6f);
     }
 }
 

@@ -99,11 +99,16 @@ public class NightHud : MonoBehaviour
 
         if (game.State == NightGame.GameState.Title)
         {
+            bool zoom = QrZoomOpen;
+            GUI.enabled = !zoom; // 拡大表示中は下のボタンを押せないようにする
             DrawStartOverlay();
             DrawRankingPanel();
             DrawConnectPanel(true);
+            GUI.enabled = true;
+            DrawQrZoom();
             return;
         }
+        QrZoomOpen = false;
         if (game.State == NightGame.GameState.NameEntry)
         {
             DrawNameEntry();
@@ -149,7 +154,7 @@ public class NightHud : MonoBehaviour
         float preview = Mathf.Min(cardW - 24f, compact ? 180f : 235f);
         float cardH = 14f + preview + 12f + 22f + 7f + 14f + 16f;
 
-        string paragraph = "球や敵にマウスの光を当て続けます。止まると地面や物の色に擬態し、最大3秒間、無敵になって敵があなたを見失います(敵は「？」を出してうろうろします)。擬態中は灯り役の光が2倍効き(待ち伏せ)、擬態中に敵を倒すと擬態ゲージが回復します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを合計0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。照らした時間はたまっていくので、途中で光を外しても続きから貯められます(進み具合は物の上のゲージで分かります)。球は合計2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を合計2秒照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。マップごとに難易度が違います(A やさしい / B ふつう / C むずかしい)。";
+        string paragraph = "石や敵にマウスの光を当て続けます。止まると地面や物の色に擬態し、最大3秒間、無敵になって敵があなたを見失います(敵は「？」を出してうろうろします)。擬態中は灯り役の光が2倍効き(待ち伏せ)、擬態中に敵を倒すと擬態ゲージが回復します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを合計0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。照らした時間はたまっていくので、途中で光を外しても続きから貯められます(進み具合は物の上のゲージで分かります)。石を合計2秒照らすと石の色が変わって蛍が集まってくるので、触れて捕まえます。2つの石の蛍を捕まえると入口の門が開きます。導きの花を合計2秒照らすと、花から最も近い、まだ蛍のいる石までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。蛍が揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。マップごとに難易度が違います(A やさしい / B ふつう / C むずかしい)。";
         var helpStyle = S("help", 11, C(0x8fada4), TextAnchor.UpperLeft, wrap: true);
         float helpW = Mathf.Min(650f, W - 48f);
         float helpH = helpOpen ? helpStyle.CalcHeight(new GUIContent(paragraph), helpW) + 8f : 0f;
@@ -170,7 +175,7 @@ public class NightHud : MonoBehaviour
         y += 56 + 8;
         Label(new Rect(0, y, W, 18), "灯りを導きに、夜の向こうへ。", S("menuSub", 13, C(0xc8ded2), TextAnchor.MiddleCenter));
         y += 18 + (compact ? 12 : 22);
-        Label(new Rect(0, y, W, 22), "2つの光の球を集めて門を開き、入口へ戻って脱出しよう。", S("mission", 13, C(0xe1eadd), TextAnchor.MiddleCenter));
+        Label(new Rect(0, y, W, 22), "2つの石を照らして蛍を集め、門を開いて入口へ戻ろう。", S("mission", 13, C(0xe1eadd), TextAnchor.MiddleCenter));
         y += 22 + 12;
 
         DrawControlStrip(y);
@@ -307,7 +312,7 @@ public class NightHud : MonoBehaviour
         Shadowed(new Rect(x + 21, y, r.width - 49, 18), game.MapId + ". " + game.Map.Name, S("hudH1", 14, C(0xdfffe0, 0.9f), TextAnchor.MiddleLeft, bold: true));
         y += 21;
         var row = S("hudRow", 10, C(0xdfffe0, 0.82f), TextAnchor.UpperLeft, wrap: true);
-        string rowText = "移動: WASD/矢印　灯り: " + (game.Flashlight.HasPhoneInput ? "スマホ" : "マウス") + "　止まる=擬態　光の球を2つ集めよう";
+        string rowText = "移動: WASD/矢印　灯り: " + (game.Flashlight.HasPhoneInput ? "スマホ" : "マウス") + "　止まる=擬態　石を照らして蛍を集めよう";
         float rowH = row.CalcHeight(new GUIContent(rowText), 220);
         Shadowed(new Rect(x, y, 220, rowH), rowText, row);
         y += rowH + 2;
@@ -326,7 +331,7 @@ public class NightHud : MonoBehaviour
 
     void DrawGoalHud()
     {
-        string text = game.GateOpened ? "門が開いた！入口へ戻ろう" : "光の球 " + game.OrbCount + " / " + NightGame.OrbTotal;
+        string text = game.GateOpened ? "門が開いた！入口へ戻ろう" : "蛍 " + game.OrbCount + " / " + NightGame.OrbTotal;
         var style = S("goal", 14, C(0xdfffe0), TextAnchor.MiddleCenter, bold: true);
         float w = Mathf.Max(250f, style.CalcSize(new GUIContent(text)).x + 30f);
         Rect r = new Rect(W / 2f - w / 2f, 12, w, 46);
@@ -460,7 +465,7 @@ public class NightHud : MonoBehaviour
         if (game.AmbushRefillFlash > 0f) Fill(new Rect(x - 3, y - 3, w + 6, campH + 6), new Color(0.75f, 0.95f, 1f, 0.55f * game.AmbushRefillFlash));
     }
 
-    // 光で動くもの(ランタン・導きの花・光の球)の上に、照らした時間のたまり具合のゲージを出す
+    // 光で動くもの(ランタン・導きの花・蛍の石)の上に、照らした時間のたまり具合のゲージを出す
     void DrawObjectGauges()
     {
         var world = game.World;
@@ -472,7 +477,7 @@ public class NightHud : MonoBehaviour
             if (!active) ObjectGauge(new Vector3(plant.x, plant.height + 1.35f, plant.z), plant.charge / NightGuidePlant.ChargeTime, C(0x98efbd), "導きの花");
         }
         foreach (var orb in world.Orbs)
-            if (!orb.collected && !orb.materialized) ObjectGauge(orb.Position + Vector3.up * 2.2f, orb.reveal / NightOrb.RevealTime, orb.color, "光の球");
+            if (!orb.collected && !orb.materialized) ObjectGauge(orb.Position + Vector3.up * 2.6f, orb.reveal / NightOrb.RevealTime, orb.color, "蛍の石");
     }
 
     void ObjectGauge(Vector3 world, float ratio, Color color, string name)
@@ -496,7 +501,7 @@ public class NightHud : MonoBehaviour
         float alpha = Mathf.Clamp01(t / 0.12f) * Mathf.Clamp01(game.AlertTimer / 0.45f);
         float pulse = 0.5f + 0.5f * Mathf.Sin(t * 14f);
         float w = 420f, h = 78f;
-        // 画面の中央をふさがないよう、上の「光の球」パネルのすぐ下に出す
+        // 画面の中央をふさがないよう、上の「蛍」パネルのすぐ下に出す
         Rect r = new Rect(W / 2f - w / 2f, 66f, w, h);
 
         Matrix4x4 old = GUI.matrix;
@@ -579,7 +584,7 @@ public class NightHud : MonoBehaviour
         LabelFx(new Rect(0, y, W, 50), win ? "門を抜けて脱出した！" : "力尽きた…",
             S(win ? "endWin" : "endLose", 38, win ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleCenter, bold: true), Mathf.Lerp(1.6f, 1f, EaseOutBack(tp)), tp);
         y += 56;
-        LabelFx(new Rect(0, y, W, 20), game.PlayerName + "  /  " + game.MapId + ". " + game.Map.Name + "  /  " + (win ? "クリアタイム " : "生存 ") + FormatTime(game.Elapsed) + "  /  光の球 " + game.OrbCount + " / " + NightGame.OrbTotal,
+        LabelFx(new Rect(0, y, W, 20), game.PlayerName + "  /  " + game.MapId + ". " + game.Map.Name + "  /  " + (win ? "クリアタイム " : "生存 ") + FormatTime(game.Elapsed) + "  /  蛍 " + game.OrbCount + " / " + NightGame.OrbTotal,
             S("endMap", 13, new Color(1, 1, 1, 0.75f), TextAnchor.MiddleCenter), 1f, Seg(t, 0.6f, 0.3f));
         y += 30;
 
@@ -823,72 +828,201 @@ public class NightHud : MonoBehaviour
     }
 
     // ================= スマホ接続(QRコード) =================
-    void DrawConnectPanel(bool title)
+    // タイトル画面: QRを大きく出し、クリックすると画面いっぱいに拡大(「戻る」で閉じる)。参加者を色の名前つきで一覧表示。
+    // プレイ中: 右下に小さなQRと、参加人数・参加中の色だけを出す。
+    // QRは準備ができるまで「QRコードを生成しています」と出し、読み取れないQRや途中で変わるQRは見せない。
+    public static bool QrZoomOpen { get; private set; }
+    public static void DebugOpenQrZoom() => QrZoomOpen = true;   // 自動撮影(NightAutoShot)用
+    public static void DebugCloseQrZoom() => QrZoomOpen = false;
+    public static bool DebugQrWaiting; // 自動撮影用: QRの準備中の表示を出す
+    readonly Dictionary<int, float> joinedAt = new Dictionary<int, float>(); // 色番号 → 参加した時刻(参加直後に光らせる)
+
+    string QrTarget(out bool online)
     {
-        string httpsUrl = PointerServer.Instance != null ? PointerServer.Instance.HttpsServerUrl : "起動中...";
-        string httpUrl = PointerServer.Instance != null ? PointerServer.Instance.ServerUrl : "起動中...";
+        var srv = PointerServer.Instance;
+        online = srv != null && !string.IsNullOrEmpty(srv.PublicUrl);
+        if (srv == null || !srv.QrReady || DebugQrWaiting) return null;
         // -tunnel で起動していて Cloudflare のURLが準備できたら、QRはそちら(5G・どのWi-Fiからでも参加可)にする
-        string publicUrl = PointerServer.Instance != null ? PointerServer.Instance.PublicUrl : null;
-        string tunnelStatus = PointerServer.Instance != null ? PointerServer.Instance.TunnelStatus : "";
-        bool online = !string.IsNullOrEmpty(publicUrl);
-        string qrTarget = online ? publicUrl : httpsUrl;
-        bool phone = game.Flashlight != null && game.Flashlight.HasPhoneInput;
-        int phoneCount = PointerServer.Instance != null ? PointerServer.Instance.GetActivePointers().Count : 0;
-
-        float qr = (title ? 120f : 92f) + (online ? 20f : 0f); // URLが長いとQRの目が細かくなるので少し大きく
-        float w = qr + 20f;
-        float h = 34f + qr + 30f + 28f;
-        Rect r = title ? new Rect(W - w - 16, 16, w, h) : new Rect(W - w - 12, H - h - 12, w, h);
-        Panel(r, PanelTex(), 9);
-
-        var head = S("qrHead", 10, C(0xdfffe0, 0.85f), TextAnchor.UpperCenter, wrap: true);
-        Label(new Rect(r.x + 6, r.y + 6, r.width - 12, 28), "灯り役はスマホで\nQRを読み取り", head);
-
-        Rect qrRect = new Rect(r.x + 10, r.y + 34, qr, qr);
-        if (qrTarget.StartsWith("https://"))
-        {
-            try { EnsureQrTexture(qrTarget); }
-            catch (System.Exception ex) { Debug.LogException(ex); qrTexture = null; }
-            if (qrTexture != null) GUI.DrawTexture(qrRect, qrTexture);
-        }
-        else
-        {
-            Label(qrRect, "準備中…\n" + httpUrl, S("qrWait", 9, C(0x98b6a8), TextAnchor.MiddleCenter, wrap: true));
-        }
-
-        var status = S(phone ? "qrOn" : "qrOff", 10, phone ? C(0x9dffb0) : C(0x98b6a8), TextAnchor.MiddleCenter);
-        string statusText = phone ? "● スマホ " + phoneCount + "人操作中" : "○ マウス操作中";
-        Label(new Rect(r.x + 4, qrRect.yMax + 3, r.width - 8, 14), statusText, status);
-        var url = S("qrUrl", 8, C(0x98b6a8, 0.8f), TextAnchor.MiddleCenter);
-        string urlText = online ? "5G・どのWi-Fiからでも参加OK"
-            : !string.IsNullOrEmpty(tunnelStatus) ? tunnelStatus
-            : httpsUrl;
-        Label(new Rect(r.x + 2, qrRect.yMax + 16, r.width - 4, 12), urlText, url);
-        DrawPlayers(new Rect(r.x + 4, qrRect.yMax + 30, r.width - 8, 20));
+        string url = online ? srv.PublicUrl : srv.HttpsServerUrl;
+        try { EnsureQrTexture(url); }
+        catch (System.Exception ex) { Debug.LogException(ex); qrTexture = null; return null; }
+        return qrTexture != null ? url : null;
     }
 
-    // 接続中のスマホ(灯り役)の一覧。参加順に、その人のライトの色の丸と番号を並べる。
-    void DrawPlayers(Rect r)
+    List<PointerServer.ConnectedPlayer> ConnectedPlayers()
     {
-        var colors = PointerServer.Instance != null ? PointerServer.Instance.GetConnectedColors() : new List<Color>();
-        var label = S("plLabel", 10, C(0xdfffe0, 0.9f), TextAnchor.MiddleCenter);
-        if (colors.Count == 0)
+        var players = PointerServer.Instance != null ? PointerServer.Instance.GetConnectedPlayers() : new List<PointerServer.ConnectedPlayer>();
+        // 新しく参加した色を記録し、プレイ中なら「◯のライトが参加！」と知らせる
+        var now = new HashSet<int>();
+        foreach (var pl in players)
         {
-            Label(r, "接続中: 0/" + PointerServer.MaxPlayers + "人", S("plNone", 10, C(0x98b6a8), TextAnchor.MiddleCenter));
-            return;
+            now.Add(pl.colorIndex);
+            if (!joinedAt.ContainsKey(pl.colorIndex))
+            {
+                joinedAt[pl.colorIndex] = Time.unscaledTime;
+                if (game.State == NightGame.GameState.Playing) game.ShowToast(pl.name + "のライトが参加！", 2f);
+            }
         }
-        const float d = 12f, gap = 2f;
-        float total = colors.Count * d + (colors.Count - 1) * gap;
-        float x = r.x + (r.width - total) / 2f;
-        var dotTex = Tex("playerDot", () => RoundedBox(32, 16, Color.white, Color.white, 0));
-        for (int i = 0; i < colors.Count; i++)
+        var gone = new List<int>();
+        foreach (var k in joinedAt.Keys) if (!now.Contains(k)) gone.Add(k);
+        foreach (var k in gone) joinedAt.Remove(k);
+        return players;
+    }
+
+    // 準備中の表示(回る点と「QRコードを生成しています」)
+    void DrawQrWaiting(Rect r, int fontSize)
+    {
+        Fill(r, new Color(1f, 1f, 1f, 0.06f));
+        float c = Mathf.Min(r.width, r.height);
+        var dot = Tex("playerDot", () => RoundedBox(32, 16, Color.white, Color.white, 0));
+        Vector2 center = new Vector2(r.center.x, r.y + r.height * 0.42f);
+        float rad = c * 0.14f, d = Mathf.Max(4f, c * 0.05f);
+        for (int i = 0; i < 8; i++)
         {
+            float ang = i / 8f * Mathf.PI * 2f + Time.unscaledTime * 4f;
             Color old = GUI.color;
-            GUI.color = colors[i];
-            GUI.DrawTexture(new Rect(x + i * (d + gap), r.y, d, d), dotTex);
+            GUI.color = new Color(0.62f, 1f, 0.75f, 0.15f + 0.85f * (i / 7f));
+            GUI.DrawTexture(new Rect(center.x + Mathf.Cos(ang) * rad - d / 2, center.y + Mathf.Sin(ang) * rad - d / 2, d, d), dot);
             GUI.color = old;
         }
-        Label(new Rect(r.x, r.y + d + 1, r.width, 12), "接続中 " + colors.Count + "/" + PointerServer.MaxPlayers + "人", label);
+        string text = "QRコードを\n生成しています" + new string('.', 1 + (int)(Time.unscaledTime * 2f) % 3);
+        var srv = PointerServer.Instance;
+        if (srv != null && srv.HttpsServerUrl.StartsWith("起動失敗")) text = "QRを作れませんでした\n" + srv.ServerUrl;
+        Label(new Rect(r.x + 4, center.y + rad + d + 4, r.width - 8, fontSize * 2.6f), text,
+            S("qrWait" + fontSize, fontSize, C(0xbfe3d2), TextAnchor.UpperCenter, wrap: true));
+    }
+
+    void DrawConnectPanel(bool title)
+    {
+        if (title) DrawTitleConnectPanel();
+        else DrawPlayConnectPanel();
+    }
+
+    void DrawTitleConnectPanel()
+    {
+        var srv = PointerServer.Instance;
+        string target = QrTarget(out bool online);
+        var players = ConnectedPlayers();
+        bool canZoom = game.State == NightGame.GameState.Title && target != null;
+
+        const float qr = 196f, w = qr + 28f;
+        int rows = Mathf.Max(1, (players.Count + 1) / 2);
+        float h = 36f + qr + 22f + 34f + rows * 22f + 14f;
+        Rect r = new Rect(W - w - 16, 16, w, h);
+        Panel(r, PanelTex(), 9);
+        Label(new Rect(r.x + 8, r.y + 8, r.width - 16, 24), "灯り役はスマホでQRを読み取り", S("qrHeadT", 13, C(0xdfffe0), TextAnchor.MiddleCenter, bold: true));
+
+        Rect qrRect = new Rect(r.x + 14, r.y + 36, qr, qr);
+        if (target != null)
+        {
+            bool hover = canZoom && qrRect.Contains(Event.current.mousePosition);
+            if (hover) Fill(new Rect(qrRect.x - 3, qrRect.y - 3, qr + 6, qr + 6), C(0x9dffb0, 0.8f));
+            GUI.DrawTexture(qrRect, qrTexture);
+            if (canZoom && GUI.Button(qrRect, GUIContent.none, GUIStyle.none)) QrZoomOpen = true;
+            string sub = canZoom ? "クリックで拡大" : "";
+            if (online) sub = (sub.Length > 0 ? sub + "・" : "") + "5G・どのWi-Fiからでも参加OK";
+            Label(new Rect(r.x + 4, qrRect.yMax + 3, r.width - 8, 16), sub, S("qrSubT", 10, C(0x98b6a8), TextAnchor.MiddleCenter));
+        }
+        else DrawQrWaiting(qrRect, 14);
+
+        float y = qrRect.yMax + 22f;
+        DrawPlayerCount(new Rect(r.x + 12, y, r.width - 24, 28), players.Count, 17);
+        y += 34f;
+        if (players.Count == 0)
+        {
+            Label(new Rect(r.x + 8, y, r.width - 16, 20), "まだ誰も参加していません", S("plNoneT", 11, C(0x98b6a8), TextAnchor.MiddleCenter));
+            return;
+        }
+        float colW = (r.width - 24f) / 2f;
+        for (int i = 0; i < players.Count; i++)
+        {
+            var pl = players[i];
+            Rect cell = new Rect(r.x + 12 + (i % 2) * colW, y + (i / 2) * 22f, colW - 4, 20);
+            DrawPlayerChip(cell, pl, 12);
+        }
+    }
+
+    // 参加人数(大きな数字)と、7人分の枠のうち埋まっている数
+    void DrawPlayerCount(Rect r, int count, int size)
+    {
+        Label(new Rect(r.x, r.y, r.width * 0.5f, r.height), "参加", S("plCntL" + size, size - 3, C(0xdfffe0, 0.85f), TextAnchor.MiddleLeft, bold: true));
+        Label(new Rect(r.x, r.y, r.width, r.height), count + " / " + PointerServer.MaxPlayers + " 人",
+            S("plCnt" + size, size, count > 0 ? C(0x9dffb0) : C(0x98b6a8), TextAnchor.MiddleRight, bold: true));
+    }
+
+    // 色の丸 + 色の名前。ライトを当てている人は丸を大きく光らせ、参加直後の2秒は枠を光らせる。
+    void DrawPlayerChip(Rect cell, PointerServer.ConnectedPlayer pl, int fontSize)
+    {
+        var dot = Tex("playerDot", () => RoundedBox(32, 16, Color.white, Color.white, 0));
+        float since = joinedAt.TryGetValue(pl.colorIndex, out var t0) ? Time.unscaledTime - t0 : 99f;
+        if (since < 2f) Fill(cell, new Color(pl.color.r, pl.color.g, pl.color.b, 0.35f * (1f - since / 2f) * (0.6f + 0.4f * Mathf.Sin(since * 12f))));
+        float d = cell.height * 0.7f * (pl.lit ? 1.15f : 1f);
+        Color old = GUI.color;
+        if (pl.lit)
+        {
+            GUI.color = new Color(pl.color.r, pl.color.g, pl.color.b, 0.35f);
+            GUI.DrawTexture(new Rect(cell.x + 2 + cell.height * 0.35f - d * 0.8f, cell.center.y - d * 0.8f, d * 1.6f, d * 1.6f), dot);
+        }
+        GUI.color = pl.color;
+        GUI.DrawTexture(new Rect(cell.x + 2 + cell.height * 0.35f - d / 2, cell.center.y - d / 2, d, d), dot);
+        GUI.color = old;
+        Label(new Rect(cell.x + cell.height + 6, cell.y, cell.width - cell.height - 6, cell.height), pl.name,
+            S("plName" + fontSize, fontSize, C(0xeaf7ee), TextAnchor.MiddleLeft, bold: true));
+    }
+
+    void DrawPlayConnectPanel()
+    {
+        string target = QrTarget(out bool online);
+        var players = ConnectedPlayers();
+        const float qr = 62f;
+        float listW = 112f;
+        int rows = Mathf.Max(1, (players.Count + 1) / 2);
+        float w = 10f + qr + 8f + listW + 8f;
+        float h = Mathf.Max(qr + 20f, 30f + rows * 17f + 8f);
+        Rect r = new Rect(W - w - 12, H - h - 12, w, h);
+        Panel(r, PanelTex(), 9);
+
+        Rect qrRect = new Rect(r.x + 10, r.y + (h - qr) / 2f, qr, qr);
+        if (target != null) GUI.DrawTexture(qrRect, qrTexture);
+        else DrawQrWaiting(qrRect, 8);
+
+        float x = qrRect.xMax + 8f, y = r.y + 6f;
+        DrawPlayerCount(new Rect(x, y, listW, 20), players.Count, 13);
+        y += 24f;
+        if (players.Count == 0)
+        {
+            Label(new Rect(x, y, listW, 16), "QRで参加できます", S("plNoneP", 9, C(0x98b6a8), TextAnchor.MiddleLeft));
+            return;
+        }
+        float colW = listW / 2f;
+        for (int i = 0; i < players.Count; i++)
+            DrawPlayerChip(new Rect(x + (i % 2) * colW, y + (i / 2) * 17f, colW - 2, 15), players[i], 10);
+    }
+
+    // タイトル画面でQRをクリックしたときの拡大表示。「戻る」ボタン・ESC・まわりのクリックで閉じる。
+    void DrawQrZoom()
+    {
+        if (!QrZoomOpen) return;
+        if (game.State != NightGame.GameState.Title || qrTexture == null) { QrZoomOpen = false; return; }
+        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape) { QrZoomOpen = false; Event.current.Use(); return; }
+
+        Fill(new Rect(0, 0, W, H), new Color(0f, 0.02f, 0.04f, 0.82f));
+        float qr = Mathf.Min(H - 190f, W - 80f);
+        float w = qr + 48f, h = qr + 150f;
+        Rect r = new Rect((W - w) / 2f, (H - h) / 2f, w, h);
+        Panel(r, PanelTex(), 9);
+        Label(new Rect(r.x, r.y + 10, w, 30), "灯り役はスマホのカメラでQRを読み取り", S("qrZoomHead", 18, C(0xdfffe0), TextAnchor.MiddleCenter, bold: true));
+        Rect qrRect = new Rect(r.x + 24, r.y + 46, qr, qr);
+        GUI.DrawTexture(qrRect, qrTexture);
+        var players = ConnectedPlayers();
+        DrawPlayerCount(new Rect(r.x + 24, qrRect.yMax + 8, qr, 26), players.Count, 16);
+        if (MenuButton(new Rect(r.center.x - 84, r.yMax - 56, 168, 42), "戻る")) QrZoomOpen = false;
+        // パネルの外をクリックしても閉じる(パネル内のクリックは下のタイトル画面に通さない)
+        if (Event.current.type == EventType.MouseDown)
+        {
+            if (!r.Contains(Event.current.mousePosition)) QrZoomOpen = false;
+            Event.current.Use();
+        }
     }
 
     void EnsureQrTexture(string url)
