@@ -570,4 +570,24 @@ public class NightWorld : MonoBehaviour
         }
         return best != null ? best.color : GroundColor;
     }
+
+    // 擬態で寄せる見た目。木・岩・草むらのすぐそばならその色、それ以外は足元(通路の土・石畳・橋の板)の色と模様。
+    public Color CamouflageColorAt(Vector3 pos, out Texture texture)
+    {
+        texture = null;
+        NightTerrainProp best = null;
+        float bestDist = float.PositiveInfinity;
+        foreach (var p in Props)
+        {
+            float d = Vector3.Distance(new Vector3(pos.x, 0, pos.z), new Vector3(p.position.x, 0, p.position.z));
+            if (d < p.radius + 0.6f && d < bestDist) { bestDist = d; best = p; }
+        }
+        if (best != null) return best.color;
+        foreach (var r in Map.Regions)
+            if (Mathf.Sqrt((pos.x - r.x) * (pos.x - r.x) + (pos.z - r.z) * (pos.z - r.z)) < r.r) { texture = PathMat.mainTexture; return PathMat.color; }
+        var s = Map.RouteSurface(pos.x, pos.z);
+        if (s.segment != null && BridgeSegment(s.segment)) return WoodMat.color;
+        texture = PathMat.mainTexture;
+        return PathMat.color;
+    }
 }

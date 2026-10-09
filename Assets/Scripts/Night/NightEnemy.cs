@@ -31,6 +31,9 @@ public class NightEnemy
 
     public float lightHp, lightHpMax;
     public Vector3 knock;
+    // プレイヤーが擬態して見失っている間: 近くをうろうろする目的地と、「？」「！」の表示用
+    public Vector3 wanderTarget;
+    public float wanderTimer, wanderPause, confused, foundTimer;
     public bool dying;
     public float dieTimer;
     public List<Vector3> path;

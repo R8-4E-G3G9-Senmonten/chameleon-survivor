@@ -163,9 +163,15 @@ public class PointerServer : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
+    // スマホの画面でもゲームと同じ RocknRoll One を使うため、StreamingAssets のフォントを配る
+    static byte[] fontBytes;
+    const string FontFile = "RocknRollOne-Regular.ttf";
+
     void Start()
     {
         if (isDuplicate) return;
+        try { fontBytes = File.ReadAllBytes(Path.Combine(Application.streamingAssetsPath, FontFile)); }
+        catch (Exception e) { Debug.LogWarning("PointerServer: フォントを読み込めませんでした(" + e.Message + ")。スマホは端末のフォントで表示します。"); }
         string ip = GetLocalIPv4();
         LocalIp = ip;
 
@@ -477,6 +483,10 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
                         {
                             WriteResponse(stream, "200 OK", "text/html; charset=utf-8", PhoneHtml);
                         }
+                        else if (method == "GET" && path == "/" + FontFile && fontBytes != null)
+                        {
+                            WriteResponse(stream, "200 OK", "font/ttf", fontBytes, "Cache-Control: max-age=86400\r\n");
+                        }
                         else
                         {
                             WriteResponse(stream, "404 Not Found", "text/plain", "not found");
@@ -760,12 +770,15 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
     }
 
     void WriteResponse(Stream stream, string status, string contentType, string content)
+        => WriteResponse(stream, status, contentType, Encoding.UTF8.GetBytes(content), "");
+
+    void WriteResponse(Stream stream, string status, string contentType, byte[] bodyBytes, string extraHeaders)
     {
-        byte[] bodyBytes = Encoding.UTF8.GetBytes(content);
         string header =
             $"HTTP/1.1 {status}\r\n" +
             $"Content-Type: {contentType}\r\n" +
             $"Content-Length: {bodyBytes.Length}\r\n" +
+            extraHeaders +
             "Access-Control-Allow-Origin: *\r\n" +
             "Connection: close\r\n\r\n";
         byte[] headerBytes = Encoding.UTF8.GetBytes(header);
@@ -872,11 +885,13 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
     --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px;
     --fast:120ms; --base:220ms; --ease-out:cubic-bezier(.2,.8,.2,1);
   }
+  /* ゲームと同じフォント(PCのゲームが /RocknRollOne-Regular.ttf で配る。読み込むまでは端末のフォント) */
+  @font-face { font-family:'RocknRoll One'; src:url('/RocknRollOne-Regular.ttf') format('truetype'); font-display:swap; }
   * { box-sizing:border-box; }
   html,body { margin:0; padding:0; width:100%; height:100%; background:var(--bg); color:var(--text); overflow:hidden;
               touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
               -webkit-tap-highlight-color:transparent;
-              font-family:-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; }
+              font-family:'RocknRoll One', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif; }
   button { font-family:inherit; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
   button:focus-visible { outline:3px solid var(--text); outline-offset:3px; }
   svg.icon { width:24px; height:24px; flex:none; fill:none; stroke:currentColor; stroke-width:2;

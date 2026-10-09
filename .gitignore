@@ -43,3 +43,6 @@ qr_print/
 
 # Cloudflare トンネルの実行ファイル(各自で入れる。大きいのでコミットしない)
 /tools/cloudflared.exe
+
+# 紹介動画(デモ撮影モードで作る動画・連番画像。ファイルが大きいのでコミットしない)
+demo_video/

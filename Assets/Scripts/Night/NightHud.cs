@@ -8,11 +8,15 @@ public class NightHud : MonoBehaviour
     public NightGame game;
 
     float scale = 1f, W, H;
+    // 画面の高さをこの値として拡大縮小する(小さいほど文字やパネルが大きくなる)。
+    // タイトル・名前入力は左右にランキングと接続パネルが並び横幅が足りなくなるため、プレイ中より控えめにする
+    const float BaseHeight = 580f, TitleBaseHeight = 700f;
+    const float SidePanelSpace = 272f; // 左右のパネルの幅+余白(中央の内容がここに重ならないようにする)
     bool helpOpen;
     float toastAlpha;
     Color vignetteColor = new Color(1f, 0.16f, 0.08f, 0f);
 
-    Font serif;
+    Font uiFont; // 画面の文字はすべて RocknRoll One(太めで読みやすい手書き風ゴシック。SIL OFL)
     readonly Dictionary<string, GUIStyle> styles = new Dictionary<string, GUIStyle>();
     readonly Dictionary<string, Texture2D> texCache = new Dictionary<string, Texture2D>();
     readonly Dictionary<string, Texture2D> previews = new Dictionary<string, Texture2D>();
@@ -24,7 +28,8 @@ public class NightHud : MonoBehaviour
     void Awake()
     {
         if (game == null) game = GetComponent<NightGame>();
-        serif = Font.CreateDynamicFontFromOSFont(new[] { "Georgia", "Times New Roman", "Yu Mincho" }, 46);
+        uiFont = Resources.Load<Font>("Fonts/RocknRollOne-Regular");
+        if (uiFont == null) uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo" }, 16);
         whiteTex = Texture2D.whiteTexture;
         markTex = UITextureFactory.CreateChameleonMark(64, C(0xf5a623), C(0x22c55e), new Color(0.9f, 0.93f, 0.75f));
         foreach (var id in NightMap.Ids) previews[id] = DrawHabitatPreview(id);
@@ -85,10 +90,12 @@ public class NightHud : MonoBehaviour
 
     void OnGUI()
     {
-        scale = Mathf.Clamp(Screen.height / 760f, 0.7f, 3f);
+        bool menu = game.State == NightGame.GameState.Title || game.State == NightGame.GameState.NameEntry;
+        scale = Mathf.Clamp(Screen.height / (menu ? TitleBaseHeight : BaseHeight), 0.7f, 3f);
         W = Screen.width / scale;
         H = Screen.height / scale;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+        GUI.skin.font = uiFont;
 
         if (game.State == NightGame.GameState.Title)
         {
@@ -109,11 +116,20 @@ public class NightHud : MonoBehaviour
         if (game.FlashLevel > 0f) Fill(new Rect(0, 0, W, H), C(0xeaf2ff, game.FlashLevel * 0.5f));
         DrawEdgeGlow();
 
-        DrawHud();
-        DrawGoalHud();
-        DrawTopRight();
-        DrawToast();
-        DrawHint();
+        // 結果画面ではプレイ中の表示を出さない(結果の文字と重なるため)
+        bool playing = game.State != NightGame.GameState.Ended;
+        if (playing)
+        {
+            DrawEnemyMarks();
+            DrawObjectGauges();
+            DrawPlayerBars();
+            DrawHud();
+            DrawGoalHud();
+            DrawTopRight();
+            DrawToast();
+            DrawThreatAlert();
+            DrawHint();
+        }
         DrawConnectPanel(false);
 
         if (game.State != NightGame.GameState.Ended) endStart = -1f;
@@ -126,13 +142,14 @@ public class NightHud : MonoBehaviour
     {
         GUI.DrawTexture(new Rect(0, 0, W, H), Tex("startBg", () => RadialBackground()), ScaleMode.StretchToFill);
 
-        float maxW = Mathf.Min(810f, W - 48f);
+        bool sidePanels = W >= 1000f; // DrawRankingPanel と同じ条件
+        float maxW = Mathf.Min(810f, W - (sidePanels ? 2f * SidePanelSpace : 48f));
         float cardW = Mathf.Floor((maxW - 32f) / 3f);
         bool compact = H < 760f;
         float preview = Mathf.Min(cardW - 24f, compact ? 180f : 235f);
         float cardH = 14f + preview + 12f + 22f + 7f + 14f + 16f;
 
-        string paragraph = "球や敵にマウスの光を当て続けます。止まると擬態して一時的に無敵になり、敵を押し返します。擬態中は灯り役の光が2倍効き(待ち伏せ)、擬態中に敵を倒すと擬態ゲージが回復します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを約0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。途中で光を外すと蓄光はリセットされます。球は約2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を約2秒連続で照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。マップごとに難易度が違います(A やさしい / B ふつう / C むずかしい)。";
+        string paragraph = "球や敵にマウスの光を当て続けます。止まると地面や物の色に擬態し、最大3秒間、無敵になって敵があなたを見失います(敵は「？」を出してうろうろします)。擬態中は灯り役の光が2倍効き(待ち伏せ)、擬態中に敵を倒すと擬態ゲージが回復します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを合計0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。照らした時間はたまっていくので、途中で光を外しても続きから貯められます(進み具合は物の上のゲージで分かります)。球は合計2秒照らして実体化させ、触れて回収します。2つ揃うと入口の門が開きます。導きの花を合計2秒照らすと、花から最も近い未回収の球までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。球が2つ揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。マップごとに難易度が違います(A やさしい / B ふつう / C むずかしい)。";
         var helpStyle = S("help", 11, C(0x8fada4), TextAnchor.UpperLeft, wrap: true);
         float helpW = Mathf.Min(650f, W - 48f);
         float helpH = helpOpen ? helpStyle.CalcHeight(new GUIContent(paragraph), helpW) + 8f : 0f;
@@ -143,8 +160,12 @@ public class NightHud : MonoBehaviour
 
         Label(new Rect(0, y, W, 14), "光と影の森 / EXPLORATION", S("eyebrow", 10, C(0xb3d2c3), TextAnchor.MiddleCenter));
         y += 14 + 8;
-        var title = S("title", 46, C(0xe6f5e9), TextAnchor.MiddleCenter);
-        title.font = serif;
+        var title = S("title", 44, C(0xe6f5e9), TextAnchor.MiddleCenter);
+        // 左右のパネルに重ならない幅に収まるよう、タイトルの文字の大きさを調整する
+        float titleRoom = W - (sidePanels ? 2f * SidePanelSpace : 48f);
+        title.fontSize = 44;
+        float titleW = title.CalcSize(new GUIContent("C H A M E L E O N   N I G H T")).x;
+        if (titleW > titleRoom) title.fontSize = Mathf.Max(24, Mathf.FloorToInt(44 * titleRoom / titleW));
         Label(new Rect(0, y, W, 56), "C H A M E L E O N   N I G H T", title);
         y += 56 + 8;
         Label(new Rect(0, y, W, 18), "灯りを導きに、夜の向こうへ。", S("menuSub", 13, C(0xc8ded2), TextAnchor.MiddleCenter));
@@ -278,7 +299,8 @@ public class NightHud : MonoBehaviour
     // ================= HUD =================
     void DrawHud()
     {
-        Rect r = new Rect(12, 12, 248, 120);
+        // HPバー・擬態ゲージは主人公の頭上に出す(DrawPlayerBars)。ここはマップ名・操作・接続状態だけ
+        Rect r = new Rect(12, 12, 248, 84);
         Panel(r, PanelTex(), 9);
         float x = r.x + 14, y = r.y + 10;
         GUI.DrawTexture(new Rect(x, y + 1, 16, 16), markTex);
@@ -296,23 +318,10 @@ public class NightHud : MonoBehaviour
         var matStyle = S(matConnected ? "matOn" : "matOff", 10, matConnected ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleLeft);
         string matText = matConnected
             ? (mat.Source.Length > 0 ? "接続中(" + mat.Source + ")" : "接続中")
-            : "未接続" + (mat != null && mat.SerialStatus.Length > 0 ? "  USB: " + mat.SerialStatus : "");
+            : "未接続"; // 詳しい理由(USBの状態など)は出さず、画面の情報を少なくする
         Shadowed(new Rect(x, y, 220, 14), (matConnected ? "● " : "○ ") + "コントローラー: " + matText, matStyle);
         y += 14 + 4;
 
-        float hpRatio = game.Hp / NightGame.HpMax;
-        bool low = hpRatio < 0.3f;
-        Bar(new Rect(x, y, 190, 11), hpRatio, low ? "hpLow" : "hp", low ? C(0xff5a4a) : C(0x6fe08a), low ? C(0xff8f7a) : C(0x9dffb0), "HP");
-        y += 11 + 5;
-        bool locked = game.CampLocked;
-        Bar(new Rect(x, y, 190, 11), game.Camp / NightGame.CampMax, locked ? "campLocked" : "camp",
-            locked ? C(0x666666) : C(0x3fa0c8), locked ? C(0x999999) : C(0x8fe6ff), "擬態ゲージ");
-        if (game.AmbushRefillFlash > 0f)
-        {
-            Fill(new Rect(x - 2, y - 2, 194, 15), new Color(0.75f, 0.95f, 1f, 0.55f * game.AmbushRefillFlash));
-            Label(new Rect(x + 196, y - 4, 60, 18), "+回復", S("campRefill", 11, new Color(0.75f, 0.95f, 1f, game.AmbushRefillFlash), TextAnchor.MiddleLeft, bold: true));
-        }
-        r.height = y + 11 + 10 - r.y;
     }
 
     void DrawGoalHud()
@@ -344,11 +353,13 @@ public class NightHud : MonoBehaviour
         var flashStyle = S(soon ? "flashSoon" : "flash", 13, soon ? Color.white : C(0xffe9a0), TextAnchor.MiddleRight, bold: soon);
 
         string kill = "撃破: " + game.KillCount;
+        string threat = "脅威 Lv." + game.Threat + (game.Threat >= NightGame.ThreatMax ? " (最大)" : "");
+        var threatStyle = S("threat" + Mathf.Min(game.Threat, 5), 13, Color.Lerp(C(0xffd9a0), C(0xff5a4a), (game.Threat - 1) / 4f), TextAnchor.MiddleRight, bold: true);
         string timer = FormatTime(game.Elapsed);
         float bw = badgeStyle.CalcSize(new GUIContent(badge)).x + 20f;
-        float contentW = Mathf.Max(bw, killStyle.CalcSize(new GUIContent(kill)).x, timerStyle.CalcSize(new GUIContent(timer)).x,
+        float contentW = Mathf.Max(bw, killStyle.CalcSize(new GUIContent(kill)).x, threatStyle.CalcSize(new GUIContent(threat)).x, timerStyle.CalcSize(new GUIContent(timer)).x,
             S("flashSoon", 13, Color.white, TextAnchor.MiddleRight, bold: true).CalcSize(new GUIContent("閃光まで 12s")).x);
-        Rect r = new Rect(W - 12 - (contentW + 24), 12, contentW + 24, 8 + 22 + 2 + 20 + 2 + 22 + 2 + 18 + 8);
+        Rect r = new Rect(W - 12 - (contentW + 24), 12, contentW + 24, 8 + 22 + 2 + 20 + 2 + 18 + 6 + 2 + 22 + 2 + 18 + 8);
         Panel(r, PanelTex(), 9);
         float x = r.x + 12, y = r.y + 8, w = contentW;
 
@@ -359,6 +370,14 @@ public class NightHud : MonoBehaviour
         y += 22 + 2;
         Shadowed(new Rect(x, y, w, 20), kill, killStyle);
         y += 20 + 2;
+        // 脅威レベル。下の細いバーは「あとどれだけ回復すると次のレベルか」
+        if (game.AlertTimer > 0f) // レベルが上がった直後は白く点滅
+            threatStyle.normal.textColor = Color.Lerp(threatStyle.normal.textColor, Color.white, Mathf.Abs(Mathf.Sin(Time.unscaledTime * 10f)));
+        Shadowed(new Rect(x, y, w, 18), threat, threatStyle);
+        y += 18 + 1;
+        Fill(new Rect(x + w - 90, y, 90, 4), new Color(1f, 1f, 1f, 0.12f));
+        Fill(new Rect(x + w - 90, y, 90 * Mathf.Clamp01(game.ThreatProgress), 4), new Color(1f, 0.45f, 0.3f, 0.85f));
+        y += 5 + 2;
         Shadowed(new Rect(x, y, w, 22), timer, timerStyle);
         y += 22 + 2;
         Shadowed(new Rect(x, y, w, 18), flash, flashStyle);
@@ -373,6 +392,128 @@ public class NightHud : MonoBehaviour
         GUI.color = new Color(1, 1, 1, toastAlpha);
         Shadowed(r, game.ToastText, style, 2f);
         GUI.color = old;
+    }
+
+    // ワールド座標を、この HUD の座標(拡大縮小後)に変換する。カメラの後ろなら false
+    bool ToHud(Vector3 world, out Vector2 p)
+    {
+        Vector3 s = game.Cam.WorldToScreenPoint(world);
+        p = new Vector2(s.x / scale, (Screen.height - s.y) / scale);
+        return s.z > 0f;
+    }
+
+    // 擬態中、敵の頭の上に「？」(見失っている)。擬態が解けた直後は「！」(見つけた)。
+    void DrawEnemyMarks()
+    {
+        var q = S("markQ", 26, C(0xffe27a), TextAnchor.MiddleCenter, bold: true);
+        var ex = S("markEx", 28, C(0xff6a4a), TextAnchor.MiddleCenter, bold: true);
+        Color old = GUI.color;
+        foreach (var en in game.Enemies)
+        {
+            if (en.dying) continue;
+            bool found = en.foundTimer > 0f;
+            if (en.confused <= 0.01f && !found) continue;
+            if (!ToHud(en.Position + Vector3.up * (en.hitHeight * 1.9f + 0.35f), out var p)) continue;
+            if (p.x < -40 || p.x > W + 40 || p.y < -40 || p.y > H + 40) continue;
+            float bob = Mathf.Sin(Time.time * 4f + en.go.GetInstanceID() * 0.37f) * 3f;
+            if (found)
+            {
+                float t = 1f - en.foundTimer / 0.8f;
+                float pop = 1f + 0.5f * Mathf.Max(0f, 1f - t * 4f); // 出た瞬間にぽんと大きく
+                GUI.color = new Color(1, 1, 1, Mathf.Clamp01(en.foundTimer / 0.25f));
+                LabelFx(new Rect(p.x - 20, p.y - 20, 40, 40), "！", ex, pop, 1f);
+            }
+            else
+            {
+                GUI.color = new Color(1, 1, 1, en.confused);
+                Shadowed(new Rect(p.x - 20, p.y - 20 + bob, 40, 40), "？", q, 2f);
+            }
+        }
+        GUI.color = old;
+    }
+
+    // 主人公の頭上に HPバー(太い・緑) と 擬態ゲージ(細い・水色)。文字は出さず、色と長さだけで伝える。
+    // 回復したときはHPバーが、擬態ゲージが戻ったときは擬態ゲージが一瞬光る。擬態の残りが1秒を切ると赤く点滅。
+    void DrawPlayerBars()
+    {
+        if (!ToHud(game.PlayerPos + Vector3.up * 1.45f, out var p)) return;
+        const float w = 104f, hpH = 12f, campH = 7f, gap = 4f;
+        float x = p.x - w / 2f, y = p.y - 18f;
+
+        Fill(new Rect(x - 3, y - 3, w + 6, hpH + gap + campH + 6), new Color(0f, 0f, 0f, 0.5f));
+
+        // HP
+        float hpRatio = game.Hp / NightGame.HpMax;
+        bool low = hpRatio < 0.3f;
+        Bar(new Rect(x, y, w, hpH), hpRatio, low ? "hpLow" : "hp", low ? C(0xff5a4a) : C(0x6fe08a), low ? C(0xff8f7a) : C(0x9dffb0), null, 0.18f);
+        if (game.HealFlash > 0f) Fill(new Rect(x - 3, y - 3, w + 6, hpH + 6), new Color(0.6f, 1f, 0.65f, 0.55f * game.HealFlash));
+
+        // 擬態ゲージ
+        y += hpH + gap;
+        float camp = game.Camp / NightGame.CampMax;
+        Color campColor;
+        if (game.CampLocked) campColor = C(0x8a8a8a);
+        else if (game.Camouflaged && camp * NightGame.CampSeconds < 1f) campColor = Mathf.Repeat(Time.time * 6f, 1f) < 0.5f ? C(0xff6a4a) : C(0xffb0a0);
+        else campColor = C(0x8fe6ff);
+        Fill(new Rect(x, y, w, campH), new Color(1f, 1f, 1f, 0.15f));
+        Fill(new Rect(x, y, w * camp, campH), campColor);
+        if (game.AmbushRefillFlash > 0f) Fill(new Rect(x - 3, y - 3, w + 6, campH + 6), new Color(0.75f, 0.95f, 1f, 0.55f * game.AmbushRefillFlash));
+    }
+
+    // 光で動くもの(ランタン・導きの花・光の球)の上に、照らした時間のたまり具合のゲージを出す
+    void DrawObjectGauges()
+    {
+        var world = game.World;
+        foreach (var lamp in world.Lamps)
+            if (!lamp.lit) ObjectGauge(new Vector3(lamp.x, lamp.height + 2.2f, lamp.z), lamp.charge / NightLamp.ChargeTime, C(0xffd390), "ランタン");
+        foreach (var plant in world.Plants)
+        {
+            bool active = game.Guidance != null && game.Guidance.plant == plant;
+            if (!active) ObjectGauge(new Vector3(plant.x, plant.height + 1.35f, plant.z), plant.charge / NightGuidePlant.ChargeTime, C(0x98efbd), "導きの花");
+        }
+        foreach (var orb in world.Orbs)
+            if (!orb.collected && !orb.materialized) ObjectGauge(orb.Position + Vector3.up * 2.2f, orb.reveal / NightOrb.RevealTime, orb.color, "光の球");
+    }
+
+    void ObjectGauge(Vector3 world, float ratio, Color color, string name)
+    {
+        if (ratio <= 0.001f) return; // まだ一度も照らしていないものには出さない
+        if (!ToHud(world, out var p)) return;
+        if (p.x < -60 || p.x > W + 60 || p.y < -30 || p.y > H + 30) return;
+        const float w = 76f, h = 9f;
+        Rect bar = new Rect(p.x - w / 2f, p.y, w, h);
+        Fill(new Rect(bar.x - 2, bar.y - 2, w + 4, h + 4), new Color(0f, 0f, 0f, 0.55f));
+        Fill(bar, new Color(1f, 1f, 1f, 0.15f));
+        Fill(new Rect(bar.x, bar.y, w * Mathf.Clamp01(ratio), h), color);
+    }
+
+    // 「敵が増えた！」の警告。ドンと拡大して出て、赤く脈打ち、最後にふわっと消える
+    void DrawThreatAlert()
+    {
+        if (game.AlertTimer <= 0f) return;
+        float t = NightGame.AlertDuration - game.AlertTimer;
+        float appear = EaseOutBack(t / 0.35f);
+        float alpha = Mathf.Clamp01(t / 0.12f) * Mathf.Clamp01(game.AlertTimer / 0.45f);
+        float pulse = 0.5f + 0.5f * Mathf.Sin(t * 14f);
+        float w = 420f, h = 78f;
+        // 画面の中央をふさがないよう、上の「光の球」パネルのすぐ下に出す
+        Rect r = new Rect(W / 2f - w / 2f, 66f, w, h);
+
+        Matrix4x4 old = GUI.matrix;
+        Color oldC = GUI.color;
+        Vector2 c = r.center;
+        float sc = Mathf.Lerp(0.6f, 1f, appear);
+        GUI.matrix = old * Matrix4x4.TRS(new Vector3(c.x, c.y, 0), Quaternion.identity, new Vector3(sc, sc, 1f)) * Matrix4x4.TRS(new Vector3(-c.x, -c.y, 0), Quaternion.identity, Vector3.one);
+        GUI.color = new Color(0.55f + 0.25f * pulse, 0.06f, 0.04f, 0.78f * alpha);
+        Panel(r, Tex("pill", () => RoundedBox(32, 11, Color.white, Color.white, 0)), 11);
+        Color line = new Color(1f, 0.55f, 0.4f, (0.35f + 0.5f * pulse) * alpha);
+        Fill(new Rect(r.x + 18, r.y + 4, r.width - 36, 2), line);
+        Fill(new Rect(r.x + 18, r.yMax - 6, r.width - 36, 2), line);
+        GUI.color = new Color(1f, 1f, 1f, alpha);
+        Shadowed(new Rect(r.x, r.y + 10, r.width, 34), game.AlertText, S("alertMain", 28, C(0xfff0e0), TextAnchor.MiddleCenter, bold: true), 2f);
+        Shadowed(new Rect(r.x, r.y + 46, r.width, 20), game.AlertSub, S("alertSub", 13, C(0xffd0c0), TextAnchor.MiddleCenter), 1f);
+        GUI.color = oldC;
+        GUI.matrix = old;
     }
 
     void DrawHint()
@@ -555,7 +696,7 @@ public class NightHud : MonoBehaviour
             S("neHint", 12, C(0xa9c4b8), TextAnchor.UpperCenter, wrap: true));
         y += 50;
 
-        var fieldStyle = new GUIStyle(GUI.skin.textField) { fontSize = 22, alignment = TextAnchor.MiddleCenter };
+        var fieldStyle = new GUIStyle(GUI.skin.textField) { font = uiFont, fontSize = 22, alignment = TextAnchor.MiddleCenter };
         fieldStyle.normal.textColor = Color.white; fieldStyle.focused.textColor = Color.white;
         GUI.SetNextControlName("playerName");
         nameText = GUI.TextField(new Rect(cx - 140, y, 280, 48), nameText, NightRanking.MaxNameLength, fieldStyle);
@@ -772,7 +913,7 @@ public class NightHud : MonoBehaviour
     {
         if (!styles.TryGetValue(key, out var s))
         {
-            s = new GUIStyle { fontSize = size, alignment = align, wordWrap = wrap, fontStyle = bold ? FontStyle.Bold : FontStyle.Normal, clipping = TextClipping.Overflow };
+            s = new GUIStyle { font = uiFont, fontSize = size, alignment = align, wordWrap = wrap, fontStyle = bold ? FontStyle.Bold : FontStyle.Normal, clipping = TextClipping.Overflow };
             styles[key] = s;
         }
         s.normal.textColor = color;

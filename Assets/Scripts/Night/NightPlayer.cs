@@ -17,6 +17,11 @@ public class NightPlayer : MonoBehaviour
     Renderer[] renderers;
     Color[] baseColors;
     Color tint = Color.white;
+    Color[] texAverage;      // 各素材のテクスチャの平均色(擬態の色を正確に合わせるため)
+    Color camoColor;
+    float camoBlend;
+    Texture[] baseTextures; // 元のテクスチャ(擬態中は地面の模様に差し替え、解けたら戻す)
+    bool texSwapped;
     Light selfGlow;
 
     static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
@@ -90,13 +95,45 @@ public class NightPlayer : MonoBehaviour
             var m = renderers[i].material;
             baseColors[i] = m.HasProperty("_Color") ? m.color : Color.white;
         }
+        texAverage = new Color[renderers.Length];
+        baseTextures = new Texture[renderers.Length];
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            baseTextures[i] = renderers[i].material.mainTexture;
+            texAverage[i] = AverageColor(baseTextures[i]);
+        }
+    }
+
+    // テクスチャ全体の平均色(縮小コピーして読む。読めないテクスチャでも使える)
+    static Color AverageColor(Texture tex)
+    {
+        if (tex == null) return Color.white;
+        var rt = RenderTexture.GetTemporary(8, 8, 0, RenderTextureFormat.ARGB32);
+        Graphics.Blit(tex, rt);
+        var prev = RenderTexture.active;
+        RenderTexture.active = rt;
+        var read = new Texture2D(8, 8, TextureFormat.RGBA32, false);
+        read.ReadPixels(new Rect(0, 0, 8, 8), 0, 0);
+        read.Apply();
+        RenderTexture.active = prev;
+        RenderTexture.ReleaseTemporary(rt);
+        Color sum = Color.black;
+        foreach (var c in read.GetPixels()) sum += c;
+        Object.Destroy(read);
+        sum /= 64f;
+        sum.a = 1f;
+        return sum;
     }
 
     // 上下左右の入力。カメラは +Z 側から -Z を見ているので、画面上=-Z、画面右=-X。
     // 本番は圧力マット(PressureMatServer経由のESP32)、開発・動作確認中はWASDでも動かせるよう、
     // どちらの入力も同時にOR(合成)して受け付ける(どちらか一方しか効かない、という作りにはしない)。
+    // 紹介動画の撮影(NightDemoVideo)で主人公を自動で動かすときだけ使う。null なら通常の入力
+    public static Vector3? DebugInput;
+
     public static Vector3 ReadInput()
     {
+        if (DebugInput.HasValue) return DebugInput.Value;
         var mat = PressureMatServer.Instance;
         Vector3 input = Vector3.zero;
         if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) || (mat != null && mat.Front)) input.z -= 1;
@@ -184,23 +221,34 @@ public class NightPlayer : MonoBehaviour
     }
 
     // 擬態中は周りの地形の色へ溶け込み、青白い光をまとう。被弾中は赤く。
-    public void UpdateLook(float dt, bool camouflaged, Color terrainColor, bool hurt)
+    // 擬態中は、足元の地面や近くの物(terrainColor / terrainTexture)と同じ見た目になる。
+    // ① まず「目標の色 ÷ 自分のテクスチャの平均色」を掛けて、全体の色を約0.3秒で目標の色に寄せる。
+    // ② 色が揃ったら、自分の模様(緑の皮膚)を地面の模様に差し替えて、周りに溶け込ませる。
+    // 擬態が解けたら、すぐに元の模様に戻して、色も元に戻していく。
+    public void UpdateLook(float dt, bool camouflaged, Color terrainColor, Texture terrainTexture, bool hurt)
     {
-        // テクスチャに色を掛け合わせるので、地形色そのままだと真っ黒になる。明るさを持ち上げて色味だけ寄せる。
-        Color camo = terrainColor * 2.6f; camo.a = 1f;
-        Color target = camouflaged ? Color.Lerp(camo, new Color(0.45f, 0.75f, 0.95f), 0.25f) : Color.white;
-        tint = Color.Lerp(tint, target, Mathf.Min(1f, dt * (camouflaged ? 4f : 6f)));
+        camoColor = camoBlend <= 0.001f ? terrainColor : Color.Lerp(camoColor, terrainColor, Mathf.Min(1f, dt * 5f));
+        camoBlend = Mathf.MoveTowards(camoBlend, camouflaged ? 1f : 0f, dt * (camouflaged ? 3f : 5f)); // 約0.3秒で色が変わる
         UpdateTorch(dt, camouflaged);
         if (renderers == null) return;
         for (int i = 0; i < renderers.Length; i++)
         {
             var m = renderers[i].material;
             if (!m.HasProperty("_Color")) continue;
-            Color c = baseColors[i] * tint;
+            Color avg = texAverage != null ? texAverage[i] : Color.white;
+            Color camo = new Color(
+                Mathf.Min(4f, camoColor.r / Mathf.Max(0.05f, avg.r)),
+                Mathf.Min(4f, camoColor.g / Mathf.Max(0.05f, avg.g)),
+                Mathf.Min(4f, camoColor.b / Mathf.Max(0.05f, avg.b)), 1f);
+            bool swap = camouflaged && camoBlend >= 0.999f;
+            if (swap) m.mainTexture = terrainTexture;
+            else if (texSwapped) m.mainTexture = baseTextures[i];
+            Color c = swap ? camoColor : Color.Lerp(baseColors[i], camo, camoBlend);
             if (hurt) c = Color.Lerp(c, new Color(0.95f, 0.25f, 0.2f), 0.55f);
             c.a = baseColors[i].a;
             m.color = c;
         }
+        texSwapped = camouflaged && camoBlend >= 0.999f;
     }
 
     public void SetAnimating(bool moving)
