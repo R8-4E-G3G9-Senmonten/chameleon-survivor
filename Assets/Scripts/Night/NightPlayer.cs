@@ -7,8 +7,13 @@ public class NightPlayer : MonoBehaviour
 {
     public GameObject characterModelPrefab;              // Assets/Models/ChameleonMeshy/Chameleon.fbx
     public RuntimeAnimatorController animatorController; // Assets/Models/ChameleonMeshy/ChameleonAnimator.controller
-    public float modelScale = 1.7f; // 見た目の大きさ(1 = モデルの元の大きさ)。当たり判定の大きさは変えない
+    // 見た目の大きさ(1 = 元の大きさ)。画面の中で主人公がよく見えるよう 1.7倍にしている。
+    // 背中の炎・頭上のゲージの高さもこれに合わせて上がる。当たり判定(CollisionRadius)は変えないので、狭い通路も今まで通り通れる。
+    public float modelScale = 1.7f;
     public float modelYawOffset = 0f;
+
+    // 頭上のHP・擬態ゲージを出す高さ(HUD が使う)
+    public float HeadHeight => 1.45f * modelScale;
 
     public const float MoveSpeed = 4.8f, Damping = 8f, CollisionRadius = 0.55f;
 
@@ -31,25 +36,22 @@ public class NightPlayer : MonoBehaviour
     // 擬態中は炎を小さく青白くして、「隠れている」状態が一目で分かるようにする(位置は分かる明るさは残す)。
     static readonly Color TorchColor = NightMeshes.Hex(0xffb15c), CamoTorchColor = new Color(0.45f, 0.75f, 1f);
     const float TorchHeight = 1.25f; // modelScale = 1 のときの高さ。大きさに合わせて上げる
-
-    // 頭上のHPバーなどを出す高さ
-    public float HeadHeight => 1.45f * modelScale;
     Transform flame, halo;
     Material flameMat, haloMat;
     float torchScale = 1f;
 
     void BuildTorch()
     {
-        float h = TorchHeight * modelScale;
-        selfGlow = NightWorld.PointLight(transform, new Vector3(0, h + 0.2f, 0), TorchColor, 1.9f, 7f);
+        float torchY = TorchHeight * modelScale; // 体が大きくなっても背中の上に来るように
+        selfGlow = NightWorld.PointLight(transform, new Vector3(0, torchY + 0.2f, 0), TorchColor, 1.9f, 7f);
         flameMat = NightMeshes.Unlit(new Color(1f, 0.82f, 0.45f, 0.95f));
         haloMat = NightMeshes.Unlit(new Color(1f, 0.6f, 0.25f, 0.28f));
         flame = NightMeshes.Primitive(PrimitiveType.Sphere, transform, flameMat).transform;
         flame.name = "TorchFlame";
-        flame.localPosition = new Vector3(0, h, 0);
+        flame.localPosition = new Vector3(0, torchY, 0);
         halo = NightMeshes.Primitive(PrimitiveType.Sphere, transform, haloMat).transform;
         halo.name = "TorchHalo";
-        halo.localPosition = new Vector3(0, h, 0);
+        halo.localPosition = new Vector3(0, torchY, 0);
     }
 
     void UpdateTorch(float dt, bool camouflaged)

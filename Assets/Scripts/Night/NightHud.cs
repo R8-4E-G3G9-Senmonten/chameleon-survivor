@@ -682,6 +682,7 @@ public class NightHud : MonoBehaviour
 
     string nameText = "";
     float nameEntryStamp = -1f;
+    float lastImeTime = -1f; // 日本語入力で変換中だった最後の時刻(確定の Enter でゲームを始めないため)
 
     // コースを決めたあと、ゲームを始める前の「名前入力」画面。名前はそのコースのランキングに載る。
     void DrawNameEntry()
@@ -701,13 +702,22 @@ public class NightHud : MonoBehaviour
             S("neHint", 12, C(0xa9c4b8), TextAnchor.UpperCenter, wrap: true));
         y += 50;
 
+        // Enter でゲーム開始。入力欄(TextField)より先に調べること:
+        // Windows では Enter 1回で「キーコードだけ」と「改行文字だけ」の2つのイベントが来て、
+        // 前者は入力欄が先に使ってしまう(後に調べると届かない)ため、どちらでも開始できるようにしている。
+        // 日本語入力の変換を確定するための Enter では始めない(変換中か、確定した直後は無視する)。
+        if (Input.compositionString.Length > 0) lastImeTime = Time.unscaledTime;
+        Event ev = Event.current;
+        bool enter = ev.type == EventType.KeyDown &&
+                     (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter || ev.character == '\n');
+        bool imeBusy = Input.compositionString.Length > 0 || Time.unscaledTime - lastImeTime < 0.15f;
+        if (enter && !imeBusy && Time.unscaledTime - game.NameEntryTime > 0.25f) { ev.Use(); game.BeginPlay(nameText); return; }
+
         var fieldStyle = new GUIStyle(GUI.skin.textField) { font = uiFont, fontSize = 22, alignment = TextAnchor.MiddleCenter };
         fieldStyle.normal.textColor = Color.white; fieldStyle.focused.textColor = Color.white;
         GUI.SetNextControlName("playerName");
         nameText = GUI.TextField(new Rect(cx - 140, y, 280, 48), nameText, NightRanking.MaxNameLength, fieldStyle);
         if (Time.unscaledTime - game.NameEntryTime < 0.4f) GUI.FocusControl("playerName"); // 開いた直後は入力欄を選択済みにする
-        bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter);
-        if (enter && Time.unscaledTime - game.NameEntryTime > 0.25f) { Event.current.Use(); game.BeginPlay(nameText); return; }
         y += 64;
 
         Rect start = new Rect(cx - 140, y, 280, 48);
