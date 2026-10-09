@@ -29,6 +29,10 @@ public class NightDemoVideo : MonoBehaviour
         if (System.Array.IndexOf(args, "-nightDemoVideo") < 0 || i < 0 || i + 1 >= args.Length) { enabled = false; return; }
         dir = Path.Combine(args[i + 1], "frames");
         Directory.CreateDirectory(dir);
+        // -nightDemoClean: 字幕と暗転を出さずに撮る(Remotion などで後から演出を重ねるため)。
+        // 場面の区切りは <フォルダ>/chapters.json に、何フレーム目から始まるかを書き出す。
+        clean = System.Array.IndexOf(args, "-nightDemoClean") >= 0;
+        chaptersPath = Path.Combine(args[i + 1], "chapters.json");
         g = NightGame.Instance;
         font = Resources.Load<Font>("Fonts/RocknRollOne-Regular");
         Application.runInBackground = true;
@@ -64,12 +68,22 @@ public class NightDemoVideo : MonoBehaviour
         if (g.State == NightGame.GameState.Playing && g.Hp < 60f) g.DebugSetHp(60f);
     }
 
+    bool clean;
+    string chaptersPath;
+    readonly List<string> chapterJson = new List<string>();
+
     void Caption(string title, string text)
     {
         chapterNo++;
         chapter = title;
         caption = text;
         captionTime = Time.time;
+        chapterJson.Add("{\"no\":" + chapterNo + ",\"frame\":" + frame + ",\"title\":\"" + title + "\",\"text\":\"" + text + "\"}");
+    }
+
+    void SaveChapters()
+    {
+        File.WriteAllText(chaptersPath, "{\"fps\":" + Fps + ",\"frames\":" + frame + ",\"chapters\":[\n" + string.Join(",\n", chapterJson) + "\n]}\n", new System.Text.UTF8Encoding(false));
     }
 
     IEnumerator Cut(System.Action during)
@@ -291,6 +305,7 @@ public class NightDemoVideo : MonoBehaviour
 
         chapter = "";
         recording = false;
+        SaveChapters();
         Debug.Log("NightDemoVideo: frames=" + frame + " (" + (frame / (float)Fps).ToString("0.0") + "秒)");
         yield return new WaitForSecondsRealtime(0.5f);
         Application.Quit();
@@ -315,6 +330,7 @@ public class NightDemoVideo : MonoBehaviour
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
         float W = Screen.width / scale, H = 720f;
 
+        if (clean) return;
         if (fade > 0f)
         {
             GUI.color = new Color(0, 0, 0, fade);
