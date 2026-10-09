@@ -436,7 +436,7 @@ public class NightHud : MonoBehaviour
     // 回復したときはHPバーが、擬態ゲージが戻ったときは擬態ゲージが一瞬光る。擬態の残りが1秒を切ると赤く点滅。
     void DrawPlayerBars()
     {
-        if (!ToHud(game.PlayerPos + Vector3.up * 1.45f, out var p)) return;
+        if (!ToHud(game.PlayerPos + Vector3.up * game.Player.HeadHeight, out var p)) return;
         const float w = 104f, hpH = 12f, campH = 7f, gap = 4f;
         float x = p.x - w / 2f, y = p.y - 18f;
 
