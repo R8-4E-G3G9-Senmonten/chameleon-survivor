@@ -44,6 +44,65 @@ public class NightEnemy
 
     public Vector3 Position { get => go.transform.position; set => go.transform.position = value; }
 
+    // ---- 使い回し(オブジェクトプール) ----
+    // 敵を出すたびにモデルを複製し、倒すたびに捨てると、そのたびに処理落ち(カクつき)が起きやすい。
+    // 倒した敵は隠して種類ごとに取っておき、次に同じ種類を出すときに状態を戻して使い回す。
+    static readonly Dictionary<Kind, Stack<NightEnemy>> pool = new Dictionary<Kind, Stack<NightEnemy>>();
+
+    static Stack<NightEnemy> PoolOf(Kind kind)
+    {
+        if (!pool.TryGetValue(kind, out var st)) pool[kind] = st = new Stack<NightEnemy>();
+        return st;
+    }
+
+    // 敵を出す(取っておいた敵があれば使い回す)
+    public static NightEnemy Spawn(Kind kind, Vector3 pos)
+    {
+        var st = PoolOf(kind);
+        while (st.Count > 0)
+        {
+            var en = st.Pop();
+            if (en.go == null) continue; // シーンを読み直したときに消えたもの
+            en.ResetFor(pos);
+            return en;
+        }
+        return new NightEnemy(kind, pos);
+    }
+
+    // 先にいくつか作って取っておく(プレイ中に初めて作るときのカクつきを防ぐ)
+    public static void Prewarm(Kind kind, int count)
+    {
+        var st = PoolOf(kind);
+        for (int need = count - st.Count; need > 0; need--) new NightEnemy(kind, new Vector3(0, -100f, 0)).Destroy();
+    }
+
+    // シーンを読み直す前に呼ぶ(読み直すと敵のオブジェクトは消えるので、取っておいた分も捨てる)
+    public static void ClearPool()
+    {
+        foreach (var st in pool.Values)
+            foreach (var en in st)
+                if (en.graph.IsValid()) en.graph.Destroy();
+        pool.Clear();
+    }
+
+    void ResetFor(Vector3 pos)
+    {
+        lightHp = lightHpMax = cfg.lightHp;
+        knock = Vector3.zero;
+        wanderTarget = Vector3.zero;
+        wanderTimer = wanderPause = confused = foundTimer = 0f;
+        dying = false;
+        dieTimer = 0f;
+        path = null;
+        navTimer = shootTimer = fxTimer = stuckTimer = noDirectTimer = 0f;
+        litBy = null;
+        litByTime = 0f;
+        go.transform.SetPositionAndRotation(pos, Quaternion.identity);
+        go.transform.localScale = Vector3.one;
+        go.SetActive(true);
+        ApplyGlow(false);
+    }
+
     public NightEnemy(Kind kind, Vector3 pos)
     {
         this.kind = kind;
@@ -177,10 +236,11 @@ public class NightEnemy
         }
     }
 
+    // 倒れた敵を片付ける。捨てずに隠して取っておき、Spawn で使い回す。
     public void Destroy()
     {
-        if (graph.IsValid()) graph.Destroy();
-        Object.Destroy(go);
+        go.SetActive(false);
+        PoolOf(kind).Push(this);
     }
 }
 

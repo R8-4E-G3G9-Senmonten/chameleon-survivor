@@ -59,7 +59,7 @@ public class NightGame : MonoBehaviour
 
     // ---- 回復オーブと脅威レベル ----
     // 敵を倒すと回復オーブを落とす(近づくと吸い寄せられ、触れるとHPが回復)。
-    // その代わり「回復した量」と「光の球の回収」で脅威レベルが上がり、敵の出る数・速さが増えていく。
+    // その代わり「回復した量」と「蛍の回収」で脅威レベルが上がり、敵の出る数・速さが増えていく。
     public const int ThreatMax = 9;
     const float HealPerThreat = 45f;          // これだけ回復するごとに脅威レベル+1
     const float HealOrbLife = 14f, HealMagnet = 3.2f, HealPickup = 0.8f;
@@ -146,7 +146,7 @@ public class NightGame : MonoBehaviour
     // ---- 表示用 ----
     public string ToastText { get; private set; } = "";
     public float ToastTimer { get; private set; }
-    public const string HintDefault = "花を合計2秒照らすと、未回収の球まで光の道が現れます。ランタンは敵を撃退。倒した敵の緑のオーブでHP回復。";
+    public const string HintDefault = "花を合計2秒照らすと、まだ蛍のいる石まで光の道が現れます。ランタンは敵を撃退。倒した敵の緑のオーブでHP回復。";
     public string Hint { get; private set; } = HintDefault;
 
     // ---- カメラ(進行方向の少し先を狙い、遅れて追従する) ----
@@ -183,6 +183,11 @@ public class NightGame : MonoBehaviour
     {
         BuildMap();
         ApplyLighting(0f);
+        // 敵を先に作って取っておく(タイトル画面の間に済ませ、プレイ中のカクつきを防ぐ)
+        NightEnemy.ClearPool();
+        NightEnemy.Prewarm(NightEnemy.Kind.Moth, 16);
+        NightEnemy.Prewarm(NightEnemy.Kind.Shooter, 5);
+        NightEnemy.Prewarm(NightEnemy.Kind.Brute, 3);
         // exe は、起動したらまずマップ(コース)選択から始まる。-skipTitle を付けたときだけ、選択済みのマップで名前入力へ進む。
         var args = System.Environment.GetCommandLineArgs();
         bool backToTitle = returnToTitle;
@@ -236,7 +241,7 @@ public class NightGame : MonoBehaviour
         State = GameState.Playing;
         if (PointerServer.Instance != null) PointerServer.Instance.ResetKills(); // スマホの撃破数はゲームごとに数え直す
         Audio.StartAmbient();
-        ShowToast(MapId + ". " + Map.Name + " — 球を2つ集め、入口の門から脱出しよう");
+        ShowToast(MapId + ". " + Map.Name + " — 2つの石を照らして蛍を集め、入口の門から脱出しよう");
     }
 
     // ステージ選択(タイトル)画面へ戻る。次の起動では exe でもタイトルを飛ばさない。
@@ -245,12 +250,14 @@ public class NightGame : MonoBehaviour
     {
         Time.timeScale = 1f;
         returnToTitle = true;
+        NightEnemy.ClearPool();
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     public void Restart()
     {
         Time.timeScale = 1f;
+        NightEnemy.ClearPool();
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
@@ -281,6 +288,7 @@ public class NightGame : MonoBehaviour
         switch (State)
         {
             case GameState.Title:
+                if (NightHud.QrZoomOpen) return; // QRの拡大表示中は、閉じる操作だけ受け付ける(NightHud 側)
                 if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) StartGame();
                 for (int i = 0; i < NightMap.Ids.Length; i++)
                     if (Input.GetKeyDown(KeyCode.Alpha1 + i) || Input.GetKeyDown(KeyCode.Keypad1 + i)) SelectMap(NightMap.Ids[i]);
@@ -386,7 +394,7 @@ public class NightGame : MonoBehaviour
         if (HealFlash > 0f) HealFlash = Mathf.Max(0f, HealFlash - dt * 1.5f);
         if (AlertTimer > 0f) AlertTimer -= dt;
 
-        // --- 光の球・門 ---
+        // --- 蛍の石・門 ---
         foreach (var orb in World.Orbs) orb.Tick(this, dt);
         var gate = World.Gate;
         gate.Animate(dt);
@@ -439,7 +447,7 @@ public class NightGame : MonoBehaviour
             float d = Mathf.Sqrt((x - PlayerPos.x) * (x - PlayerPos.x) + (z - PlayerPos.z) * (z - PlayerPos.z));
             if (d >= 12f && d <= 24f)
             {
-                var en = new NightEnemy(kind, new Vector3(x, Map.SurfaceAt(x, z), z));
+                var en = NightEnemy.Spawn(kind, new Vector3(x, Map.SurfaceAt(x, z), z));
                 en.lightHp = en.lightHpMax = en.cfg.lightHp * Difficulty.enemyHp;
                 Enemies.Add(en);
                 return;
@@ -724,7 +732,7 @@ public class NightGame : MonoBehaviour
             Vector2 r = Random.insideUnitCircle.normalized * Random.Range(4f, 7f);
             float x = PlayerPos.x + r.x, z = PlayerPos.z + r.y;
             if (!Map.Walkable(x, z, 0.5f)) continue;
-            var en = new NightEnemy(PickType(), new Vector3(x, Map.SurfaceAt(x, z), z));
+            var en = NightEnemy.Spawn(PickType(), new Vector3(x, Map.SurfaceAt(x, z), z));
             en.lightHp = en.lightHpMax = en.cfg.lightHp * Difficulty.enemyHp * hpScale;
             Enemies.Add(en);
             made++;
@@ -742,7 +750,7 @@ public class NightGame : MonoBehaviour
         return best;
     }
 
-    public void DebugRaiseThreat() => RaiseThreat("光の球を取った…森がざわめき出した", 4);
+    public void DebugRaiseThreat() => RaiseThreat("蛍を捕まえた…森がざわめき出した", 4);
 
     // ---- 脅威レベル(敵が増える) ----
     void RaiseThreat(string reason, int wave)
@@ -962,19 +970,19 @@ public class NightGame : MonoBehaviour
         if (g.time <= 0f) ClearGuidance();
     }
 
-    // ---- 光の球・門 ----
+    // ---- 蛍の石・門 ----
     public void OnOrbCollected(NightOrb orb)
     {
         OrbCount++;
         World.Gate.UpdateSockets(World.Orbs);
-        ShowToast("光の球を獲得！ " + OrbCount + " / " + OrbTotal);
+        ShowToast("蛍を捕まえた！ " + OrbCount + " / " + OrbTotal);
         Audio.PlayDownChime();
-        RaiseThreat("光の球を取った…森がざわめき出した", 3 + Threat);
+        RaiseThreat("蛍を捕まえた…森がざわめき出した", 3 + Threat);
         if (OrbCount >= OrbTotal && !World.Gate.opened)
         {
             World.Gate.Open();
             ClearGuidance();
-            ShowToast("2つの球が揃った！入口の門が開いた！", 3.5f);
+            ShowToast("蛍が揃った！入口の門が開いた！", 3.5f);
             Audio.PlayPulse();
         }
     }

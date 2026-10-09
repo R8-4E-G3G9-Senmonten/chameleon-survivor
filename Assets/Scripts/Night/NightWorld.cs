@@ -343,7 +343,7 @@ public class NightWorld : MonoBehaviour
         }
     }
 
-    // ---- 光の球の祠 ----
+    // ---- 蛍の石の台座 ----
     void BuildOrbs()
     {
         for (int i = 0; i < Map.Orbs.Length; i++)

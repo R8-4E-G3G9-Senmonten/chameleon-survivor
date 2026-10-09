@@ -74,6 +74,9 @@ public class PointerServer : MonoBehaviour
 
     // 誰が見ても区別しやすい、はっきりした色の並び。参加した順に1人ずつ割り当てる(人数が多ければ循環する)。
     static readonly int[] Palette = { 0xff6b6b, 0x6bdfff, 0xffe066, 0xb388ff, 0x6bff95, 0xff9f6b, 0xff6bd6, 0x8c8cff };
+    // スマホ画面の ColorNames と同じ並び(ゲーム画面にも色の名前を出す)
+    static readonly string[] PaletteNames = { "赤", "水色", "黄色", "紫", "緑", "オレンジ", "ピンク", "青" };
+    static string NameOf(int index) => PaletteNames[((index % PaletteNames.Length) + PaletteNames.Length) % PaletteNames.Length];
     static Color ColorOf(int index) => NightMeshes.Hex(Palette[((index % Palette.Length) + Palette.Length) % Palette.Length]);
     static string HexOf(int index) => "#" + (Palette[((index % Palette.Length) + Palette.Length) % Palette.Length] & 0xffffff).ToString("x6");
 
@@ -119,6 +122,45 @@ public class PointerServer : MonoBehaviour
     const string FullReply = "{\"ok\":false,\"full\":true}";
 
     public const int MaxPlayers = MaxParticipants;
+
+    // QRコードを出してよいか。HTTPSサーバーが起動し、-tunnel 指定時は5G用URLの準備が終わる(または失敗が分かる)まで待つ。
+    // 途中でQRが切り替わると、先に読み取った人が別のURLにつながってしまうため。
+    public bool QrReady
+    {
+        get
+        {
+            if (!HttpsServerUrl.StartsWith("https://")) return false;
+            if (!TunnelRequested || !string.IsNullOrEmpty(PublicUrl)) return true;
+            return !string.IsNullOrEmpty(TunnelStatus) && !TunnelStatus.Contains("準備中");
+        }
+    }
+
+    public struct ConnectedPlayer
+    {
+        public int colorIndex;
+        public Color color;
+        public string name; // 色の名前(赤・水色…)
+        public bool lit;    // 今ライトを当てている
+    }
+
+    // 接続中のスマホ(灯り役)を参加順に返す。GetConnectedColors と同じ対象。
+    public List<ConnectedPlayer> GetConnectedPlayers()
+    {
+        var list = new List<ConnectedPlayer>();
+        int now = Environment.TickCount;
+        lock (dataLock)
+        {
+            foreach (var kv in pointers)
+            {
+                int age = now - kv.Value.lastReceiveTimeMs;
+                if (age >= 2500) continue;
+                int ci = kv.Value.colorIndex;
+                list.Add(new ConnectedPlayer { colorIndex = ci, color = ColorOf(ci), name = NameOf(ci), lit = kv.Value.active && age < 500 });
+            }
+        }
+        list.Sort((a, b) => a.colorIndex.CompareTo(b.colorIndex));
+        return list;
+    }
 
     // 接続中(直近2.5秒以内に何か受信した)のスマホの色を、参加順に返す。画面に参加者を表示するための一覧。
     // スマホ側は触っていなくても定期的に送ってくるので、画面を触っていない人も「接続中」に数えられる。
