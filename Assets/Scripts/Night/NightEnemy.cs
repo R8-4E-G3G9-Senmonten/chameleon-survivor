@@ -39,6 +39,8 @@ public class NightEnemy
     public List<Vector3> path;
     public float navTimer, shootTimer, fxTimer, stuckTimer, noDirectTimer;
     public float hitHeight = 0.4f; // 被ダメージの火花を出す高さ(体の中心あたり)
+    public string litBy; // 最後にこの敵を照らしたスマホのid(倒した時に、そのスマホの撃破数に数える)
+    public float litByTime;
 
     public Vector3 Position { get => go.transform.position; set => go.transform.position = value; }
 

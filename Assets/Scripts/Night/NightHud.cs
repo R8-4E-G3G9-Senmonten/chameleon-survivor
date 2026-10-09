@@ -817,10 +817,15 @@ public class NightHud : MonoBehaviour
     {
         string httpsUrl = PointerServer.Instance != null ? PointerServer.Instance.HttpsServerUrl : "起動中...";
         string httpUrl = PointerServer.Instance != null ? PointerServer.Instance.ServerUrl : "起動中...";
+        // -tunnel で起動していて Cloudflare のURLが準備できたら、QRはそちら(5G・どのWi-Fiからでも参加可)にする
+        string publicUrl = PointerServer.Instance != null ? PointerServer.Instance.PublicUrl : null;
+        string tunnelStatus = PointerServer.Instance != null ? PointerServer.Instance.TunnelStatus : "";
+        bool online = !string.IsNullOrEmpty(publicUrl);
+        string qrTarget = online ? publicUrl : httpsUrl;
         bool phone = game.Flashlight != null && game.Flashlight.HasPhoneInput;
         int phoneCount = PointerServer.Instance != null ? PointerServer.Instance.GetActivePointers().Count : 0;
 
-        float qr = title ? 120f : 92f;
+        float qr = (title ? 120f : 92f) + (online ? 20f : 0f); // URLが長いとQRの目が細かくなるので少し大きく
         float w = qr + 20f;
         float h = 34f + qr + 30f + 28f;
         Rect r = title ? new Rect(W - w - 16, 16, w, h) : new Rect(W - w - 12, H - h - 12, w, h);
@@ -830,9 +835,9 @@ public class NightHud : MonoBehaviour
         Label(new Rect(r.x + 6, r.y + 6, r.width - 12, 28), "灯り役はスマホで\nQRを読み取り", head);
 
         Rect qrRect = new Rect(r.x + 10, r.y + 34, qr, qr);
-        if (httpsUrl.StartsWith("https://"))
+        if (qrTarget.StartsWith("https://"))
         {
-            try { EnsureQrTexture(httpsUrl); }
+            try { EnsureQrTexture(qrTarget); }
             catch (System.Exception ex) { Debug.LogException(ex); qrTexture = null; }
             if (qrTexture != null) GUI.DrawTexture(qrRect, qrTexture);
         }
@@ -845,7 +850,10 @@ public class NightHud : MonoBehaviour
         string statusText = phone ? "● スマホ " + phoneCount + "人操作中" : "○ マウス操作中";
         Label(new Rect(r.x + 4, qrRect.yMax + 3, r.width - 8, 14), statusText, status);
         var url = S("qrUrl", 8, C(0x98b6a8, 0.8f), TextAnchor.MiddleCenter);
-        Label(new Rect(r.x + 2, qrRect.yMax + 16, r.width - 4, 12), httpsUrl, url);
+        string urlText = online ? "5G・どのWi-Fiからでも参加OK"
+            : !string.IsNullOrEmpty(tunnelStatus) ? tunnelStatus
+            : httpsUrl;
+        Label(new Rect(r.x + 2, qrRect.yMax + 16, r.width - 4, 12), urlText, url);
         DrawPlayers(new Rect(r.x + 4, qrRect.yMax + 30, r.width - 8, 20));
     }
 
