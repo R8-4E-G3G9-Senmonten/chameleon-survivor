@@ -14,13 +14,19 @@ public class NightEnemy
         public bool ranged;
     }
 
+    // 全種類の敵の光HPにかける倍率。照らすとテンポよく倒れて気持ちいいように、元の値の6割にしている。
+    // 倒れるまでの照射時間(マップB・灯り1つ・待ち伏せなし)の目安:
+    //   群れ型 約1.0秒→0.6秒 / 遠距離型 約2.1秒→1.3秒 / 硬い型 約3.8秒→2.3秒
+    // 難しすぎる・簡単すぎる時はこの1つの数字で調整する(マップ別の倍率は NightDifficulty.enemyHp)。
+    const float HpScale = 0.6f;
+
     public static Config ConfigOf(Kind k)
     {
         switch (k)
         {
-            case Kind.Brute: return new Config { speed = 2.05f, contactDps = 24, lightHp = 115, drain = 38, regen = 20, color = NightMeshes.Hex(0x8a3b3b), scale = 1f };
-            case Kind.Shooter: return new Config { speed = 1.8f, contactDps = 8, lightHp = 60, drain = 35, regen = 15, color = NightMeshes.Hex(0xff8c00), scale = 0.8f, ranged = true };
-            default: return new Config { speed = 3.5f, contactDps = 11, lightHp = 34, drain = 44, regen = 16, color = NightMeshes.Hex(0x8a4b8a), scale = 0.55f };
+            case Kind.Brute: return new Config { speed = 2.05f, contactDps = 24, lightHp = 115 * HpScale, drain = 38, regen = 20, color = NightMeshes.Hex(0x8a3b3b), scale = 1f };
+            case Kind.Shooter: return new Config { speed = 1.8f, contactDps = 8, lightHp = 60 * HpScale, drain = 35, regen = 15, color = NightMeshes.Hex(0xff8c00), scale = 0.8f, ranged = true };
+            default: return new Config { speed = 3.5f, contactDps = 11, lightHp = 34 * HpScale, drain = 44, regen = 16, color = NightMeshes.Hex(0x8a4b8a), scale = 0.55f };
         }
     }
 

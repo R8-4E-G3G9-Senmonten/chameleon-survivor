@@ -1217,7 +1217,7 @@ function blinkFrame() {
 // 高さは自分の光の色ごとに変える(何人かで遊んでいても、自分のスマホの音だとわかりやすいように)。
 // スマホのブラウザは、画面を一度タップするまで音を出せないので、「タップして始める」やライトONを押した時に準備する。
 // (iPhone はマナーモード(消音スイッチ)だと鳴らない)
-var audioCtx = null, lastSoundAt = 0;
+var audioCtx = null, audioOut = null, lastSoundAt = 0;
 var ColorPitch = { '#ff6b6b':523, '#6bdfff':587, '#ffe066':659, '#b388ff':784, '#6bff95':880,
                    '#ff9f6b':1047, '#ff6bd6':1175, '#8c8cff':1319 }; // ド レ ミ ソ ラ ド レ ミ
 function unlockAudio() {
@@ -1226,18 +1226,26 @@ function unlockAudio() {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       audioCtx = new AC();
+      // 音を大きくしても割れないよう、最後にリミッター(圧縮)を通してからスピーカーへ出す
+      audioOut = audioCtx.createDynamicsCompressor();
+      audioOut.threshold.value = -8;
+      audioOut.knee.value = 4;
+      audioOut.ratio.value = 12;
+      audioOut.attack.value = 0.002;
+      audioOut.release.value = 0.12;
+      audioOut.connect(audioCtx.destination);
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
   } catch (e) {}
 }
-function tone(freq, start, dur, vol) {
+function tone(freq, start, dur, vol, type) {
   var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-  osc.type = 'triangle';
+  osc.type = type || 'triangle';
   osc.frequency.setValueAtTime(freq, start);
   gain.gain.setValueAtTime(0.0001, start);
   gain.gain.exponentialRampToValueAtTime(vol, start + 0.008);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.connect(gain); gain.connect(audioOut);
   osc.start(start); osc.stop(start + dur + 0.02);
 }
 function playKillSound() {
@@ -1247,8 +1255,11 @@ function playKillSound() {
   lastSoundAt = now;
   var base = ColorPitch[(myColor || '').toLowerCase()] || 784;
   var t = audioCtx.currentTime;
-  tone(base, t, 0.16, 0.22);
-  tone(base * 1.5, t + 0.07, 0.28, 0.2); // 5度上の音を重ねて「ピロン」
+  // スマホのスピーカーでもはっきり聞こえるよう大きめに。1オクターブ上の矩形波を少し混ぜて、音を明るく通りやすくする
+  tone(base, t, 0.18, 0.9);
+  tone(base * 2, t, 0.12, 0.18, 'square');
+  tone(base * 1.5, t + 0.07, 0.32, 0.85); // 5度上の音を重ねて「ピロン」
+  tone(base * 3, t + 0.07, 0.2, 0.15, 'square');
 }
 
 function onKills(n) {
