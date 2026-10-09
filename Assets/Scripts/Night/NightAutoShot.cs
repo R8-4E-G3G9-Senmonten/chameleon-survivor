@@ -206,7 +206,7 @@ public class NightAutoShot : MonoBehaviour
             using (var wc = new System.Net.WebClient())
             {
                 wc.Headers[System.Net.HttpRequestHeader.ContentType] = "application/json";
-                wc.UploadString("http://127.0.0.1:8787/pointer", "{\"id\":\"" + id + "\",\"x\":0.5,\"y\":0.5,\"active\":false}");
+                wc.UploadString("http://127.0.0.1:" + (PointerServer.Instance != null ? PointerServer.Instance.port : 8787) + "/pointer", "{\"id\":\"" + id + "\",\"x\":0.5,\"y\":0.5,\"active\":false}");
             }
         }
         catch (System.Exception e) { Debug.Log("NightAutoShot: PostFake failed " + e.Message); }

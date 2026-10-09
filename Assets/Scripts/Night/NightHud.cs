@@ -392,7 +392,9 @@ public class NightHud : MonoBehaviour
     {
         if (toastAlpha <= 0.001f) return;
         var style = S("toast", 20, C(0xffe9a0), TextAnchor.MiddleCenter, bold: true);
-        Rect r = new Rect(0, H * 0.22f, W, 30);
+        float y = H * 0.22f;
+        if (game.AlertTimer > 0f) y = Mathf.Max(y, AlertTop + AlertHeight + 10f); // 警告の帯と重ならないように
+        Rect r = new Rect(0, y, W, 30);
         Color old = GUI.color;
         GUI.color = new Color(1, 1, 1, toastAlpha);
         Shadowed(r, game.ToastText, style, 2f);
@@ -443,7 +445,7 @@ public class NightHud : MonoBehaviour
     {
         if (!ToHud(game.PlayerPos + Vector3.up * game.Player.HeadHeight, out var p)) return;
         const float w = 104f, hpH = 12f, campH = 7f, gap = 4f;
-        float x = p.x - w / 2f, y = p.y - 18f;
+        float x = p.x - w / 2f, y = p.y - 34f;
 
         Fill(new Rect(x - 3, y - 3, w + 6, hpH + gap + campH + 6), new Color(0f, 0f, 0f, 0.5f));
 
@@ -492,6 +494,8 @@ public class NightHud : MonoBehaviour
         Fill(new Rect(bar.x, bar.y, w * Mathf.Clamp01(ratio), h), color);
     }
 
+    const float AlertTop = 66f, AlertHeight = 78f;
+
     // 「敵が増えた！」の警告。ドンと拡大して出て、赤く脈打ち、最後にふわっと消える
     void DrawThreatAlert()
     {
@@ -500,9 +504,9 @@ public class NightHud : MonoBehaviour
         float appear = EaseOutBack(t / 0.35f);
         float alpha = Mathf.Clamp01(t / 0.12f) * Mathf.Clamp01(game.AlertTimer / 0.45f);
         float pulse = 0.5f + 0.5f * Mathf.Sin(t * 14f);
-        float w = 420f, h = 78f;
+        float w = 420f, h = AlertHeight;
         // 画面の中央をふさがないよう、上の「蛍」パネルのすぐ下に出す
-        Rect r = new Rect(W / 2f - w / 2f, 66f, w, h);
+        Rect r = new Rect(W / 2f - w / 2f, AlertTop, w, h);
 
         Matrix4x4 old = GUI.matrix;
         Color oldC = GUI.color;
@@ -756,15 +760,16 @@ public class NightHud : MonoBehaviour
         var top = NightRanking.Top(game.MapId);
         const float w = 252f, rowH = 28f;
         bool anyFail = top.Exists(e => !e.cleared);
-        float h = 74f + Mathf.Max(top.Count, 3) * rowH + 12f + (anyFail ? 18f : 0f);
+        const float listTop = 94f;
+        float h = listTop + Mathf.Max(top.Count, 3) * rowH + 12f + (anyFail ? 18f : 0f);
         Rect r = new Rect(10, 16, w, h);
         Panel(r, PanelTex(), 9);
         Label(new Rect(r.x + 14, r.y + 10, w - 28, 24), game.MapId + ". " + game.Map.Name, S("rkHead", 17, C(0xdfffe0), TextAnchor.MiddleLeft, bold: true));
         var rd = game.Difficulty;
-        Label(new Rect(r.x + 14, r.y + 34, w - 28, 18), rd.Stars + " " + rd.label, S("rkDiff" + game.MapId, 12, rd.color, TextAnchor.MiddleRight, bold: true));
-        Label(new Rect(r.x + 14, r.y + 34, w - 28, 18), "TOP " + NightRanking.MaxEntries + " ランキング", S("rkSub", 13, C(0xdfc985), TextAnchor.MiddleLeft, bold: true));
-        Label(new Rect(r.x + 14, r.y + 52, w - 28, 16), "スコア = クリアタイム + 撃破数", S("rkSub2", 11, C(0x9fbdb0), TextAnchor.MiddleLeft));
-        float y = r.y + 74f;
+        Label(new Rect(r.x + 14, r.y + 34, w - 28, 18), rd.Stars + " " + rd.label, S("rkDiff" + game.MapId, 12, rd.color, TextAnchor.MiddleLeft, bold: true));
+        Label(new Rect(r.x + 14, r.y + 54, w - 28, 18), "TOP " + NightRanking.MaxEntries + " ランキング", S("rkSub", 13, C(0xdfc985), TextAnchor.MiddleLeft, bold: true));
+        Label(new Rect(r.x + 14, r.y + 72, w - 28, 16), "スコア = クリアタイム + 撃破数", S("rkSub2", 11, C(0x9fbdb0), TextAnchor.MiddleLeft));
+        float y = r.y + listTop;
         if (top.Count == 0)
         {
             Label(new Rect(r.x + 14, y, w - 28, 60), "まだ記録がありません。\n最初の1位を目指そう！", S("rkNone", 14, C(0xc4dacd), TextAnchor.UpperLeft));
@@ -787,8 +792,10 @@ public class NightHud : MonoBehaviour
             else Label(new Rect(r.x + 12, y + 2, 22, 24), (i + 1).ToString(), S("rkNum", 14, C(0xa9c4b8), TextAnchor.MiddleCenter));
             Color tc = i < 3 ? medal : C(0xe6f5e9);
             string nm = e.name + (e.cleared ? "" : " *");
-            Label(new Rect(r.x + 42, y + 1, 120, 26), nm, S("rkName" + (i < 3 ? i : 3), 14, tc, TextAnchor.MiddleLeft, bold: i < 3));
-            Label(new Rect(r.x + 150, y + 1, w - 164, 26), e.score.ToString("N0"), S("rkScore" + (i < 3 ? i : 3), 15, tc, TextAnchor.MiddleRight, bold: true));
+            var nameStyle = S("rkName" + (i < 3 ? i : 3), 14, tc, TextAnchor.MiddleLeft, bold: i < 3);
+            nameStyle.clipping = TextClipping.Clip;
+            Label(new Rect(r.x + 42, y + 1, 118, 26), nm, nameStyle);
+            Label(new Rect(r.x + 164, y + 1, w - 178, 26), e.score.ToString("N0"), S("rkScore" + (i < 3 ? i : 3), 15, tc, TextAnchor.MiddleRight, bold: true));
             y += rowH;
         }
         if (anyFail) Label(new Rect(r.x + 14, y + 2, w - 28, 16), "* 途中終了", S("rkNote", 11, C(0x8fada4), TextAnchor.MiddleLeft));
@@ -830,7 +837,7 @@ public class NightHud : MonoBehaviour
     // ================= スマホ接続(QRコード) =================
     // タイトル画面: QRを大きく出し、クリックすると画面いっぱいに拡大(「戻る」で閉じる)。参加者を色の名前つきで一覧表示。
     // プレイ中: 右下に小さなQRと、参加人数・参加中の色だけを出す。
-    // QRは準備ができるまで「QRコードを生成しています」と出し、読み取れないQRや途中で変わるQRは見せない。
+    // QRは準備ができるまで「QRコードを作成中」と出し、読み取れないQRや途中で変わるQRは見せない。
     public static bool QrZoomOpen { get; private set; }
     public static void DebugOpenQrZoom() => QrZoomOpen = true;   // 自動撮影(NightAutoShot)用
     public static void DebugCloseQrZoom() => QrZoomOpen = false;
@@ -869,7 +876,7 @@ public class NightHud : MonoBehaviour
         return players;
     }
 
-    // 準備中の表示(回る点と「QRコードを生成しています」)
+    // 準備中の表示(回る点と「QRコードを作成中」)
     void DrawQrWaiting(Rect r, int fontSize)
     {
         Fill(r, new Color(1f, 1f, 1f, 0.06f));
@@ -885,9 +892,7 @@ public class NightHud : MonoBehaviour
             GUI.DrawTexture(new Rect(center.x + Mathf.Cos(ang) * rad - d / 2, center.y + Mathf.Sin(ang) * rad - d / 2, d, d), dot);
             GUI.color = old;
         }
-        string text = "QRコードを\n生成しています" + new string('.', 1 + (int)(Time.unscaledTime * 2f) % 3);
-        var srv = PointerServer.Instance;
-        if (srv != null && srv.HttpsServerUrl.StartsWith("起動失敗")) text = "QRを作れませんでした\n" + srv.ServerUrl;
+        string text = "QRコードを\n作成中" + new string('.', 1 + (int)(Time.unscaledTime * 2f) % 3);
         Label(new Rect(r.x + 4, center.y + rad + d + 4, r.width - 8, fontSize * 2.6f), text,
             S("qrWait" + fontSize, fontSize, C(0xbfe3d2), TextAnchor.UpperCenter, wrap: true));
     }
@@ -907,7 +912,7 @@ public class NightHud : MonoBehaviour
 
         const float qr = 196f, w = qr + 28f;
         int rows = Mathf.Max(1, (players.Count + 1) / 2);
-        float h = 36f + qr + 22f + 34f + rows * 22f + 14f;
+        float h = 36f + qr + 22f + 34f + rows * 28f + 14f;
         Rect r = new Rect(W - w - 16, 16, w, h);
         Panel(r, PanelTex(), 9);
         Label(new Rect(r.x + 8, r.y + 8, r.width - 16, 24), "灯り役はスマホでQRを読み取り", S("qrHeadT", 13, C(0xdfffe0), TextAnchor.MiddleCenter, bold: true));
@@ -937,8 +942,8 @@ public class NightHud : MonoBehaviour
         for (int i = 0; i < players.Count; i++)
         {
             var pl = players[i];
-            Rect cell = new Rect(r.x + 12 + (i % 2) * colW, y + (i / 2) * 22f, colW - 4, 20);
-            DrawPlayerChip(cell, pl, 12);
+            Rect cell = new Rect(r.x + 12 + (i % 2) * colW + 2, y + (i / 2) * 28f + 2, colW - 8, 24);
+            DrawPlayerChip(cell, pl, 13);
         }
     }
 
@@ -950,24 +955,24 @@ public class NightHud : MonoBehaviour
             S("plCnt" + size, size, count > 0 ? C(0x9dffb0) : C(0x98b6a8), TextAnchor.MiddleRight, bold: true));
     }
 
-    // 色の丸 + 色の名前。ライトを当てている人は丸を大きく光らせ、参加直後の2秒は枠を光らせる。
+    // 参加者の札: その人のライトの色で塗りつぶし、色の名前を濃い文字で書く(色が一目で分かり、色だけに頼らず名前でも分かる)。
+    // ライトを当てている人は白い枠で光らせ、参加した直後の2秒は札が明滅する。
     void DrawPlayerChip(Rect cell, PointerServer.ConnectedPlayer pl, int fontSize)
     {
-        var dot = Tex("playerDot", () => RoundedBox(32, 16, Color.white, Color.white, 0));
+        var pill = Tex("playerPill", () => RoundedBox(48, 10, Color.white, Color.white, 0));
         float since = joinedAt.TryGetValue(pl.colorIndex, out var t0) ? Time.unscaledTime - t0 : 99f;
-        if (since < 2f) Fill(cell, new Color(pl.color.r, pl.color.g, pl.color.b, 0.35f * (1f - since / 2f) * (0.6f + 0.4f * Mathf.Sin(since * 12f))));
-        float d = cell.height * 0.7f * (pl.lit ? 1.15f : 1f);
+        float flash = since < 2f ? 0.5f + 0.5f * Mathf.Sin(since * 14f) : 1f;
         Color old = GUI.color;
         if (pl.lit)
         {
-            GUI.color = new Color(pl.color.r, pl.color.g, pl.color.b, 0.35f);
-            GUI.DrawTexture(new Rect(cell.x + 2 + cell.height * 0.35f - d * 0.8f, cell.center.y - d * 0.8f, d * 1.6f, d * 1.6f), dot);
+            GUI.color = new Color(1f, 1f, 1f, 0.9f);
+            GUI.DrawTexture(new Rect(cell.x - 2, cell.y - 2, cell.width + 4, cell.height + 4), pill);
         }
-        GUI.color = pl.color;
-        GUI.DrawTexture(new Rect(cell.x + 2 + cell.height * 0.35f - d / 2, cell.center.y - d / 2, d, d), dot);
+        Color c = pl.color;
+        GUI.color = new Color(c.r, c.g, c.b, Mathf.Lerp(0.8f, 1f, flash));
+        GUI.DrawTexture(cell, pill);
         GUI.color = old;
-        Label(new Rect(cell.x + cell.height + 6, cell.y, cell.width - cell.height - 6, cell.height), pl.name,
-            S("plName" + fontSize, fontSize, C(0xeaf7ee), TextAnchor.MiddleLeft, bold: true));
+        Label(cell, pl.name, S("plName" + fontSize, fontSize, C(0x0b1712), TextAnchor.MiddleCenter, bold: true));
     }
 
     void DrawPlayConnectPanel()
@@ -975,10 +980,10 @@ public class NightHud : MonoBehaviour
         string target = QrTarget(out bool online);
         var players = ConnectedPlayers();
         const float qr = 62f;
-        float listW = 112f;
+        float listW = 132f;
         int rows = Mathf.Max(1, (players.Count + 1) / 2);
-        float w = 10f + qr + 8f + listW + 8f;
-        float h = Mathf.Max(qr + 20f, 30f + rows * 17f + 8f);
+        float w = 10f + qr + 10f + listW + 10f;
+        float h = Mathf.Max(qr + 20f, 30f + rows * 22f + 8f);
         Rect r = new Rect(W - w - 12, H - h - 12, w, h);
         Panel(r, PanelTex(), 9);
 
@@ -986,7 +991,7 @@ public class NightHud : MonoBehaviour
         if (target != null) GUI.DrawTexture(qrRect, qrTexture);
         else DrawQrWaiting(qrRect, 8);
 
-        float x = qrRect.xMax + 8f, y = r.y + 6f;
+        float x = qrRect.xMax + 10f, y = r.y + 6f;
         DrawPlayerCount(new Rect(x, y, listW, 20), players.Count, 13);
         y += 24f;
         if (players.Count == 0)
@@ -996,7 +1001,7 @@ public class NightHud : MonoBehaviour
         }
         float colW = listW / 2f;
         for (int i = 0; i < players.Count; i++)
-            DrawPlayerChip(new Rect(x + (i % 2) * colW, y + (i / 2) * 17f, colW - 2, 15), players[i], 10);
+            DrawPlayerChip(new Rect(x + (i % 2) * colW + 2, y + (i / 2) * 22f + 2, colW - 6, 18), players[i], 11);
     }
 
     // タイトル画面でQRをクリックしたときの拡大表示。「戻る」ボタン・ESC・まわりのクリックで閉じる。
