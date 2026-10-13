@@ -1,6 +1,8 @@
 @echo off
-REM 夜の光収集版(マップ選択・光の球集め)をUnityエディタを開かずにビルドして起動するショートカット。
-REM ダブルクリックするだけで最新のコードでビルドされます(毎回1分前後かかります)。
+REM 夜の森モードをビルドして起動するショートカット(5G版)。ダブルクリックするだけで最新のコードで遊べる。
+REM ゲーム画面のQRは、5G・別のWi-Fiのスマホからも参加できるURL(Cloudflare のトンネル)になる。
+REM インターネットがない・cloudflared が入っていない時は、自動で同じWi-Fi用のQRになる。
+REM インターネットがない会場では play_night_wifi.bat を使うと、QRがすぐ出る。
 
 setlocal
 set UNITY_EXE="C:\Program Files\Unity\Hub\Editor\6000.4.3f1\Editor\Unity.exe"
@@ -21,7 +23,10 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [2/2] 起動します...
-start "" "%PROJECT_DIR%Build\NightForest\ChameleonNight.exe"
+REM tools\cloudflared.exe を置いてあればそれを使う(なければ winget で入れたもの等を自動で探す)
+set CF_ARG=
+if exist "%PROJECT_DIR%tools\cloudflared.exe" set CF_ARG=-cloudflared "%PROJECT_DIR%tools\cloudflared.exe"
+start "" "%PROJECT_DIR%Build\NightForest\ChameleonNight.exe" %CF_ARG%
 
 REM ゲームウィンドウが別のウィンドウの裏に隠れて見えないことがあるため、
 REM 少し待ってから前面に出す。

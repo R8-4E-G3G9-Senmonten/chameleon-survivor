@@ -34,13 +34,18 @@ public class PointerServer : MonoBehaviour
     public string HttpsServerUrl { get; private set; } = "起動中...";
     public string LocalIp { get; private set; } = "取得中...";
 
-    // -tunnel を付けて起動した時だけ、Cloudflare のトンネル(cloudflared)をゲームから起動して、
-    // インターネット上の https://xxxx.trycloudflare.com/ からもスマホが参加できるようにする。
-    // 準備ができたら PublicUrl に入り、ゲーム画面のQRがそのURLに切り替わる(5Gでも、別のWi-Fiでも参加可)。
+    // 起動すると、Cloudflare のトンネル(cloudflared)をゲームから立ち上げて、
+    // インターネット上の https://xxxx.trycloudflare.com/ からもスマホが参加できるようにする(5G版のQR)。
+    // 準備ができたら PublicUrl に入り、ゲーム画面のQRがそのURLになる(5Gでも、別のWi-Fiでも参加可)。
+    // 次の時は、同じWi-Fi用のQR(このPCのIPアドレス)になる:
+    //   - -noTunnel を付けて起動した(play_night_wifi.bat。インターネットがない会場向け)
+    //   - cloudflared が入っていない / 起動できない
+    //   - TunnelGiveUpMs たっても5G用のURLができない(インターネットにつながっていない等)
     public bool TunnelRequested { get; private set; }
     public string PublicUrl { get; private set; } // 外から開けることを確認できるまでは null
     public string TunnelStatus { get; private set; } = "";
     System.Diagnostics.Process tunnelProcess;
+    const int TunnelGiveUpMs = 45000; // これだけ待ってもURLができなければ、同じWi-Fi用のQRにする
 
     TcpListener listener;
     Thread acceptThread;
@@ -123,7 +128,7 @@ public class PointerServer : MonoBehaviour
 
     public const int MaxPlayers = MaxParticipants;
 
-    // QRコードを出してよいか。HTTPSサーバーが起動し、-tunnel 指定時は5G用URLの準備が終わる(または失敗が分かる)まで待つ。
+    // QRコードを出してよいか。HTTPSサーバーが起動し、5G版(-noTunnel なし)の時は5G用URLの準備が終わる(または失敗が分かる)まで待つ。
     // 途中でQRが切り替わると、先に読み取った人が別のURLにつながってしまうため。
     public bool QrReady
     {
@@ -255,7 +260,8 @@ public class PointerServer : MonoBehaviour
         }
 
         string[] args = Environment.GetCommandLineArgs();
-        if (Array.IndexOf(args, "-tunnel") >= 0)
+        // 以前の -tunnel 指定は今は不要(何も付けなければ5G版)。付いていても同じように動く。
+        if (Array.IndexOf(args, "-noTunnel") < 0)
         {
             TunnelRequested = true;
             int i = Array.IndexOf(args, "-cloudflared");
@@ -314,9 +320,9 @@ public class PointerServer : MonoBehaviour
         string exe = FindCloudflared(explicitPath);
         if (exe == null)
         {
-            TunnelStatus = "cloudflared が見つかりません";
-            Debug.LogError("PointerServer: -tunnel が指定されましたが cloudflared.exe が見つかりません。" +
-                "「winget install --id Cloudflare.cloudflared」で入れるか、-cloudflared <パス> で指定してください。");
+            TunnelStatus = "cloudflared がないため同じWi-Fiで参加";
+            Debug.LogWarning("PointerServer: cloudflared.exe が見つからないため、同じWi-Fi用のQRにします。" +
+                "5G版にするには「winget install --id Cloudflare.cloudflared」で入れるか、-cloudflared <パス> で指定してください。");
             return;
         }
         TunnelStatus = "5G用URLを準備中…";
@@ -360,12 +366,27 @@ public class PointerServer : MonoBehaviour
             tunnelProcess.Exited += (s, e) =>
             {
                 PublicUrl = null;
-                if (running) TunnelStatus = "トンネルが止まりました";
+                if (running && (string.IsNullOrEmpty(TunnelStatus) || TunnelStatus.Contains("準備中"))) TunnelStatus = "トンネルが止まりました";
             };
             tunnelProcess.Start();
+            ChildProcessJob.Attach(tunnelProcess);
             tunnelProcess.BeginErrorReadLine();
             tunnelProcess.BeginOutputReadLine();
             Debug.Log("PointerServer: Cloudflare トンネルを起動しました (" + exe + ")");
+
+            // インターネットにつながっていないと cloudflared はつながるまで試し続け、失敗を知らせてこない。
+            // QR はトンネルの結果が出るまで出さないので、一定時間でURLができなければあきらめて同じWi-Fi用にする。
+            var proc = tunnelProcess;
+            new Thread(() =>
+            {
+                int until = Environment.TickCount + TunnelGiveUpMs;
+                while (running && !checking && Environment.TickCount < until) Thread.Sleep(500);
+                if (!running || checking) return;
+                TunnelStatus = "5G用URLを作れなかったため同じWi-Fiで参加";
+                Debug.LogWarning("PointerServer: " + TunnelGiveUpMs / 1000 + "秒たっても5G用のURLができなかったため(インターネットに" +
+                    "つながっていない?)、同じWi-Fi用のQRにします。");
+                try { if (!proc.HasExited) proc.Kill(); } catch { }
+            }) { IsBackground = true }.Start();
         }
         catch (Exception e)
         {
@@ -1583,3 +1604,74 @@ btnRecenter.addEventListener('click', function(e){
 </script>
 </body></html>";
 }
+
+// ゲームから起動した子プロセス(cloudflared)を、ゲームが終わったら必ず一緒に終わらせる。
+// Windows の「ジョブ」に入れておくと、ゲームが強制終了・クラッシュした時でも Windows が子プロセスを終わらせてくれる。
+// これがないと、残った cloudflared がゲームの待ち受けポート(8787/8788)を握ったまま動き続け、
+// 次に起動したゲームが別のポートで起動することになる(子プロセスは親の開いているポートを引き継いでしまうため)。
+static class ChildProcessJob
+{
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct BasicLimitInformation
+    {
+        public long PerProcessUserTimeLimit, PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize, MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass, SchedulingClass;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct IoCounters
+    {
+        public ulong ReadOperationCount, WriteOperationCount, OtherOperationCount, ReadTransferCount, WriteTransferCount, OtherTransferCount;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct ExtendedLimitInformation
+    {
+        public BasicLimitInformation BasicLimitInformation;
+        public IoCounters IoInfo;
+        public UIntPtr ProcessMemoryLimit, JobMemoryLimit, PeakProcessMemoryUsed, PeakJobMemoryUsed;
+    }
+
+    const int JobObjectExtendedLimitInformation = 9;
+    const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern IntPtr CreateJobObject(IntPtr attributes, string name);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern bool SetInformationJobObject(IntPtr job, int infoClass, ref ExtendedLimitInformation info, uint length);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+    static IntPtr job = IntPtr.Zero; // ゲームが終わるまで閉じない(閉じた瞬間に中のプロセスが終わる)
+
+    public static void Attach(System.Diagnostics.Process process)
+    {
+        try
+        {
+            if (job == IntPtr.Zero)
+            {
+                job = CreateJobObject(IntPtr.Zero, null);
+                var info = new ExtendedLimitInformation();
+                info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, ref info,
+                        (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(ExtendedLimitInformation))))
+                    Debug.LogWarning("PointerServer: 子プロセスの自動終了の設定に失敗しました。");
+            }
+            if (!AssignProcessToJobObject(job, process.Handle))
+                Debug.LogWarning("PointerServer: cloudflared をゲームと一緒に終わるよう設定できませんでした。");
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("PointerServer: 子プロセスの自動終了を設定できませんでした: " + e.Message);
+        }
+    }
+#else
+    public static void Attach(System.Diagnostics.Process process) { }
+#endif
+}
+
