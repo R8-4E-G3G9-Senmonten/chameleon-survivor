@@ -68,7 +68,11 @@ public class PointerServer : MonoBehaviour
     // ゲームの様子(スマホ画面に出す): カメレオンの画面上の位置(上端原点のビューポート座標)と、プレイ中かどうか。
     // ゲームのメインスレッドから SetGameView で書き込み、通信スレッドが返事に入れて送る。
     float viewPlayerX = 0.5f, viewPlayerY = 0.5f;
-    bool viewPlaying;
+    string viewState = "wait"; // "wait"(タイトル・名前入力) / "play"(プレイ中・一時停止) / "end"(結果画面)
+    // 結果(viewState が "end" の間だけスマホに送る)
+    bool resultWin;
+    int resultTeamKills, resultSeconds;
+    string resultMap = "";
 
     // Keyed by a per-page-load client id so multiple phones can each drive
     // their own light at once. Entries are pruned after a while of silence
@@ -105,24 +109,43 @@ public class PointerServer : MonoBehaviour
         }
     }
 
-    public void SetGameView(Vector2 playerViewport, bool playing)
+    public void SetGameView(Vector2 playerViewport, string state, bool win, int teamKills, int seconds, string map)
     {
         lock (dataLock)
         {
             viewPlayerX = Mathf.Clamp01(playerViewport.x);
             viewPlayerY = Mathf.Clamp01(playerViewport.y);
-            viewPlaying = playing;
+            viewState = state;
+            resultWin = win;
+            resultTeamKills = teamKills;
+            resultSeconds = seconds;
+            resultMap = map ?? "";
         }
     }
+
+    static string JsonText(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     // スマホへの返事。変化した時だけ送るので、位置は0.01刻みに丸めて細かい揺れでは送らないようにする。
     // dataLock の中で呼ぶこと。
     string BuildReply(PointerEntry entry)
     {
         var ci = System.Globalization.CultureInfo.InvariantCulture;
-        return "{\"ok\":true,\"color\":\"" + HexOf(entry.colorIndex) + "\",\"kills\":" + entry.kills +
-               ",\"play\":" + (viewPlaying ? "true" : "false") +
-               ",\"px\":" + viewPlayerX.ToString("0.00", ci) + ",\"py\":" + viewPlayerY.ToString("0.00", ci) + "}";
+        string json = "{\"ok\":true,\"color\":\"" + HexOf(entry.colorIndex) + "\",\"kills\":" + entry.kills +
+               ",\"st\":\"" + viewState + "\",\"play\":" + (viewState == "play" ? "true" : "false") +
+               ",\"px\":" + viewPlayerX.ToString("0.00", ci) + ",\"py\":" + viewPlayerY.ToString("0.00", ci);
+        if (viewState == "end")
+        {
+            // 灯り役の中での順位(撃破数の多い順。同じ数なら同じ順位)
+            int rank = 1, players = 0;
+            foreach (var e in pointers.Values)
+            {
+                players++;
+                if (e.kills > entry.kills) rank++;
+            }
+            json += ",\"win\":" + (resultWin ? "true" : "false") + ",\"tk\":" + resultTeamKills + ",\"sec\":" + resultSeconds +
+                    ",\"rank\":" + rank + ",\"of\":" + players + ",\"map\":\"" + JsonText(resultMap) + "\"";
+        }
+        return json + "}";
     }
     const string FullReply = "{\"ok\":false,\"full\":true}";
 
@@ -1104,6 +1127,25 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
   #btnStart:active { transform:scale(.97); }
   #startNote { font-size:13px !important; }
   #fullOverlay { display:none; }
+
+  /* ---- 結果画面(ゲームが終わったら出す。次のゲームが始まると自動で閉じる) ---- */
+  #resultOverlay { display:none; gap:var(--s4); z-index:31; }
+  #resultOverlay h1 { font-size:34px; }
+  #resultOverlay h1.win { color:var(--good); }
+  #resCard { width:min(100%, 320px); padding:var(--s4) var(--s5); border-radius:var(--r-md);
+             background:var(--surface); border:2px solid var(--c); text-align:center; }
+  .resLabel { font-size:14px; color:var(--muted); }
+  #resKills { display:flex; align-items:baseline; justify-content:center; gap:var(--s2); margin:var(--s1) 0; }
+  #resKillNum { font-size:72px; font-weight:800; line-height:1; color:var(--c); font-variant-numeric:tabular-nums; }
+  #resKills .unit { font-size:18px; color:var(--muted); }
+  #resRank { font-size:17px; font-weight:700; }
+  #resTeam { font-size:14px; color:var(--muted); }
+  .resBtn { width:min(100%, 320px); min-height:56px; display:flex; align-items:center; justify-content:center; gap:var(--s2);
+            font-size:17px; font-weight:800; border-radius:var(--r-md); border:none; transition:transform var(--fast); }
+  .resBtn:active { transform:scale(.97); }
+  #btnSave { background:var(--c); color:#111; }
+  #btnNext { background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-weight:700; }
+  #resNote { font-size:12px !important; }
   #debug { position:fixed; left:var(--s4); right:var(--s4); bottom:calc(var(--s2) + env(safe-area-inset-bottom)); z-index:21; text-align:center;
            font-size:12px; color:var(--warn); white-space:pre-wrap; pointer-events:none; }
 
@@ -1190,6 +1232,22 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
   </ol>
   <button id=""btnStart"" type=""button"">タップして始める</button>
   <p id=""startNote"">iPhoneは画面の回転をロックしておくと安定します</p>
+</div>
+<div id=""resultOverlay"" class=""overlay"" role=""dialog"" aria-modal=""true"" aria-labelledby=""resTitle"">
+  <div class=""tag"" id=""resMap""></div>
+  <h1 id=""resTitle"" tabindex=""-1"">ゲーム終了</h1>
+  <div id=""resCard"">
+    <div class=""resLabel"">あなたの撃破</div>
+    <div id=""resKills""><span id=""resKillNum"">0</span><span class=""unit"">体</span></div>
+    <div id=""resRank""></div>
+  </div>
+  <div id=""resTeam""></div>
+  <button id=""btnSave"" class=""resBtn"" type=""button"">
+    <svg class=""icon"" viewBox=""0 0 24 24"" aria-hidden=""true""><path d=""M12 3v12M7 10l5 5 5-5""/><path d=""M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2""/></svg>
+    記念に画像を保存
+  </button>
+  <button id=""btnNext"" class=""resBtn"" type=""button"">次のゲームも参加する</button>
+  <p id=""resNote"">次のゲームが始まると、この画面は自動で閉じます</p>
 </div>
 <div id=""fullOverlay"" class=""overlay"" role=""alert"">
   <h1>満員です</h1>
@@ -1378,6 +1436,7 @@ function handleReply(data) {
   if (data.color) applyMyColor(data.color);
   if (typeof data.kills === 'number') onKills(data.kills);
   if (typeof data.px === 'number') onGameView(!!data.play, data.px, data.py);
+  if (data.st) onGameState(data);
 }
 function connectWs() {
   if (!('WebSocket' in window)) return;
@@ -1445,6 +1504,93 @@ function updateAim() {
   aimEl.className = 'marker' + (lightOn ? ' on' : '');
 }
 updateAim();
+
+// ---- 結果画面 ----
+// ゲームが「プレイ中」から「終了」に変わったら、自分の撃破数・灯り役の中での順位・チームの結果を出す。
+// 次のゲームが始まったら(「プレイ中」に戻ったら)自動で閉じる。ゲームの途中から参加した人にも出す。
+// 終わった後に開いた人(このゲームで遊んでいない人)には出さない。
+var lastSt = null, resultImage = null, resultData = null;
+function fmtTime(sec) { var m = Math.floor(sec / 60), s = sec % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
+function onGameState(d) {
+  if (d.st === 'end' && lastSt === 'play') showResult(d);
+  if (d.st === 'play' && lastSt !== null && lastSt !== 'play') hideResult();
+  lastSt = d.st;
+}
+function showResult(d) {
+  lightTouchId = null; setLight(false, 'ゲーム終了');
+  resultData = d;
+  $('resMap').textContent = d.map || '';
+  var title = $('resTitle');
+  title.textContent = d.win ? '脱出成功！' : 'ゲーム終了';
+  title.className = d.win ? 'win' : '';
+  $('resKillNum').textContent = d.kills;
+  $('resRank').textContent = d.of > 1 ? '灯り役 ' + d.of + '人中 ' + d.rank + '位' : (d.kills > 0 ? 'ナイス！' : '');
+  $('resTeam').textContent = 'チーム全体 ' + d.tk + '体撃破 ・ ' + (d.win ? 'クリア ' : '生存 ') + fmtTime(d.sec);
+  $('resultOverlay').style.display = 'flex';
+  $('resTitle').focus({preventScroll:true});
+  // 保存ボタンを押した瞬間に共有画面を開けるよう、画像は先に作っておく(作るのに時間がかかると共有が断られるため)
+  resultImage = null;
+  makeResultImage(d).then(function (blob) { resultImage = blob; }).catch(function () {});
+}
+function hideResult() { $('resultOverlay').style.display = 'none'; }
+
+// 記念画像(縦長 1080x1350): 自分の色の枠・撃破数・順位・チームの結果・日付
+function makeResultImage(d) {
+  var fontReady = (document.fonts && document.fonts.load) ? document.fonts.load(""80px 'RocknRoll One'"").catch(function () {}) : Promise.resolve();
+  return fontReady.then(function () {
+    var W = 1080, H = 1350, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    var g = cv.getContext('2d'), c = myColor || '#fff2c0';
+    var font = ""'RocknRoll One', 'Hiragino Sans', 'Noto Sans JP', sans-serif"";
+    var bg = g.createRadialGradient(W / 2, H * 0.35, 50, W / 2, H * 0.35, H * 0.8);
+    bg.addColorStop(0, '#173a2e'); bg.addColorStop(1, '#050b09');
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    g.strokeStyle = c; g.lineWidth = 28; g.strokeRect(14, 14, W - 28, H - 28);
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    g.fillStyle = '#9dffb0'; g.font = '40px ' + font; g.fillText('CHAMELEON NIGHT', W / 2, 150);
+    g.fillStyle = '#a3c4b5'; g.font = '40px ' + font; g.fillText(d.map || '', W / 2, 220);
+    g.fillStyle = d.win ? '#9dffb0' : '#e6f5ec'; g.font = '92px ' + font; g.fillText(d.win ? '脱出成功！' : 'ゲーム終了', W / 2, 360);
+    g.fillStyle = '#a3c4b5'; g.font = '44px ' + font; g.fillText('灯り役のあなたの撃破', W / 2, 500);
+    g.fillStyle = c; g.font = '260px ' + font; g.fillText(String(d.kills), W / 2, 770);
+    g.fillStyle = '#e6f5ec'; g.font = '56px ' + font; g.fillText('体', W / 2, 860);
+    if (d.of > 1) { g.font = '60px ' + font; g.fillText('灯り役 ' + d.of + '人中 ' + d.rank + '位', W / 2, 990); }
+    g.fillStyle = '#a3c4b5'; g.font = '42px ' + font;
+    g.fillText('チーム全体 ' + d.tk + '体撃破 ・ ' + (d.win ? 'クリア ' : '生存 ') + fmtTime(d.sec), W / 2, 1090);
+    var now = new Date();
+    g.font = '36px ' + font;
+    g.fillText(now.getFullYear() + '.' + (now.getMonth() + 1) + '.' + now.getDate() + '  カメレオンナイト', W / 2, 1240);
+    return new Promise(function (resolve, reject) {
+      cv.toBlob(function (b) { b ? resolve(b) : reject(new Error('toBlob')); }, 'image/png');
+    });
+  });
+}
+function saveResultImage() {
+  if (!resultImage) {
+    toast('画像を準備中です。もう一度押してください');
+    if (resultData) makeResultImage(resultData).then(function (b) { resultImage = b; });
+    return;
+  }
+  var name = 'chameleon-night-' + Date.now() + '.png';
+  var file = null;
+  try { file = new File([resultImage], name, { type: 'image/png' }); } catch (e) {}
+  // スマホでは共有画面(「画像を保存」やSNSへ送れる)を開く。使えない時はダウンロードする
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'カメレオンナイト' }).catch(function () {});
+    return;
+  }
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(resultImage);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+  toast('画像を保存しました');
+}
+$('btnSave').addEventListener('click', function (e) { e.preventDefault(); saveResultImage(); });
+$('btnNext').addEventListener('click', function (e) {
+  e.preventDefault();
+  hideResult();
+  toast('次のゲームが始まるまで待っていてね');
+});
 
 // ---- ライトON ボタン: 押している間だけ照らす ----
 // ボタンに置いた指を(スマホを動かした拍子に)ずらしても、その指を離すまでは点けたままにする。

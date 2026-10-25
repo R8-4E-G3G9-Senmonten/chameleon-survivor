@@ -77,7 +77,12 @@ public class NightGame : MonoBehaviour
     readonly List<HealOrb> healOrbs = new List<HealOrb>();
     Material healCoreMat, healHaloMat;
     float SpawnRateBoost => 1f + 0.16f * (Threat - 1);       // 出現ペースの倍率
-    int MaxEnemiesNow => Difficulty.maxEnemies + 5 * (Threat - 1);
+    int MaxEnemiesNow => Mathf.RoundToInt((Difficulty.maxEnemies + 5 * (Threat - 1)) * MaxEnemiesScale);
+
+    // ---- 敵の多さ(たくさん出して、まとめて倒せる爽快感を出す) ----
+    const float SpawnPace = 2f;         // 出現ペースの倍率(2 = 元の2倍の頻度で出る)
+    const float MaxEnemiesScale = 1.5f; // 同時に出る敵の上限の倍率
+    const int MothSwarm = 3;            // 群れ型(小さい敵)は、この数でかたまって出てくる
     public int OrbCount { get; private set; }
     public bool Cleared { get; private set; }
     public bool GateOpened => World.Gate != null && World.Gate.opened;
@@ -372,8 +377,9 @@ public class NightGame : MonoBehaviour
         spawnTimer -= dt;
         if (spawnTimer <= 0f)
         {
-            SpawnEnemy(PickType());
-            spawnTimer = Mathf.Max(0.7f, 2.4f - Elapsed * 0.012f) * (GateOpened ? 0.85f : 1f) * Difficulty.spawnInterval / SpawnRateBoost;
+            var kind = PickType();
+            SpawnEnemy(kind, kind == NightEnemy.Kind.Moth ? MothSwarm : 1);
+            spawnTimer = Mathf.Max(0.7f, 2.4f - Elapsed * 0.012f) * (GateOpened ? 0.85f : 1f) * Difficulty.spawnInterval / SpawnRateBoost / SpawnPace;
         }
 
         // --- 敵 ---
@@ -418,11 +424,14 @@ public class NightGame : MonoBehaviour
     void LateUpdate()
     {
         if (State == GameState.Title || State == GameState.NameEntry) PlaceCamera();
-        // スマホ画面のミニ画面に、カメレオンが今ゲーム画面のどこにいるかを出す
+        // スマホ画面に、カメレオンが今ゲーム画面のどこにいるか・ゲームの状態・終わった時の結果を出す
         if (PointerServer.Instance != null && Cam != null && Player != null)
         {
             Vector3 v = Cam.WorldToViewportPoint(PlayerPos);
-            PointerServer.Instance.SetGameView(new Vector2(v.x, 1f - v.y), State == GameState.Playing || State == GameState.Paused);
+            string st = State == GameState.Playing || State == GameState.Paused ? "play"
+                      : State == GameState.Ended ? "end" : "wait";
+            PointerServer.Instance.SetGameView(new Vector2(v.x, 1f - v.y), st, Cleared, KillCount, ScoreSeconds,
+                MapId + ". " + Map.Name);
         }
     }
 
@@ -435,7 +444,8 @@ public class NightGame : MonoBehaviour
         return NightEnemy.Kind.Moth;                   // 45% 群れ型
     }
 
-    void SpawnEnemy(NightEnemy.Kind kind)
+    // count > 1 のときは、同じ場所のまわりにかためて出す(光をひと振りすると、まとめて倒せる)
+    void SpawnEnemy(NightEnemy.Kind kind, int count = 1)
     {
         if (Enemies.Count >= MaxEnemiesNow) return;
         var segs = Map.Segments;
@@ -447,9 +457,18 @@ public class NightGame : MonoBehaviour
             float d = Mathf.Sqrt((x - PlayerPos.x) * (x - PlayerPos.x) + (z - PlayerPos.z) * (z - PlayerPos.z));
             if (d >= 12f && d <= 24f)
             {
-                var en = NightEnemy.Spawn(kind, new Vector3(x, Map.SurfaceAt(x, z), z));
-                en.lightHp = en.lightHpMax = en.cfg.lightHp * Difficulty.enemyHp;
-                Enemies.Add(en);
+                for (int k = 0; k < count && Enemies.Count < MaxEnemiesNow; k++)
+                {
+                    float ex = x, ez = z;
+                    if (k > 0)
+                    {
+                        float ox = x + Random.Range(-0.9f, 0.9f), oz = z + Random.Range(-0.9f, 0.9f);
+                        if (Map.Walkable(ox, oz, 0.3f)) { ex = ox; ez = oz; }
+                    }
+                    var en = NightEnemy.Spawn(kind, new Vector3(ex, Map.SurfaceAt(ex, ez), ez));
+                    en.lightHp = en.lightHpMax = en.cfg.lightHp * Difficulty.enemyHp;
+                    Enemies.Add(en);
+                }
                 return;
             }
         }
@@ -615,8 +634,12 @@ public class NightGame : MonoBehaviour
             Camp = Mathf.Min(CampMax, Camp + AmbushKillRefill);
             AmbushRefillFlash = 1f;
         }
+        // 倒した手ごたえ: 光の粒を多めに飛ばし、足元から衝撃波の輪を広げる
         SurvivorBurst.Spawn(en.Position + Vector3.up * 0.4f * en.cfg.scale, new Color(1f, 0.85f, 0.45f),
-            en.kind == NightEnemy.Kind.Brute ? 14 : 8);
+            en.kind == NightEnemy.Kind.Brute ? 22 : 12);
+        Vector3 ep = en.Position;
+        AddPulse(new Vector3(ep.x, ep.y + 0.1f, ep.z), 0.32f, 0.5f, new Color(1f, 0.9f, 0.6f, 0.85f), 0.35f,
+            en.kind == NightEnemy.Kind.Brute ? 5f : 3.2f);
         DropHealOrb(en);
     }
 

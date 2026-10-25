@@ -22,7 +22,14 @@ public class NightFlashlight : MonoBehaviour
     public Vector2? DebugAim; // 自動テスト用: 指定するとマウス/スマホの代わりにこの位置(上端原点のビューポート座標)を照らす
 
     readonly List<Light> spots = new List<Light>();
-    readonly List<Transform> aimRings = new List<Transform>();
+
+    // 狙っている場所の目印(地面に貼る): 太めの輪 + うっすら塗った円 + 中心の点。どれもその人のライトの色。
+    // 色付きのスポットライトは暗い地面では明るく見えにくいので、光そのものは白に近くして明るさを出し、
+    // 「誰の光がどこか」はこの目印の色で見分けられるようにしている。
+    class AimMarker { public Transform root; public Material band, fill, dot; }
+    readonly List<AimMarker> markers = new List<AimMarker>();
+    const float SpotTint = 0.35f;      // スポットライトにその人の色をどれだけ混ぜるか(0=白, 1=その色そのまま)
+    const float SpotBrightness = 1.4f; // スポットライトの明るさの倍率
 
     Light MakeSpot()
     {
@@ -36,12 +43,23 @@ public class NightFlashlight : MonoBehaviour
         return l;
     }
 
-    Transform MakeRing()
+    AimMarker MakeMarker()
     {
-        var ring = NightMeshes.MeshObject("AimRing", NightMeshes.Ring(2.82f, 2.94f, 64),
-            NightMeshes.Unlit(NightMeshes.Hex(0xffe9a1, 0.32f)), null);
-        ring.SetActive(false);
-        return ring.transform;
+        var root = new GameObject("AimMarker").transform;
+        var m = new AimMarker
+        {
+            root = root,
+            band = NightMeshes.Unlit(Color.white),
+            fill = NightMeshes.Unlit(Color.white),
+            dot = NightMeshes.Unlit(Color.white),
+        };
+        NightMeshes.MeshObject("AimFill", NightMeshes.Ring(0f, 2.94f, 64), m.fill, root);
+        var band = NightMeshes.MeshObject("AimBand", NightMeshes.Ring(2.62f, 2.94f, 64), m.band, root);
+        band.transform.localPosition = new Vector3(0, 0.01f, 0);
+        var dot = NightMeshes.MeshObject("AimDot", NightMeshes.Ring(0f, 0.2f, 24), m.dot, root);
+        dot.transform.localPosition = new Vector3(0, 0.02f, 0);
+        root.gameObject.SetActive(false);
+        return m;
     }
 
     public void Aim(Camera cam, NightMap map, float playerY)
@@ -53,9 +71,9 @@ public class NightFlashlight : MonoBehaviour
         DeadZone = BaseDeadZone * Mathf.Clamp(scale, 0.6f, 1f);
 
         while (spots.Count < aims.Count) spots.Add(MakeSpot());
-        while (aimRings.Count < aims.Count) aimRings.Add(MakeRing());
+        while (markers.Count < aims.Count) markers.Add(MakeMarker());
         for (int i = 0; i < spots.Count; i++) spots[i].enabled = i < aims.Count;
-        for (int i = 0; i < aimRings.Count; i++) aimRings[i].gameObject.SetActive(i < aims.Count);
+        for (int i = 0; i < markers.Count; i++) markers[i].root.gameObject.SetActive(i < aims.Count);
 
         Targets.Clear();
         TargetOwners.Clear();
@@ -72,21 +90,23 @@ public class NightFlashlight : MonoBehaviour
             TargetOwners.Add(aims[i].id);
 
             var spot = spots[i];
-            spot.color = color;
-            spot.intensity = (7.5f * Mathf.Min(1.6f, 0.8f + 1.25f * 0.2f)) * Mathf.Clamp(scale, 0.5f, 1f);
+            spot.color = Color.Lerp(Color.white, color, SpotTint);
+            spot.intensity = SpotBrightness * (7.5f * Mathf.Min(1.6f, 0.8f + 1.25f * 0.2f)) * Mathf.Clamp(scale, 0.5f, 1f);
             spot.spotAngle = 2f * Mathf.Min(Mathf.PI / 3.2f, Mathf.PI / 6.3f * (LightRadius / 2.4f)) * Mathf.Rad2Deg;
             spot.innerSpotAngle = spot.spotAngle * 0.5f;
             spot.transform.position = target + Vector3.up * 9f;
             spot.transform.LookAt(target);
 
-            var ring = aimRings[i];
-            ring.GetComponent<MeshRenderer>().sharedMaterial.color = new Color(color.r, color.g, color.b, 0.4f);
-            ring.localScale = Vector3.one * Mathf.Clamp(scale, 0.4f, 1f);
-            ring.position = new Vector3(target.x, map.SurfaceAt(target.x, target.z) + 0.15f, target.z);
+            var mk = markers[i];
+            mk.band.color = new Color(color.r, color.g, color.b, 0.85f);
+            mk.fill.color = new Color(color.r, color.g, color.b, 0.14f);
+            mk.dot.color = new Color(color.r, color.g, color.b, 0.95f);
+            mk.root.localScale = Vector3.one * Mathf.Clamp(scale, 0.4f, 1f);
+            mk.root.position = new Vector3(target.x, map.SurfaceAt(target.x, target.z) + 0.15f, target.z);
         }
     }
 
-    public void HideRing() { foreach (var r in aimRings) if (r != null) r.gameObject.SetActive(false); }
+    public void HideRing() { foreach (var m in markers) if (m.root != null) m.root.gameObject.SetActive(false); }
 
     static readonly Color MouseColor = NightMeshes.Hex(0xfff2c0); // マウス操作時は従来通りの暖色
 
