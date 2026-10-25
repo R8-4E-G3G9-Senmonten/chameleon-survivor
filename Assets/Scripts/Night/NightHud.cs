@@ -849,7 +849,7 @@ public class NightHud : MonoBehaviour
         var srv = PointerServer.Instance;
         online = srv != null && !string.IsNullOrEmpty(srv.PublicUrl);
         if (srv == null || !srv.QrReady || DebugQrWaiting) return null;
-        // -tunnel で起動していて Cloudflare のURLが準備できたら、QRはそちら(5G・どのWi-Fiからでも参加可)にする
+        // Cloudflare のURL(5G版)が準備できたらQRはそちら(5G・どのWi-Fiからでも参加可)、できなければ同じWi-Fi用にする
         string url = online ? srv.PublicUrl : srv.HttpsServerUrl;
         try { EnsureQrTexture(url); }
         catch (System.Exception ex) { Debug.LogException(ex); qrTexture = null; return null; }
@@ -925,7 +925,8 @@ public class NightHud : MonoBehaviour
             GUI.DrawTexture(qrRect, qrTexture);
             if (canZoom && GUI.Button(qrRect, GUIContent.none, GUIStyle.none)) QrZoomOpen = true;
             string sub = canZoom ? "クリックで拡大" : "";
-            if (online) sub = (sub.Length > 0 ? sub + "・" : "") + "5G・どのWi-Fiからでも参加OK";
+            // 5G用のURLが作れず(インターネットがない・cloudflared がない等)同じWi-Fi用のQRになった時は、そう伝える
+            sub = (sub.Length > 0 ? sub + "・" : "") + (online ? "5G・どのWi-Fiからでも参加OK" : "同じWi-Fiにつないで参加");
             Label(new Rect(r.x + 4, qrRect.yMax + 3, r.width - 8, 16), sub, S("qrSubT", 10, C(0x98b6a8), TextAnchor.MiddleCenter));
         }
         else DrawQrWaiting(qrRect, 14);

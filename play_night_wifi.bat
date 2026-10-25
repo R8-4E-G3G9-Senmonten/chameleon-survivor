@@ -1,6 +1,6 @@
 @echo off
-REM 5G・別のWi-Fiのスマホからも参加できる版(Cloudflare のトンネルを使う)。それ以外は play_night.bat と同じ。
-REM インターネットにつながっているPCで使うこと。URLの準備に10～30秒ほどかかり、準備できるとゲーム画面のQRが切り替わる。
+REM 夜の森モードをビルドして起動するショートカット(同じWi-Fi版)。インターネットがない会場向け。
+REM 5G用のURLを作らないので、QRがすぐ出る。スマホはこのPCと同じWi-Fiにつないでから読み取る。
 
 setlocal
 set UNITY_EXE="C:\Program Files\Unity\Hub\Editor\6000.4.3f1\Editor\Unity.exe"
@@ -21,11 +21,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [2/2] 起動します...
-REM -tunnel: ゲームが Cloudflare のトンネル(cloudflared)を起動し、画面のQRをインターネット用のURLにする
-REM          (5G・別のWi-Fiのスマホからも参加できる。cloudflared は winget install --id Cloudflare.cloudflared で入れる)
-set CF_ARG=
-if exist "%PROJECT_DIR%tools\cloudflared.exe" set CF_ARG=-cloudflared "%PROJECT_DIR%tools\cloudflared.exe"
-start "" "%PROJECT_DIR%Build\NightForest\ChameleonNight.exe" -tunnel %CF_ARG%
+start "" "%PROJECT_DIR%Build\NightForest\ChameleonNight.exe" -noTunnel
 
 REM ゲームウィンドウが別のウィンドウの裏に隠れて見えないことがあるため、
 REM 少し待ってから前面に出す。
