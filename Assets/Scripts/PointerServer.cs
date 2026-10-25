@@ -63,6 +63,7 @@ public class PointerServer : MonoBehaviour
         public int lastReceiveTimeMs;
         public int colorIndex;
         public int kills; // このスマホの光で倒した敵の数(ゲーム開始ごとに0に戻す)
+        public int lastHitMs = int.MinValue; // このスマホの光が最後に敵にダメージを与えた時刻(スマホで音を鳴らすため)
     }
 
     // ゲームの様子(スマホ画面に出す): カメレオンの画面上の位置(上端原点のビューポート座標)と、プレイ中かどうか。
@@ -92,6 +93,18 @@ public class PointerServer : MonoBehaviour
     public struct PointerSample { public Vector2 pos; public Color color; public string id; }
 
     // id のスマホの光で敵を倒した(NightGame から呼ぶ)。次にそのスマホから届いた時の返事で知らせる。
+    // id のスマホの光が今、敵にダメージを与えている(NightGame から毎フレーム呼ぶ)。
+    // 最後に当たってから HitHoldMs の間は「当たっている」と返事で知らせ、スマホはその間ずっと音を鳴らす。
+    const int HitHoldMs = 250; // 敵の間をライトが横切った時などに音がブツブツ切れないよう、少しだけ余韻を持たせる
+    public void MarkHitting(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+        lock (dataLock)
+        {
+            if (pointers.TryGetValue(id, out PointerEntry entry)) entry.lastHitMs = Environment.TickCount;
+        }
+    }
+
     public void AddKill(string id)
     {
         if (string.IsNullOrEmpty(id)) return;
@@ -132,6 +145,7 @@ public class PointerServer : MonoBehaviour
         var ci = System.Globalization.CultureInfo.InvariantCulture;
         string json = "{\"ok\":true,\"color\":\"" + HexOf(entry.colorIndex) + "\",\"kills\":" + entry.kills +
                ",\"st\":\"" + viewState + "\",\"play\":" + (viewState == "play" ? "true" : "false") +
+               ",\"hit\":" + (Environment.TickCount - entry.lastHitMs < HitHoldMs ? "true" : "false") +
                ",\"px\":" + viewPlayerX.ToString("0.00", ci) + ",\"py\":" + viewPlayerY.ToString("0.00", ci);
         if (viewState == "end")
         {
@@ -236,12 +250,23 @@ public class PointerServer : MonoBehaviour
     // スマホの画面でもゲームと同じ RocknRoll One を使うため、StreamingAssets のフォントを配る
     static byte[] fontBytes;
     const string FontFile = "RocknRollOne-Regular.ttf";
+    // スマホで鳴らす効果音。StreamingAssets/sfx から /sfx/<名前> で配る。
+    //   kyupiin1.mp3         撃破音「キュピーン1」 Springin' Sound Stock https://www.springin.org/sound-stock/
+    //   message-display2.mp3 光を当てている間の音「メッセージ表示音2」 効果音ラボ https://soundeffect-lab.info/
+    // どちらのサイトも音声ファイルへの直リンクを禁止しているので、スマホには必ずこのPCから配る。
+    static readonly Dictionary<string, byte[]> sfxBytes = new Dictionary<string, byte[]>();
+    static readonly string[] SfxFiles = { "kyupiin1.mp3", "message-display2.mp3" };
 
     void Start()
     {
         if (isDuplicate) return;
         try { fontBytes = File.ReadAllBytes(Path.Combine(Application.streamingAssetsPath, FontFile)); }
         catch (Exception e) { Debug.LogWarning("PointerServer: フォントを読み込めませんでした(" + e.Message + ")。スマホは端末のフォントで表示します。"); }
+        foreach (string name in SfxFiles)
+        {
+            try { sfxBytes[name] = File.ReadAllBytes(Path.Combine(Application.streamingAssetsPath, "sfx", name)); }
+            catch (Exception e) { Debug.LogWarning("PointerServer: 効果音 " + name + " を読み込めませんでした(" + e.Message + ")。スマホは作った音で代わりに鳴らします。"); }
+        }
         string ip = GetLocalIPv4();
         LocalIp = ip;
 
@@ -594,6 +619,10 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
                         else if (method == "GET" && path == "/" + FontFile && fontBytes != null)
                         {
                             WriteResponse(stream, "200 OK", "font/ttf", fontBytes, "Cache-Control: max-age=86400\r\n");
+                        }
+                        else if (method == "GET" && path.StartsWith("/sfx/") && sfxBytes.TryGetValue(path.Substring(5), out byte[] sound))
+                        {
+                            WriteResponse(stream, "200 OK", "audio/mpeg", sound, "Cache-Control: max-age=86400\r\n");
                         }
                         else
                         {
@@ -982,7 +1011,7 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
 <meta name=""mobile-web-app-capable"" content=""yes"">
 <meta name=""apple-mobile-web-app-capable"" content=""yes"">
 <meta name=""apple-mobile-web-app-status-bar-style"" content=""black-translucent"">
-<title>カメレオンナイト - 灯り役</title>
+<title>カメレオンサバイバー - 灯り役</title>
 <style>
   /* ---- デザイントークン(暗い画面で光が映える OLED 向けダーク。文字はどれも背景とのコントラスト 6:1 以上) ---- */
   :root {
@@ -1223,7 +1252,7 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
 </div>
 
 <div id=""startOverlay"" class=""overlay"">
-  <div class=""tag"">CHAMELEON NIGHT</div>
+  <div class=""tag"">CHAMELEON SURVIVOR</div>
   <h1>灯り役で参加</h1>
   <ol id=""steps"">
     <li><span class=""num"">1</span>スマホを縦向きに持つ</li>
@@ -1356,8 +1385,9 @@ function blinkFrame() {
   })();
 }
 // ---- 倒した時の音 ----
-// 音声ファイルは使わず、ブラウザの中で「ピロン」という短い2音を作って鳴らす。
-// 高さは自分の光の色ごとに変える(何人かで遊んでいても、自分のスマホの音だとわかりやすいように)。
+// 撃破音は Springin' Sound Stock(https://www.springin.org/sound-stock/)、「当てている音」は効果音ラボ
+// (https://soundeffect-lab.info/)の音を、PCのゲームが /sfx/ で配る。
+// 読み込めなかった時は、ブラウザの中で作った「ピロン」「ジジジ」で代わりに鳴らす(高さは自分の光の色ごと)。
 // スマホのブラウザは、画面を一度タップするまで音を出せないので、「タップして始める」やライトONを押した時に準備する。
 // (iPhone はマナーモード(消音スイッチ)だと鳴らない)
 var audioCtx = null, audioOut = null, lastSoundAt = 0;
@@ -1377,10 +1407,39 @@ function unlockAudio() {
       audioOut.attack.value = 0.002;
       audioOut.release.value = 0.12;
       audioOut.connect(audioCtx.destination);
+      loadSfx();
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
   } catch (e) {}
 }
+var sfx = {}; // 名前 → 読み込んだ音(AudioBuffer)
+var SfxFiles = { kill: 'kyupiin1.mp3', hit: 'message-display2.mp3' }; // 「キュピーン1」/「メッセージ表示音2」(ピピピピ)
+function loadSfx() {
+  Object.keys(SfxFiles).forEach(function (name) {
+    fetch('/sfx/' + SfxFiles[name]).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.arrayBuffer();
+    }).then(function (data) {
+      // 古い iPhone の Safari は Promise 版がないので、コールバック版で呼ぶ
+      audioCtx.decodeAudioData(data, function (buf) { sfx[name] = buf; }, function () {});
+    }).catch(function () {});
+  });
+}
+// くり返し鳴らす範囲(秒)。音の出だしと消えていく終わりを除いた、音量がしっかりある所だけをくり返して、
+// つなぎ目で音が途切れたり波打ったりしないようにする
+function loopRange(buf) {
+  var d = buf.getChannelData(0), w = Math.round(buf.sampleRate * 0.05), rms = [], max = 0;
+  for (var i = 0; i + w <= d.length; i += w) {
+    var sum = 0;
+    for (var j = i; j < i + w; j++) sum += d[j] * d[j];
+    rms.push(Math.sqrt(sum / w)); max = Math.max(max, rms[rms.length - 1]);
+  }
+  var a = 0, b = rms.length - 1;
+  while (a < b && rms[a] < max * 0.6) a++;
+  while (b > a && rms[b] < max * 0.6) b--;
+  return { start: a * w / buf.sampleRate, end: (b + 1) * w / buf.sampleRate };
+}
+
 function tone(freq, start, dur, vol, type) {
   var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
   osc.type = type || 'triangle';
@@ -1396,8 +1455,16 @@ function playKillSound() {
   var now = Date.now();
   if (now - lastSoundAt < 90) return; // 同時に何体も倒した時に音が重なりすぎないように
   lastSoundAt = now;
-  var base = ColorPitch[(myColor || '').toLowerCase()] || 784;
   var t = audioCtx.currentTime;
+  if (sfx.kill) {
+    var src = audioCtx.createBufferSource(), g = audioCtx.createGain();
+    src.buffer = sfx.kill;
+    g.gain.value = 1.3; // 元の音がほぼ最大音量なので少しだけ上げる(最後のリミッターで割れないようにしている)
+    src.connect(g); g.connect(audioOut);
+    src.start(t);
+    return;
+  }
+  var base = ColorPitch[(myColor || '').toLowerCase()] || 784;
   // スマホのスピーカーでもはっきり聞こえるよう大きめに。1オクターブ上の矩形波を少し混ぜて、音を明るく通りやすくする
   tone(base, t, 0.18, 0.9);
   tone(base * 2, t, 0.12, 0.18, 'square');
@@ -1437,6 +1504,7 @@ function handleReply(data) {
   if (typeof data.kills === 'number') onKills(data.kills);
   if (typeof data.px === 'number') onGameView(!!data.play, data.px, data.py);
   if (data.st) onGameState(data);
+  if (typeof data.hit === 'boolean') setHitting(data.hit && lightOn);
 }
 function connectWs() {
   if (!('WebSocket' in window)) return;
@@ -1493,9 +1561,10 @@ function send(x, y, active, force) {
 
 // ボタンを押したまま狙いを止めている間も、0.25秒ごとに最後の状態を送り続ける。
 // これでゲーム画面に「接続中」と表示され続け、狙いを止めても光が消えない。撃破数などの返事もこれで届く。
+// ライトを点けている間は0.1秒ごとにする(敵に当たり始めた・外れたことを早く受け取って、音をすぐ鳴らす/止めるため)
 setInterval(function () {
-  if (Date.now() - last > 250) send(aimX, aimY, lightOn);
-}, 250);
+  if (Date.now() - last > (lightOn ? 100 : 250)) send(aimX, aimY, lightOn);
+}, 100);
 send(0.5, 0.5, false); // ページを開いた時点で接続を知らせる
 
 function updateAim() {
@@ -1504,6 +1573,66 @@ function updateAim() {
   aimEl.className = 'marker' + (lightOn ? ' on' : '');
 }
 updateAim();
+
+// ---- 敵にダメージを与えている間の音と振動 ----
+// 自分のライトが敵に当たっている間、「ジジジ…」という音を鳴らし続ける(ゲームが返事の hit で知らせてくる)。
+// 音の高さは自分の色ごとに少し変える。Android は短い振動もくり返す(iPhone のブラウザは振動できない)。
+var hitting = false, hitNodes = null, hitBuzzTimer = null;
+function startHitSound() {
+  if (!audioCtx || audioCtx.state !== 'running' || hitNodes) return;
+  var t = audioCtx.currentTime;
+  if (sfx.hit) {
+    var src = audioCtx.createBufferSource(), g = audioCtx.createGain(), range = loopRange(sfx.hit);
+    src.buffer = sfx.hit;
+    src.loop = true; src.loopStart = range.start; src.loopEnd = range.end; // 当たっている間ずっとくり返す
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(2.5, t + 0.03); // 元の音が小さめなので、撃破音より少し小さいくらいまで上げる
+    src.connect(g); g.connect(audioOut);
+    src.start(t); // 1回目は出だしから鳴らし、その後は loopStart〜loopEnd をくり返す
+    hitNodes = { oscs: [src], gain: g };
+    return;
+  }
+  var base = (ColorPitch[(myColor || '').toLowerCase()] || 784) / 4; // 撃破音より2オクターブ低い、うなるような音
+  var osc = audioCtx.createOscillator(), osc2 = audioCtx.createOscillator();
+  osc.type = 'sawtooth'; osc.frequency.setValueAtTime(base, t);
+  osc2.type = 'square'; osc2.frequency.setValueAtTime(base * 1.01, t); // 少しずらして重ね、ザラついた電気の音にする
+  var filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass'; filter.frequency.setValueAtTime(1400, t);
+  var gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.35, t + 0.03);
+  // 「ジジジ」と細かく震えるように、音量を1秒に22回揺らす
+  var lfo = audioCtx.createOscillator(), lfoGain = audioCtx.createGain();
+  lfo.frequency.setValueAtTime(22, t); lfoGain.gain.setValueAtTime(0.15, t);
+  lfo.connect(lfoGain); lfoGain.connect(gain.gain);
+  osc.connect(filter); osc2.connect(filter); filter.connect(gain); gain.connect(audioOut);
+  osc.start(t); osc2.start(t); lfo.start(t);
+  hitNodes = { oscs: [osc, osc2, lfo], gain: gain };
+}
+function stopHitSound() {
+  if (!hitNodes) return;
+  var n = hitNodes, t = audioCtx.currentTime;
+  hitNodes = null;
+  n.gain.gain.cancelScheduledValues(t);
+  n.gain.gain.setValueAtTime(Math.max(n.gain.gain.value, 0.0001), t);
+  n.gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06); // プツッと鳴らないよう、すっと消す
+  n.oscs.forEach(function (o) { try { o.stop(t + 0.08); } catch (e) {} });
+}
+function setHitting(on) {
+  if (hitting === on) return;
+  hitting = on;
+  if (on) {
+    startHitSound();
+    if (navigator.vibrate) {
+      navigator.vibrate([25, 55, 25, 55, 25, 55, 25, 55, 25, 55]);
+      hitBuzzTimer = setInterval(function () { navigator.vibrate([25, 55, 25, 55, 25, 55, 25, 55, 25, 55]); }, 400);
+    }
+  } else {
+    stopHitSound();
+    if (hitBuzzTimer) { clearInterval(hitBuzzTimer); hitBuzzTimer = null; }
+    if (navigator.vibrate) navigator.vibrate(0);
+  }
+}
 
 // ---- 結果画面 ----
 // ゲームが「プレイ中」から「終了」に変わったら、自分の撃破数・灯り役の中での順位・チームの結果を出す。
@@ -1547,7 +1676,7 @@ function makeResultImage(d) {
     g.fillStyle = bg; g.fillRect(0, 0, W, H);
     g.strokeStyle = c; g.lineWidth = 28; g.strokeRect(14, 14, W - 28, H - 28);
     g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-    g.fillStyle = '#9dffb0'; g.font = '40px ' + font; g.fillText('CHAMELEON NIGHT', W / 2, 150);
+    g.fillStyle = '#9dffb0'; g.font = '40px ' + font; g.fillText('CHAMELEON SURVIVOR', W / 2, 150);
     g.fillStyle = '#a3c4b5'; g.font = '40px ' + font; g.fillText(d.map || '', W / 2, 220);
     g.fillStyle = d.win ? '#9dffb0' : '#e6f5ec'; g.font = '92px ' + font; g.fillText(d.win ? '脱出成功！' : 'ゲーム終了', W / 2, 360);
     g.fillStyle = '#a3c4b5'; g.font = '44px ' + font; g.fillText('灯り役のあなたの撃破', W / 2, 500);
@@ -1558,7 +1687,7 @@ function makeResultImage(d) {
     g.fillText('チーム全体 ' + d.tk + '体撃破 ・ ' + (d.win ? 'クリア ' : '生存 ') + fmtTime(d.sec), W / 2, 1090);
     var now = new Date();
     g.font = '36px ' + font;
-    g.fillText(now.getFullYear() + '.' + (now.getMonth() + 1) + '.' + now.getDate() + '  カメレオンナイト', W / 2, 1240);
+    g.fillText(now.getFullYear() + '.' + (now.getMonth() + 1) + '.' + now.getDate() + '  カメレオンサバイバー', W / 2, 1240);
     return new Promise(function (resolve, reject) {
       cv.toBlob(function (b) { b ? resolve(b) : reject(new Error('toBlob')); }, 'image/png');
     });
@@ -1575,7 +1704,7 @@ function saveResultImage() {
   try { file = new File([resultImage], name, { type: 'image/png' }); } catch (e) {}
   // スマホでは共有画面(「画像を保存」やSNSへ送れる)を開く。使えない時はダウンロードする
   if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: 'カメレオンナイト' }).catch(function () {});
+    navigator.share({ files: [file], title: 'カメレオンサバイバー' }).catch(function () {});
     return;
   }
   var a = document.createElement('a');
@@ -1600,7 +1729,7 @@ var offReason = ''; // 直前に消えた理由(画面に出して、予期せ�
 function setLight(on, reason) {
   if (lightOn === on) return;
   lightOn = on;
-  if (!on) offReason = reason || '';
+  if (!on) { offReason = reason || ''; setHitting(false); }
   btnLight.className = on ? 'on' : '';
   btnLight.setAttribute('aria-pressed', on ? 'true' : 'false');
   lightText.textContent = on ? '点灯中' : 'ライトON';

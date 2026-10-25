@@ -551,7 +551,11 @@ public class NightGame : MonoBehaviour
             {
                 en.lightHp -= en.cfg.drain * LightPower * (Camouflaged ? AmbushLightMultiplier : 1f) * dt;
                 if (Random.value < dt * 8f) Audio.PlayHitBuzz();
-                if (lightOwner != null) { en.litBy = lightOwner; en.litByTime = Time.time; }
+                if (lightOwner != null)
+                {
+                    en.litBy = lightOwner; en.litByTime = Time.time;
+                    if (PointerServer.Instance != null) PointerServer.Instance.MarkHitting(lightOwner); // スマホで「当てている音」を鳴らす
+                }
             }
             if (flashHit) en.lightHp -= en.cfg.drain * FlashDamage * FlashLevel * dt;
             if (lantern > 0f) en.lightHp -= lantern * dt;

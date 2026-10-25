@@ -169,9 +169,9 @@ public class NightHud : MonoBehaviour
         // 左右のパネルに重ならない幅に収まるよう、タイトルの文字の大きさを調整する
         float titleRoom = W - (sidePanels ? 2f * SidePanelSpace : 48f);
         title.fontSize = 44;
-        float titleW = title.CalcSize(new GUIContent("C H A M E L E O N   N I G H T")).x;
+        float titleW = title.CalcSize(new GUIContent("C H A M E L E O N   S U R V I V O R")).x;
         if (titleW > titleRoom) title.fontSize = Mathf.Max(24, Mathf.FloorToInt(44 * titleRoom / titleW));
-        Label(new Rect(0, y, W, 56), "C H A M E L E O N   N I G H T", title);
+        Label(new Rect(0, y, W, 56), "C H A M E L E O N   S U R V I V O R", title);
         y += 56 + 8;
         Label(new Rect(0, y, W, 18), "灯りを導きに、夜の向こうへ。", S("menuSub", 13, C(0xc8ded2), TextAnchor.MiddleCenter));
         y += 18 + (compact ? 12 : 22);
@@ -893,7 +893,11 @@ public class NightHud : MonoBehaviour
             GUI.color = old;
         }
         string text = "QRコードを\n作成中" + new string('.', 1 + (int)(Time.unscaledTime * 2f) % 3);
-        Label(new Rect(r.x + 4, center.y + rad + d + 4, r.width - 8, fontSize * 2.6f), text,
+        // 5G用URLは、作られてからインターネットで開けるようになるまで1分ほどかかることがある(Cloudflare側の準備待ち)。
+        // 止まっているように見えないよう、大きく表示できる所では目安も出す
+        bool tunnelWait = PointerServer.Instance != null && PointerServer.Instance.TunnelRequested && fontSize >= 12;
+        if (tunnelWait) text += "\n(1分ほどかかります)";
+        Label(new Rect(r.x + 4, center.y + rad + d + 4, r.width - 8, fontSize * (tunnelWait ? 3.9f : 2.6f)), text,
             S("qrWait" + fontSize, fontSize, C(0xbfe3d2), TextAnchor.UpperCenter, wrap: true));
     }
 

@@ -28,4 +28,4 @@ REM 少し待ってから前面に出す。
 timeout /t 2 /nobreak >nul
 powershell -NoProfile -Command "$p = Get-Process ChameleonNight -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p) { Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class W { [DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h); }'; [W]::SetForegroundWindow($p.MainWindowHandle) }"
 
-echo 起動しました。ウィンドウが見当たらない場合はタスクバーの「ChameleonNight_Prototype」を確認してください。
+echo 起動しました。ウィンドウが見当たらない場合はタスクバーの「カメレオンサバイバー」を確認してください。
