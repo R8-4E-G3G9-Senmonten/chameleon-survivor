@@ -15,6 +15,12 @@
 | `play_survivor.bat` | 同上(サバイバーモード) |
 | `esp32/controller/controller.ino` | **ESP32のスケッチ(Arduino IDE用)。デモではこれを使う** |
 | `esp32/pressure_mat/pressure_mat.ino` | 参考: Wi-Fiで送る版のスケッチ |
+| `docs/` | 解説資料。**敵キャラの詳細は [`docs/enemies.md`](docs/enemies.md)**、仕組みの解説は `system-guide.html` |
+| `blender/chameleon/` | 主人公カメレオンを作る Blender スクリプト |
+| `blender/enemies/` | 敵モデル(Meshy AI)に骨とアニメを自動で付ける Blender スクリプト |
+| `tools/` | QR印刷・紹介動画づくりのスクリプト。5G用QRに使う `cloudflared.exe` もここに置く(Gitには入れない) |
+| `mockup/` | HTMLで作った試作・UI案 |
+| `reference/` | 参考資料(試作の動画・画像、元の Meshy モデルなど) |
 
 ---
 
@@ -83,10 +89,13 @@ New-NetFirewallRule -DisplayName "ChameleonNight PointerServer HTTPS" -Direction
 ### PC: 必要なソフト
 
 - Unity Hub と **Unity 6000.4.3f1**(`play_night.bat` はこのバージョンを使います)
-- **cloudflared**(5G・どのWi-Fiからでも参加できるQRを作るため。アカウント登録は不要)。ターミナルで次を実行する:
-  ```
-  winget install --id Cloudflare.cloudflared
-  ```
+- **cloudflared**(5G・どのWi-Fiからでも参加できるQRを作るため。アカウント登録は不要)。**これが無いと、QRは同じWi-Fi用になります。** 次のどちらかで入れる:
+  - ターミナルで `winget install --id Cloudflare.cloudflared`
+  - winget が無いPCでは、[公式のリリース](https://github.com/cloudflare/cloudflared/releases/latest)から `cloudflared-windows-amd64.exe` をダウンロードし、名前を `cloudflared.exe` に変えて、このフォルダの `tools\` に置く。PowerShell なら次の1行(このフォルダで実行):
+    ```powershell
+    Invoke-WebRequest https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile tools\cloudflared.exe
+    ```
+  - 入ったかどうかは、ゲームのログ `%USERPROFILE%\AppData\LocalLow\DefaultCompany\ChameleonNight_Prototype\Player.log` に「Cloudflare トンネルを起動しました」と出るかで分かる(「cloudflared.exe が見つからない」と出たら入っていない)
 - ESP32に書き込む場合は Arduino IDE
 
 ### ESP32: スケッチを書き込む(ESP32ごとに1回)

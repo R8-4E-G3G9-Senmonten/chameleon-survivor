@@ -193,6 +193,7 @@ public class NightGame : MonoBehaviour
         NightEnemy.Prewarm(NightEnemy.Kind.Moth, 16);
         NightEnemy.Prewarm(NightEnemy.Kind.Shooter, 5);
         NightEnemy.Prewarm(NightEnemy.Kind.Brute, 3);
+        NightEnemy.Prewarm(NightEnemy.Kind.Sprite, 3);
         // exe は、起動したらまずマップ(コース)選択から始まる。-skipTitle を付けたときだけ、選択済みのマップで名前入力へ進む。
         var args = System.Environment.GetCommandLineArgs();
         bool backToTitle = returnToTitle;
@@ -339,7 +340,7 @@ public class NightGame : MonoBehaviour
             Camp = Mathf.Min(CampMax, Camp + CampRecharge * dt);
             if (CampLocked && Camp >= CampUnlock) CampLocked = false;
         }
-        else if (idleTimer > 0.3f && !CampLocked)
+        else if (idleTimer > 0.3f && !CampLocked && !DebugNoCamo)
         {
             if (!wasCamouflaged && Camp >= CampEnterMin) { Camouflaged = true; OnCamouflageStart(); }
             else if (wasCamouflaged) Camouflaged = true;
@@ -440,8 +441,9 @@ public class NightGame : MonoBehaviour
     {
         float r = Random.value;
         if (r < 0.25f) return NightEnemy.Kind.Brute;   // 25% 硬い型
-        if (r < 0.55f) return NightEnemy.Kind.Shooter; // 30% 遠距離型
-        return NightEnemy.Kind.Moth;                   // 45% 群れ型
+        if (r < 0.50f) return NightEnemy.Kind.Shooter; // 25% 遠距離型
+        if (r < 0.62f) return NightEnemy.Kind.Sprite;  // 12% すり抜け型
+        return NightEnemy.Kind.Moth;                   // 38% 群れ型
     }
 
     // count > 1 のときは、同じ場所のまわりにかためて出す(光をひと振りすると、まとめて倒せる)
@@ -511,7 +513,8 @@ public class NightGame : MonoBehaviour
                 pos += en.knock * dt;
                 en.knock *= Mathf.Max(0f, 1f - 5.5f * dt);
             }
-            Map.ConstrainActor(ref pos, 0.35f);
+            if (en.cfg.phasing) FollowGround(ref pos, dt); // すり抜け型は通路の外にいてもよい
+            else Map.ConstrainActor(ref pos, 0.35f);
             pos.x = Mathf.Clamp(pos.x, -NightMap.HalfW - 2f, NightMap.HalfW + 2f);
             pos.z = Mathf.Clamp(pos.z, NightMap.GoalZ - 2f, NightMap.StartZ + 10f);
             en.Position = pos;
@@ -534,7 +537,8 @@ public class NightGame : MonoBehaviour
             }
             else if (en.knock.magnitude < 2.5f && dist > 0.7f)
             {
-                AdvanceEnemy(en, dt);
+                if (en.cfg.phasing) PhaseTowardPlayer(en, dt);
+                else AdvanceEnemy(en, dt);
             }
             if (dist < 0.9f && Mathf.Abs(en.Position.y - pp.y) < 0.9f) contactDps = Mathf.Max(contactDps, en.cfg.contactDps);
 
@@ -619,6 +623,25 @@ public class NightGame : MonoBehaviour
         if (en.stuckTimer > 0.3f) { en.navTimer = 0f; en.path = null; en.noDirectTimer = 0.8f; en.stuckTimer = 0f; }
     }
 
+    // すり抜け型: 通路も壁も無視して、プレイヤーへまっすぐ進む
+    void PhaseTowardPlayer(NightEnemy en, float dt)
+    {
+        Vector3 pos = en.Position;
+        Vector3 to = PlayerPos - pos; to.y = 0f;
+        float d = to.magnitude;
+        if (d < 0.01f) return;
+        pos += to / d * Mathf.Min(d, en.cfg.speed * Difficulty.enemySpeed * dt);
+        FollowGround(ref pos, dt);
+        en.Position = pos;
+        en.go.transform.rotation = Quaternion.Euler(0, Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, 0);
+    }
+
+    // 通路の外でも、いちばん近い地面の高さへなめらかに合わせる(段差の上下で急にワープしないように)
+    void FollowGround(ref Vector3 pos, float dt)
+    {
+        pos.y = Mathf.MoveTowards(pos.y, Map.SurfaceAt(pos.x, pos.z), 6f * dt);
+    }
+
     void KillEnemy(NightEnemy en)
     {
         if (en.dying) return;
@@ -646,6 +669,7 @@ public class NightGame : MonoBehaviour
     // ---- 回復オーブ ----
     void DropHealOrb(NightEnemy en)
     {
+        if (en.cfg.noHealDrop) return; // すり抜け型は落とさない
         float amount = en.kind == NightEnemy.Kind.Brute ? 14f : en.kind == NightEnemy.Kind.Shooter ? 6f : 4f;
         DropHealOrb(en.Position, amount);
     }
@@ -764,6 +788,7 @@ public class NightGame : MonoBehaviour
 
     // 紹介動画の撮影(NightDemoVideo)用
     public void DebugSetHp(float hp) => Hp = Mathf.Clamp(hp, 0f, HpMax);
+    public bool DebugNoCamo; // 動作確認用: 止まっていても擬態しない(敵が追ってくる様子を見るため)
     public void DebugFlashIn(float seconds) { if (FlashT < 0f) FlashWait = seconds; }
     public int DebugHealOrbCount => healOrbs.Count;
     public Vector3 DebugNearestHealOrb()
@@ -874,7 +899,8 @@ public class NightGame : MonoBehaviour
         if (to.magnitude < 0.2f) return;
         float speed = en.cfg.speed * Difficulty.enemySpeed * 0.35f;
         Vector3 next = pos + to.normalized * Mathf.Min(to.magnitude, speed * dt);
-        Map.ConstrainActor(ref next, 0.35f);
+        if (en.cfg.phasing) FollowGround(ref next, dt);
+        else Map.ConstrainActor(ref next, 0.35f);
         en.Position = next;
         Quaternion face = Quaternion.Euler(0, Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg, 0);
         en.go.transform.rotation = Quaternion.Slerp(en.go.transform.rotation, face, Mathf.Min(1f, dt * 6f));

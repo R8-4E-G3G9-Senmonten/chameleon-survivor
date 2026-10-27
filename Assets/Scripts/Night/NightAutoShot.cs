@@ -27,6 +27,8 @@ public class NightAutoShot : MonoBehaviour
         if (System.Array.IndexOf(args, "-nightHealTest") >= 0) { StartCoroutine(HealTest()); return; }
         if (System.Array.IndexOf(args, "-nightCamoTest") >= 0) { StartCoroutine(CamoTest()); return; }
         if (System.Array.IndexOf(args, "-nightGaugeTest") >= 0) { StartCoroutine(GaugeTest()); return; }
+        if (System.Array.IndexOf(args, "-nightEnemyGallery") >= 0) { StartCoroutine(EnemyGallery()); return; }
+        if (System.Array.IndexOf(args, "-nightSpriteTest") >= 0) { StartCoroutine(SpriteTest()); return; }
         StartCoroutine(m >= 0 && m + 1 < args.Length ? Tour(args[m + 1]) : Run());
     }
 
@@ -125,6 +127,159 @@ public class NightAutoShot : MonoBehaviour
         yield return new WaitForSeconds(3f);
         yield return Shot("heal_05_after");
         Application.Quit();
+    }
+
+    // 敵の見た目の確認: 全種類の見た目を1体ずつ横に並べ(ゲームの敵としては動かさない)、
+    // 明るいライトを足して、正面・斜め・横から撮る。アニメの途中のコマも撮る
+    IEnumerator EnemyGallery()
+    {
+        yield return new WaitForSeconds(1f);
+        g.SelectMap("A");
+        yield return new WaitForSeconds(0.5f);
+        g.BeginPlay("テスト");
+        g.Flashlight.DebugAim = new Vector2(0.9f, 0.1f);
+        yield return new WaitForSeconds(0.3f);
+        RenderSettings.fog = false;
+        RenderSettings.ambientLight = new Color(0.45f, 0.45f, 0.5f);
+        var sun = new GameObject("GallerySun").AddComponent<Light>();
+        sun.type = LightType.Directional;
+        sun.intensity = 1.1f;
+        sun.transform.rotation = Quaternion.Euler(40f, 160f, 0f);
+
+        var models = NightEnemyModels.Instance;
+        var kinds = new System.Collections.Generic.List<NightEnemy.Kind>();
+        for (int k = 0; k < NightEnemy.KindCount; k++)
+        {
+            var list = models.ListOf((NightEnemy.Kind)k);
+            for (int n = 0; list != null && n < list.Length; n++) kinds.Add((NightEnemy.Kind)k);
+        }
+        const float gap = 4.5f;
+        // マップの木や壁にさえぎられないよう、マップの外の何もない所に地面を1枚置いて並べる
+        Vector3 c = new Vector3(400f, 0f, 400f);
+        var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        floor.transform.position = c;
+        floor.transform.localScale = new Vector3(6f, 1f, 4f);
+        floor.GetComponent<Renderer>().material.color = new Color(0.25f, 0.32f, 0.28f);
+        for (int i = 0; i < kinds.Count; i++)
+        {
+            float x = c.x + (i - (kinds.Count - 1) * 0.5f) * gap;
+            new NightEnemy(kinds[i], new Vector3(x, 0f, c.z));
+        }
+
+        yield return LockCamera(c + new Vector3(0f, 5f, 24f), c + Vector3.up * 2f, 0.4f);
+        yield return Shot("gallery_01_front");
+        yield return LockCamera(c + new Vector3(0f, 5f, 24f), c + Vector3.up * 2f, 0.35f);
+        yield return Shot("gallery_02_front_later");
+        yield return LockCamera(c + new Vector3(0f, 16f, 18f), c + Vector3.up * 1f, 0.3f);
+        yield return Shot("gallery_03_top");
+        for (int i = 0; i < kinds.Count; i++)
+        {
+            float x = c.x + (i - (kinds.Count - 1) * 0.5f) * gap;
+            Vector3 p = new Vector3(x, c.y, c.z);
+            yield return LockCamera(p + new Vector3(7f, 2.5f, 3f), p + Vector3.up * 1.6f, 0.25f);
+            yield return Shot("gallery_side_" + i);
+        }
+        Application.Quit();
+    }
+
+    // すり抜け型の確認: 通路の外(森の中)に出して、通路を無視してまっすぐ近づいてくるか・
+    // 倒しても回復オーブを落とさないか・体力が一番低いかをログに出す
+    IEnumerator SpriteTest()
+    {
+        yield return new WaitForSeconds(1f);
+        var args = System.Environment.GetCommandLineArgs();
+        int m = System.Array.IndexOf(args, "-nightMap");
+        g.SelectMap(m >= 0 && m + 1 < args.Length ? args[m + 1] : "A");
+        yield return new WaitForSeconds(0.5f);
+        g.BeginPlay("テスト");
+        g.Flashlight.DebugAim = new Vector2(0.9f, 0.1f); // まだ照らさない
+        yield return new WaitForSeconds(0.3f);
+        for (int k = 0; k < NightEnemy.KindCount; k++)
+            Debug.Log("NightAutoShot: hp " + (NightEnemy.Kind)k + "=" + NightEnemy.ConfigOf((NightEnemy.Kind)k).lightHp);
+        // 止まっていると擬態して敵が見失うので、擬態ゲージが切れる(しばらく擬態できなくなる)まで待つ
+        float w = 0f;
+        while (!g.Camouflaged && w < 2f) { w += Time.deltaTime; yield return null; }
+        while (g.Camouflaged) yield return null;
+
+        // プレイヤーから横に離れた、通路の外の場所を探して出す
+        Vector3 pp = g.PlayerPos, start = pp;
+        for (float off = 6f; off < 20f; off += 0.5f)
+        {
+            if (!g.Map.Walkable(pp.x + off, pp.z, 0f)) { start = new Vector3(pp.x + off + 2f, 0f, pp.z); break; }
+        }
+        start.y = g.Map.SurfaceAt(start.x, start.z);
+        var en = NightEnemy.Spawn(NightEnemy.Kind.Sprite, start);
+        g.Enemies.Add(en);
+        Debug.Log("NightAutoShot: sprite start=" + start + " walkable=" + g.Map.Walkable(start.x, start.z, 0f) + " dist=" + NightMap.Flat(start, pp).ToString("0.0"));
+        int offPath = 0;
+        for (int s = 0; s < 8; s++)
+        {
+            Vector3 mid = Vector3.Lerp(pp, en.Position, 0.5f);
+            yield return LockCamera(mid + new Vector3(0f, 9f, 10f), mid + Vector3.up * 0.6f, 0.25f); // ライトは当てないまま見る
+            if (!g.Map.Walkable(en.Position.x, en.Position.z, 0f)) offPath++;
+            Debug.Log("NightAutoShot: sprite t=" + (s * 0.25f).ToString("0.00") + " pos=" + en.Position + " dist=" + NightMap.Flat(en.Position, g.PlayerPos).ToString("0.0") +
+                      " onPath=" + g.Map.Walkable(en.Position.x, en.Position.z, 0f));
+            if (s == 2) yield return Shot("sprite_01_through_forest");
+        }
+        Debug.Log("NightAutoShot: sprite offPathSamples=" + offPath);
+
+        int orbsBefore = g.DebugHealOrbCount;
+        yield return LockCameraOn(en.Position, 1.5f); // 照らして倒す
+        Debug.Log("NightAutoShot: sprite dying=" + en.dying + " healOrbs before=" + orbsBefore + " after=" + g.DebugHealOrbCount);
+        yield return Shot("sprite_02_killed");
+
+        // 4方向(通路の外も含む)から出し、プレイヤーに触れるまでの時間を見る(段差・橋のあるマップは -nightMap B / C で)
+        {
+            string id = g.MapId;
+            g.Flashlight.DebugAim = new Vector2(0.9f, 0.1f);
+            g.DebugNoCamo = true;
+            g.DebugFlashIn(60f); // 自動の閃光で倒されないように遅らせる
+            while (g.Camouflaged) yield return null;
+            Vector3 p0 = g.PlayerPos;
+            var list = new System.Collections.Generic.List<NightEnemy>();
+            foreach (var o in new[] { new Vector3(9f, 0, 0), new Vector3(-9f, 0, 0), new Vector3(0, 0, 9f), new Vector3(0, 0, -9f) })
+            {
+                Vector3 s = p0 + o;
+                s.y = g.Map.SurfaceAt(s.x, s.z);
+                var e = NightEnemy.Spawn(NightEnemy.Kind.Sprite, s);
+                g.Enemies.Add(e);
+                list.Add(e);
+            }
+            float[] reach = { -1f, -1f, -1f, -1f };
+            float hp0 = g.Hp, t = 0f, realT = 0f;
+            int frames = 0;
+            while (t < 7f && g.State == NightGame.GameState.Playing)
+            {
+                for (int i = 0; i < list.Count; i++)
+                    if (reach[i] < 0f && NightMap.Flat(list[i].Position, g.PlayerPos) < 0.95f && Mathf.Abs(list[i].Position.y - g.PlayerPos.y) < 0.9f) reach[i] = t;
+                if (System.Array.TrueForAll(reach, r => r >= 0f)) break;
+                hp0 = Mathf.Max(hp0, g.Hp);
+                g.DebugSetHp(100f); // ほかの敵に倒されて途中で終わらないように
+                t += Mathf.Min(Time.deltaTime, 0.05f); // ゲームと同じく1フレーム最大0.05秒で数える(ゲーム内の時間)
+                frames++; realT += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            Debug.Log("NightAutoShot: sprite map " + id + " fps=" + (frames / Mathf.Max(0.01f, realT)).ToString("0") + " enemies=" + g.Enemies.Count);
+            Debug.Log("NightAutoShot: sprite map " + id + " reach=" + string.Join(",", System.Array.ConvertAll(reach, r => r.ToString("0.0"))) +
+                      " hp " + hp0.ToString("0") + "->" + g.Hp.ToString("0") + " playerY=" + g.PlayerPos.y.ToString("0.00"));
+            for (int i = 0; i < list.Count; i++)
+                if (reach[i] < 0f) Debug.Log("NightAutoShot: sprite map " + id + " stuck#" + i + " pos=" + list[i].Position);
+        }
+        Application.Quit();
+    }
+
+    // LockCameraOn と同じく、毎フレーム Update の後にカメラを上書きし直す(位置と注視点を直接指定する版)
+    IEnumerator LockCamera(Vector3 pos, Vector3 look, float seconds)
+    {
+        float t = 0f;
+        while (true)
+        {
+            g.Cam.transform.position = pos;
+            g.Cam.transform.LookAt(look);
+            if (t >= seconds) yield break;
+            t += Time.deltaTime;
+            yield return null;
+        }
     }
 
     IEnumerator Shot(string name)
@@ -330,7 +485,7 @@ public class NightAutoShot : MonoBehaviour
             yield return Shot("09b_prop_glow");
         }
 
-        // 敵の3Dモデル(狼・巨人・キノコ)を並べて確認する。1枚は光を当て、1枚は当てない
+        // 敵の3Dモデル(群れ型・硬い型・遠距離型)を並べて確認する。1枚は光を当て、1枚は当てない
         Vector3 pc = g.PlayerPos;
         var kinds = new[] { NightEnemy.Kind.Moth, NightEnemy.Kind.Brute, NightEnemy.Kind.Shooter };
         for (int i = 0; i < kinds.Length; i++)
@@ -343,13 +498,14 @@ public class NightAutoShot : MonoBehaviour
         {
             if (e.kind != NightEnemy.Kind.Moth || e.go == null) continue;
             Transform fl = null, bl = null;
-            foreach (var t in e.go.GetComponentsInChildren<Transform>()) { if (t.name == "frontleg0") fl = t; if (t.name == "backleg0") bl = t; }
+            // 四足(狼・猪)の前足が進む向き(go.forward)の側にあるか。プラスなら正しい向き
+            foreach (var t in e.go.GetComponentsInChildren<Transform>()) { if (t.name == "LegFL") fl = t; if (t.name == "LegBL") bl = t; }
             if (fl != null && bl != null)
-                Debug.Log("NightAutoShot: wolf front-back along go.forward=" + Vector3.Dot(fl.position - bl.position, e.go.transform.forward).ToString("0.00"));
+                Debug.Log("NightAutoShot: quad front-back along go.forward=" + Vector3.Dot(fl.position - bl.position, e.go.transform.forward).ToString("0.00"));
         }
-        yield return Shot("12a_enemy_models_colossus_lit");
+        yield return Shot("12a_enemy_models_brute_lit");
         yield return LockCameraOn(new Vector3(pc.x - 2.6f, pc.y, pc.z - 6f), 0.4f);
-        yield return Shot("12b_enemy_wolf_lit");
+        yield return Shot("12b_enemy_moth_lit");
 
         // 閃光
         wait = 0f;
