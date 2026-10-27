@@ -12,7 +12,6 @@ public class NightHud : MonoBehaviour
     // タイトル・名前入力は左右にランキングと接続パネルが並び横幅が足りなくなるため、プレイ中より控えめにする
     const float BaseHeight = 580f, TitleBaseHeight = 700f;
     const float SidePanelSpace = 272f; // 左右のパネルの幅+余白(中央の内容がここに重ならないようにする)
-    bool helpOpen;
     float toastAlpha;
     Color vignetteColor = new Color(1f, 0.16f, 0.08f, 0f);
 
@@ -21,6 +20,7 @@ public class NightHud : MonoBehaviour
     readonly Dictionary<string, Texture2D> texCache = new Dictionary<string, Texture2D>();
     readonly Dictionary<string, Texture2D> previews = new Dictionary<string, Texture2D>();
     Texture2D whiteTex, markTex, qrTexture;
+    Texture2D logoTex; // タイトルロゴ(カメレオンの絵+「カメレオンサバイバー」。promo_video の TitleLogo で作った画像)
     string qrUrl;
 
     static Color C(int rgb, float a = 1f) => NightMeshes.Hex(rgb, a);
@@ -32,6 +32,7 @@ public class NightHud : MonoBehaviour
         if (uiFont == null) uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Yu Gothic UI", "Meiryo" }, 16);
         whiteTex = Texture2D.whiteTexture;
         markTex = UITextureFactory.CreateChameleonMark(64, C(0xf5a623), C(0x22c55e), new Color(0.9f, 0.93f, 0.75f));
+        logoTex = Resources.Load<Texture2D>("UI/TitleLogo");
         foreach (var id in NightMap.Ids) previews[id] = DrawHabitatPreview(id);
     }
 
@@ -148,38 +149,50 @@ public class NightHud : MonoBehaviour
         GUI.DrawTexture(new Rect(0, 0, W, H), Tex("startBg", () => RadialBackground()), ScaleMode.StretchToFill);
 
         bool sidePanels = W >= 1000f; // DrawRankingPanel と同じ条件
-        float maxW = Mathf.Min(810f, W - (sidePanels ? 2f * SidePanelSpace : 48f));
+        // マップ(難易度)選択のカード。タイトルが目立つよう、カードは控えめな大きさにする
+        float maxW = Mathf.Min(660f, W - (sidePanels ? 2f * SidePanelSpace : 48f));
         float cardW = Mathf.Floor((maxW - 32f) / 3f);
         bool compact = H < 760f;
-        float preview = Mathf.Min(cardW - 24f, compact ? 180f : 235f);
-        float cardH = 14f + preview + 12f + 22f + 7f + 14f + 16f;
+        float preview = Mathf.Min(cardW - 24f, compact ? 140f : 170f);
+        float cardH = 14f + preview + 12f + 22f + 14f;
 
-        string paragraph = "石や敵にマウスの光を当て続けます。止まると地面や物の色に擬態し、最大3秒間、無敵になって敵があなたを見失います(敵は「？」を出してうろうろします)。擬態中は灯り役の光が2倍効き(待ち伏せ)、擬態中に敵を倒すと擬態ゲージが回復します。擬態ゲージは移動中に回復。約12秒ごとの閃光でも敵にダメージを与えられます。ランタンを合計0.5秒照らすと点灯し、半径9.5mの同じ高さ・光の届く範囲の敵を倒します。点灯後も半径8.5mの敵に継続ダメージを与えます。照らした時間はたまっていくので、途中で光を外しても続きから貯められます(進み具合は物の上のゲージで分かります)。石を合計2秒照らすと石の色が変わって蛍が集まってくるので、触れて捕まえます。2つの石の蛍を捕まえると入口の門が開きます。導きの花を合計2秒照らすと、花から最も近い、まだ蛍のいる石までの道が約7秒間光ります。光の道は橋や階段に沿って現れます。蛍が揃った後は、花が入口の門まで案内します。門を通過するとクリアです。帰り道は敵の出現が少し速くなります。マップごとに難易度が違います(A やさしい / B ふつう / C むずかしい)。";
-        var helpStyle = S("help", 11, C(0x8fada4), TextAnchor.UpperLeft, wrap: true);
-        float helpW = Mathf.Min(650f, W - 48f);
-        float helpH = helpOpen ? helpStyle.CalcHeight(new GUIContent(paragraph), helpW) + 8f : 0f;
+        // タイトルロゴ。左右のパネルに重ならない幅いっぱいまで大きく出す(ロゴ画像がなければ文字のタイトル)。
+        // 操作説明やマップの説明は出さず、ロゴ・マップ選択・開始ボタンだけのすっきりした画面にする
+        float titleRoom = W - (sidePanels ? 2f * SidePanelSpace : 48f);
+        float logoH = 56f, logoW = 0f;
+        if (logoTex != null)
+        {
+            logoH = compact ? 170f : 230f;
+            logoW = logoH * logoTex.width / logoTex.height;
+            if (logoW > titleRoom) { logoH *= titleRoom / logoW; logoW = titleRoom; }
+        }
 
-        float total = 14 + 8 + 56 + 8 + 18 + (compact ? 12 : 22) + 22 + 12 + 20 + (compact ? 14 : 22) + cardH + 18 + 42 + 18 + 46 + 18 + 18 + helpH;
+        float gap = compact ? 22f : 36f;
+        // ロゴの下に一文だけのサブタイトル(遠くからでも読める大きさ)
+        const string Subtitle = "スマホのライトで敵を照らして、カメレオンと夜の森を生き抜け！";
+        var subStyle = S("subtitle", compact ? 20 : 26, C(0xe6f5e9), TextAnchor.MiddleCenter, bold: true);
+        float subH = subStyle.fontSize * 1.6f;
+
+        float total = logoH + 6 + subH + gap + cardH + gap + 46;
         float y = Mathf.Max(16f, (H - total) / 2f);
         float cx = W / 2f;
 
-        Label(new Rect(0, y, W, 14), "光と影の森 / EXPLORATION", S("eyebrow", 10, C(0xb3d2c3), TextAnchor.MiddleCenter));
-        y += 14 + 8;
-        var title = S("title", 44, C(0xe6f5e9), TextAnchor.MiddleCenter);
-        // 左右のパネルに重ならない幅に収まるよう、タイトルの文字の大きさを調整する
-        float titleRoom = W - (sidePanels ? 2f * SidePanelSpace : 48f);
-        title.fontSize = 44;
-        float titleW = title.CalcSize(new GUIContent("C H A M E L E O N   S U R V I V O R")).x;
-        if (titleW > titleRoom) title.fontSize = Mathf.Max(24, Mathf.FloorToInt(44 * titleRoom / titleW));
-        Label(new Rect(0, y, W, 56), "C H A M E L E O N   S U R V I V O R", title);
-        y += 56 + 8;
-        Label(new Rect(0, y, W, 18), "灯りを導きに、夜の向こうへ。", S("menuSub", 13, C(0xc8ded2), TextAnchor.MiddleCenter));
-        y += 18 + (compact ? 12 : 22);
-        Label(new Rect(0, y, W, 22), "2つの石を照らして蛍を集め、門を開いて入口へ戻ろう。", S("mission", 13, C(0xe1eadd), TextAnchor.MiddleCenter));
-        y += 22 + 12;
-
-        DrawControlStrip(y);
-        y += 20 + (compact ? 14 : 22);
+        if (logoTex != null)
+        {
+            GUI.DrawTexture(new Rect(cx - logoW / 2f, y, logoW, logoH), logoTex, ScaleMode.ScaleToFit, true);
+        }
+        else
+        {
+            const string TitleText = "カメレオンサバイバー";
+            var title = S("title", 48, C(0xe6f5e9), TextAnchor.MiddleCenter);
+            title.fontSize = 48;
+            float titleW = title.CalcSize(new GUIContent(TitleText)).x;
+            if (titleW > titleRoom) title.fontSize = Mathf.Max(24, Mathf.FloorToInt(48 * titleRoom / titleW));
+            Label(new Rect(0, y, W, 56), TitleText, title);
+        }
+        y += logoH + 6;
+        Shadowed(new Rect(0, y, W, subH), Subtitle, subStyle, 2f);
+        y += subH + gap;
 
         // マップ選択カード
         float rowW = cardW * 3 + 32f;
@@ -194,80 +207,16 @@ public class NightHud : MonoBehaviour
             DrawMapCard(r, id, selected, hover, preview);
             if (GUI.Button(r, GUIContent.none, GUIStyle.none)) game.SelectMap(id);
         }
-        y += cardH + 18;
-
-        Label(new Rect(cx - 300, y, 600, 42), game.Map != null ? game.Map.Description : "", S("mapDesc", 13, C(0xc7dacf), TextAnchor.MiddleCenter, wrap: true));
-        y += 42 + 18;
+        y += cardH + gap;
 
         Rect btn = new Rect(cx - 140, y, 280, 46);
         bool btnHover = btn.Contains(Event.current.mousePosition);
         GUI.DrawTexture(btn, Tex("startBtn" + btnHover, () => Gradient(280, 46, C(0x2e7974), C(0x246257), 8, C(0x8ddccb, btnHover ? 0.9f : 0.53f), 1, 120f)));
         Label(btn, "このマップでプレイ →", S("startBtnText", 16, Color.white, TextAnchor.MiddleCenter));
         if (GUI.Button(btn, GUIContent.none, GUIStyle.none)) game.StartGame();
-        y += 46 + 18;
 
-        Rect summary = new Rect(cx - 140, y, 280, 18);
-        Label(summary, (helpOpen ? "▼ " : "▶ ") + "遊び方・擬態と閃光について", S("helpSummary", 11, C(0x8fada4), TextAnchor.MiddleCenter));
-        if (GUI.Button(summary, GUIContent.none, GUIStyle.none)) helpOpen = !helpOpen;
-        y += 18 + 8;
-        if (helpOpen) Label(new Rect(cx - helpW / 2f, y, helpW, helpH), paragraph, helpStyle);
-
-        Label(new Rect(16, H - 24, W - 32, 18), "Enter でプレイ開始　1 / 2 / 3 でマップ選択", S("titleKeys", 10, C(0x8fada4, 0.7f), TextAnchor.MiddleLeft));
-
-        // 展示会場でESP32やスマホの接続先を手動設定する際にすぐ分かるよう、PCのIPを大きめに表示しておく
-        string ip = PointerServer.Instance != null ? PointerServer.Instance.LocalIp : "取得中...";
-        Label(new Rect(16, H - 44, W - 32, 18), "このPCのIP: " + ip, S("titleIp", 13, C(0xdfc985, 0.95f), TextAnchor.MiddleLeft, bold: true));
-    }
-
-    void DrawControlStrip(float y)
-    {
-        var text = S("strip", 11, C(0xa6c3b6), TextAnchor.MiddleLeft);
-        var kbd = S("kbd", 11, C(0xdfeee6), TextAnchor.MiddleCenter);
-        // [項目] = (キー..., 説明)
-        var items = new List<KeyValuePair<string[], string>>
-        {
-            new KeyValuePair<string[], string>(new[] { "WASD", "↑↓←→" }, "移動"),
-            new KeyValuePair<string[], string>(new string[0], "マウスで照らす"),
-            new KeyValuePair<string[], string>(new string[0], "止まると擬態"),
-            new KeyValuePair<string[], string>(new string[0], "ランタンは照らすとすぐ点灯・周囲の敵を撃退"),
-            new KeyValuePair<string[], string>(new string[0], "花を照らすと道案内"),
-        };
-        const float gap = 14f;
-        float total = 0f;
-        var widths = new List<float>();
-        foreach (var it in items)
-        {
-            float w = 0f;
-            for (int k = 0; k < it.Key.Length; k++) w += kbd.CalcSize(new GUIContent(it.Key[k])).x + 10f + (k > 0 ? text.CalcSize(new GUIContent(" / ")).x : 0f);
-            if (it.Key.Length > 0) w += 4f;
-            w += text.CalcSize(new GUIContent(it.Value)).x;
-            widths.Add(w);
-            total += w;
-        }
-        total += gap * (items.Count - 1);
-        float x = Mathf.Max(8f, (W - total) / 2f);
-        for (int i = 0; i < items.Count; i++)
-        {
-            var it = items[i];
-            float cx = x;
-            for (int k = 0; k < it.Key.Length; k++)
-            {
-                if (k > 0)
-                {
-                    float sw = text.CalcSize(new GUIContent(" / ")).x;
-                    Label(new Rect(cx, y, sw, 20), " / ", text);
-                    cx += sw;
-                }
-                float kw = kbd.CalcSize(new GUIContent(it.Key[k])).x + 10f;
-                Rect kr = new Rect(cx, y + 1, kw, 18);
-                Panel(kr, Tex("kbdBox", () => RoundedBox(32, 4, C(0x152c2c), C(0x608778, 0.4f), 1)), 4);
-                Label(kr, it.Key[k], kbd);
-                cx += kw;
-            }
-            if (it.Key.Length > 0) cx += 4f;
-            Label(new Rect(cx, y, widths[i], 20), it.Value, text);
-            x += widths[i] + gap;
-        }
+        // 始める前にマットが反応するか確かめられるよう、タイトルでも左下に大きめに接続状態と踏んでいるパッドを出す
+        DrawMatStatus(20, H - 20 - MatStatusHeight(TitleMatScale, 14), TitleMatScale, 14);
     }
 
     void DrawMapCard(Rect r, string id, bool selected, bool hover, float preview)
@@ -280,8 +229,6 @@ public class NightHud : MonoBehaviour
         Rect pv = new Rect(r.x + (r.width - preview) / 2f, r.y + 14, preview, preview);
         GUI.DrawTexture(pv, previews[id], ScaleMode.ScaleToFit);
         Label(new Rect(r.x + 12, pv.yMax + 12, r.width - 24, 22), id + ". " + NightMap.NameOf(id), S("cardTitle", 16, C(0xdfffe0), TextAnchor.MiddleLeft, bold: true));
-        string info = id == "A" ? "分岐 / 導きの花 / 祠" : id == "B" ? "階段 / 高台 / 石造遺跡" : "周回 / 湖畔 / 小島";
-        Label(new Rect(r.x + 12, pv.yMax + 41, r.width - 24, 14), info, S("cardInfo", 10, C(0x98b6a8), TextAnchor.MiddleLeft));
 
         var diff = NightDifficulty.For(id);
         var dStyle = S("cardDiff" + id, 11, diff.color, TextAnchor.MiddleCenter, bold: true);
@@ -305,28 +252,61 @@ public class NightHud : MonoBehaviour
     void DrawHud()
     {
         // HPバー・擬態ゲージは主人公の頭上に出す(DrawPlayerBars)。ここはマップ名・操作・接続状態だけ
-        Rect r = new Rect(12, 12, 248, 84);
+        var row = S("hudRow", 10, C(0xdfffe0, 0.82f), TextAnchor.UpperLeft, wrap: true);
+        string rowText = "移動: WASD/矢印　灯り: " + (game.Flashlight.HasPhoneInput ? "スマホ" : "マウス") + "　止まる=擬態　石を照らして蛍を集めよう";
+        float rowH = row.CalcHeight(new GUIContent(rowText), 220);
+        Rect r = new Rect(12, 12, 248, 10 + 21 + rowH + 10);
         Panel(r, PanelTex(), 9);
         float x = r.x + 14, y = r.y + 10;
         GUI.DrawTexture(new Rect(x, y + 1, 16, 16), markTex);
         Shadowed(new Rect(x + 21, y, r.width - 49, 18), game.MapId + ". " + game.Map.Name, S("hudH1", 14, C(0xdfffe0, 0.9f), TextAnchor.MiddleLeft, bold: true));
         y += 21;
-        var row = S("hudRow", 10, C(0xdfffe0, 0.82f), TextAnchor.UpperLeft, wrap: true);
-        string rowText = "移動: WASD/矢印　灯り: " + (game.Flashlight.HasPhoneInput ? "スマホ" : "マウス") + "　止まる=擬態　石を照らして蛍を集めよう";
-        float rowH = row.CalcHeight(new GUIContent(rowText), 220);
         Shadowed(new Rect(x, y, 220, rowH), rowText, row);
-        y += rowH + 2;
 
-        // 圧力マット(ESP32)との接続表示。展示中に接続が切れていないか一目で分かるように。
+        // マットの反応はプレイ中は小さめにして左下(下のヒントの上)に出す
+        DrawMatStatus(16, H - 18 - 16 - 10 - MatStatusHeight(PlayMatScale, 10), PlayMatScale, 10);
+    }
+
+    // 圧力マット(ESP32)との接続表示と、どのパッドが踏まれているか。タイトル画面とプレイ中の左下に出す。
+    // 展示中に接続が切れていないか一目で分かるように。
+    // k はマットの図の大きさの倍率、fontSize は文字の大きさ(図だけ大きくして、文字は控えめにできる)
+    const float MatCell = 10f; // マットの図の1マス(8px + すき間2px)
+    const float PlayMatScale = 1.3f, TitleMatScale = 2.5f;
+    static float MatStatusHeight(float k, int fontSize) => fontSize * 1.4f + 4 + MatCell * 5 * k; // 接続表示の行 + マットの図(5マス四方)
+
+    void DrawMatStatus(float x, float y, float k, int fontSize)
+    {
         var mat = PressureMatServer.Instance;
         bool matConnected = mat != null && mat.Connected;
-        var matStyle = S(matConnected ? "matOn" : "matOff", 10, matConnected ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleLeft);
+        var matStyle = S((matConnected ? "matOn" : "matOff") + fontSize, fontSize, matConnected ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleLeft);
         string matText = matConnected
             ? (mat.Source.Length > 0 ? "接続中(" + mat.Source + ")" : "接続中")
             : "未接続"; // 詳しい理由(USBの状態など)は出さず、画面の情報を少なくする
-        Shadowed(new Rect(x, y, 220, 14), (matConnected ? "● " : "○ ") + "コントローラー: " + matText, matStyle);
-        y += 14 + 4;
+        Shadowed(new Rect(x, y, 300, fontSize * 1.4f), (matConnected ? "● " : "○ ") + "コントローラー: " + matText, matStyle);
+        y += fontSize * 1.4f + 4;
 
+        // マットのどこが踏まれているか。実物のマットと同じ並び(上=前・下=後ろの横長、左右の縦長)で、
+        // 踏んでいるパッドが緑に光る。マットの調子を確かめる用
+        //    ■■■
+        //  ■      ■
+        //  ■      ■
+        //  ■      ■
+        //    ■■■
+        float c = MatCell * k, g = 2f * k;
+        Shadowed(new Rect(x, y + c * 2, fontSize * 3.4f, c), "マット", S("matLabel" + fontSize, fontSize, C(0xdfffe0, 0.82f), TextAnchor.MiddleLeft));
+        float ox = x + fontSize * 3.6f;
+        bool[] on = mat != null && mat.HasMatInput
+            ? new[] { mat.Front, mat.Back, mat.Left, mat.Right }
+            : new bool[4];
+        Rect[] pads =
+        {
+            new Rect(ox + c, y, c * 3 - g, c - g),         // 前(上)
+            new Rect(ox + c, y + c * 4, c * 3 - g, c - g), // 後ろ(下)
+            new Rect(ox, y + c, c - g, c * 3 - g),         // 左
+            new Rect(ox + c * 4, y + c, c - g, c * 3 - g), // 右
+        };
+        for (int i = 0; i < 4; i++)
+            Fill(pads[i], on[i] ? C(0x9dffb0) : new Color(1f, 1f, 1f, matConnected ? 0.18f : 0.08f));
     }
 
     void DrawGoalHud()

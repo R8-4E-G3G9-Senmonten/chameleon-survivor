@@ -27,7 +27,58 @@ public class NightAutoShot : MonoBehaviour
         if (System.Array.IndexOf(args, "-nightHealTest") >= 0) { StartCoroutine(HealTest()); return; }
         if (System.Array.IndexOf(args, "-nightCamoTest") >= 0) { StartCoroutine(CamoTest()); return; }
         if (System.Array.IndexOf(args, "-nightGaugeTest") >= 0) { StartCoroutine(GaugeTest()); return; }
+        if (System.Array.IndexOf(args, "-nightBench") >= 0) { StartCoroutine(Bench()); return; }
         StartCoroutine(m >= 0 && m + 1 < args.Length ? Tour(args[m + 1]) : Run());
+    }
+
+    // 重さの計測: マップCで敵を大量に出し、光を当て続けた時と雷の時のフレーム時間を bench.txt に書く(軽量化の前後比較用)。
+    // 垂直同期を切って、1フレームにかかる時間そのものを測る。「-benchNoAim」を付けると自動で照らさず、スマホの光だけになる。
+    IEnumerator Bench()
+    {
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = -1;
+        Random.InitState(1234);
+        bool aim = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-benchNoAim") < 0;
+        yield return new WaitForSeconds(1f);
+        g.SelectMap("C");
+        yield return new WaitForSeconds(0.5f);
+        g.BeginPlay("テスト");
+        yield return new WaitForSeconds(1f);
+        var report = new StringBuilder();
+        foreach (int n in new[] { 30, 70 })
+        {
+            g.DebugSpawnNear(n - g.Enemies.Count, 50f); // 倒れないよう硬くして、数をそろえる
+            yield return Measure("敵" + n + "体・光を当てる", 5f, aim, report);
+            g.DebugFlashIn(0.5f);
+            yield return Measure("敵" + n + "体・雷", 2.5f, aim, report);
+        }
+        File.WriteAllText(Path.Combine(dir, "bench.txt"), report.ToString());
+        Debug.Log("NightAutoShot: bench\n" + report);
+        Application.Quit();
+    }
+
+    IEnumerator Measure(string label, float seconds, bool aim, StringBuilder report)
+    {
+        var times = new System.Collections.Generic.List<float>();
+        float t = 0f;
+        while (t < seconds)
+        {
+            g.DebugSetHp(999f);
+            // 擬態しないよう、主人公を小さく回らせ続ける
+            NightPlayer.DebugInput = new Vector3(Mathf.Cos(Time.time * 2f), 0, Mathf.Sin(Time.time * 2f)) * 0.6f;
+            if (aim && g.Enemies.Count > 0)
+            {
+                Vector3 v = g.Cam.WorldToViewportPoint(g.Enemies[(int)(Time.time * 2f) % g.Enemies.Count].Position);
+                g.Flashlight.DebugAim = new Vector2(v.x, 1f - v.y);
+            }
+            yield return null;
+            times.Add(Time.unscaledDeltaTime * 1000f);
+            t += Time.unscaledDeltaTime;
+        }
+        times.Sort();
+        float avg = 0f; foreach (var x in times) avg += x; avg /= times.Count;
+        report.AppendLine(label + ": 平均 " + avg.ToString("0.0") + "ms (" + (1000f / avg).ToString("0") + "fps)  遅い5% " +
+            times[(int)(times.Count * 0.95f)].ToString("0.0") + "ms  最大 " + times[times.Count - 1].ToString("0.0") + "ms  敵 " + g.Enemies.Count);
     }
 
     // 指定マップを開始し、広場を順に巡って撮影する(階段・橋・湖などの地形確認用)

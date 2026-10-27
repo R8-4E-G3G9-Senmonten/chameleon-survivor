@@ -63,7 +63,8 @@ public class PointerServer : MonoBehaviour
         public int lastReceiveTimeMs;
         public int colorIndex;
         public int kills; // このスマホの光で倒した敵の数(ゲーム開始ごとに0に戻す)
-        public int lastHitMs = int.MinValue; // このスマホの光が最後に敵にダメージを与えた時刻(スマホで音を鳴らすため)
+        public int lastHitMs; // このスマホの光が最後に敵にダメージを与えた時刻(スマホで音を鳴らすため)
+        public bool hasHit;   // 一度でも当てたか(未設定の時刻との引き算があふれて「当たっている」にならないように)
     }
 
     // ゲームの様子(スマホ画面に出す): カメレオンの画面上の位置(上端原点のビューポート座標)と、プレイ中かどうか。
@@ -101,7 +102,7 @@ public class PointerServer : MonoBehaviour
         if (string.IsNullOrEmpty(id)) return;
         lock (dataLock)
         {
-            if (pointers.TryGetValue(id, out PointerEntry entry)) entry.lastHitMs = Environment.TickCount;
+            if (pointers.TryGetValue(id, out PointerEntry entry)) { entry.lastHitMs = Environment.TickCount; entry.hasHit = true; }
         }
     }
 
@@ -145,7 +146,7 @@ public class PointerServer : MonoBehaviour
         var ci = System.Globalization.CultureInfo.InvariantCulture;
         string json = "{\"ok\":true,\"color\":\"" + HexOf(entry.colorIndex) + "\",\"kills\":" + entry.kills +
                ",\"st\":\"" + viewState + "\",\"play\":" + (viewState == "play" ? "true" : "false") +
-               ",\"hit\":" + (Environment.TickCount - entry.lastHitMs < HitHoldMs ? "true" : "false") +
+               ",\"hit\":" + (entry.hasHit && Environment.TickCount - entry.lastHitMs < HitHoldMs ? "true" : "false") +
                ",\"px\":" + viewPlayerX.ToString("0.00", ci) + ",\"py\":" + viewPlayerY.ToString("0.00", ci);
         if (viewState == "end")
         {
@@ -1412,6 +1413,8 @@ function unlockAudio() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
   } catch (e) {}
 }
+// スマホの効果音(撃破音・当てている間の音)を鳴らすか。音を決め直すまで、いったん鳴らさない(振動はそのまま)
+var SoundEnabled = false;
 var sfx = {}; // 名前 → 読み込んだ音(AudioBuffer)
 var SfxFiles = { kill: 'kyupiin1.mp3', hit: 'message-display2.mp3' }; // 「キュピーン1」/「メッセージ表示音2」(ピピピピ)
 function loadSfx() {
@@ -1451,7 +1454,7 @@ function tone(freq, start, dur, vol, type) {
   osc.start(start); osc.stop(start + dur + 0.02);
 }
 function playKillSound() {
-  if (!audioCtx || audioCtx.state !== 'running') return;
+  if (!SoundEnabled || !audioCtx || audioCtx.state !== 'running') return;
   var now = Date.now();
   if (now - lastSoundAt < 90) return; // 同時に何体も倒した時に音が重なりすぎないように
   lastSoundAt = now;
@@ -1579,7 +1582,7 @@ updateAim();
 // 音の高さは自分の色ごとに少し変える。Android は短い振動もくり返す(iPhone のブラウザは振動できない)。
 var hitting = false, hitNodes = null, hitBuzzTimer = null;
 function startHitSound() {
-  if (!audioCtx || audioCtx.state !== 'running' || hitNodes) return;
+  if (!SoundEnabled || !audioCtx || audioCtx.state !== 'running' || hitNodes) return;
   var t = audioCtx.currentTime;
   if (sfx.hit) {
     var src = audioCtx.createBufferSource(), g = audioCtx.createGain(), range = loopRange(sfx.hit);
