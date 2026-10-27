@@ -46,3 +46,7 @@ qr_print/
 
 # 紹介動画(デモ撮影モードで作る動画・連番画像。ファイルが大きいのでコミットしない)
 demo_video/
+
+# Blender の自動バックアップと、Windows のフォルダ設定ファイル
+*.blend1
+desktop.ini

@@ -1,22 +1,26 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 敵: 群れ型(moth)・硬い型(brute)・遠距離型(shooter)。通路グラフに沿ってプレイヤーを追う。
+// 敵: 群れ型(moth)・硬い型(brute)・遠距離型(shooter)・すり抜け型(sprite)。通路グラフに沿ってプレイヤーを追う。
+// すり抜け型だけは通路を無視して、木や崖を突き抜けてまっすぐ追ってくる(近距離型・体力は一番低い・回復オーブを落とさない)。
 // 光(懐中電灯・閃光・点灯したランタン)を浴び続けると lightHp が減って倒れる。
 public class NightEnemy
 {
-    public enum Kind { Moth, Brute, Shooter }
+    public enum Kind { Moth, Brute, Shooter, Sprite }
+    public const int KindCount = 4;
 
     public struct Config
     {
         public float speed, contactDps, lightHp, drain, regen, scale;
         public Color color;
         public bool ranged;
+        public bool phasing;    // 通路を無視して壁や木をすり抜ける
+        public bool noHealDrop; // 倒しても回復オーブを落とさない
     }
 
     // 全種類の敵の光HPにかける倍率。照らすとテンポよく倒れて気持ちいいように、元の値の6割にしている。
     // 倒れるまでの照射時間(マップB・灯り1つ・待ち伏せなし)の目安:
-    //   群れ型 約1.0秒→0.6秒 / 遠距離型 約2.1秒→1.3秒 / 硬い型 約3.8秒→2.3秒
+    //   すり抜け型 約0.4秒 / 群れ型 約1.0秒→0.6秒 / 遠距離型 約2.1秒→1.3秒 / 硬い型 約3.8秒→2.3秒
     // 難しすぎる・簡単すぎる時はこの1つの数字で調整する(マップ別の倍率は NightDifficulty.enemyHp)。
     const float HpScale = 0.6f;
 
@@ -26,6 +30,8 @@ public class NightEnemy
         {
             case Kind.Brute: return new Config { speed = 2.05f, contactDps = 24, lightHp = 115 * HpScale, drain = 38, regen = 20, color = NightMeshes.Hex(0x8a3b3b), scale = 1f };
             case Kind.Shooter: return new Config { speed = 1.8f, contactDps = 8, lightHp = 60 * HpScale, drain = 35, regen = 15, color = NightMeshes.Hex(0xff8c00), scale = 0.8f, ranged = true };
+            // 近道してくる分、足は群れ型より遅め
+            case Kind.Sprite: return new Config { speed = 2.6f, contactDps = 10, lightHp = 20 * HpScale, drain = 44, regen = 16, color = NightMeshes.Hex(0x7fe0b0), scale = 0.6f, phasing = true, noHealDrop = true };
             default: return new Config { speed = 3.5f, contactDps = 11, lightHp = 34 * HpScale, drain = 44, regen = 16, color = NightMeshes.Hex(0x8a4b8a), scale = 0.55f };
         }
     }
@@ -223,10 +229,23 @@ public class NightEnemy
             inst.transform.localScale = Vector3.one * k;
             // 足元(最下点)が地面に来るように持ち上げ、中心はXZの原点に揃える
             Vector3 center = go.transform.InverseTransformPoint(b.center);
-            inst.transform.localPosition = new Vector3(-center.x * k, -(b.min.y - go.transform.position.y) * k, -center.z * k);
+            inst.transform.localPosition = new Vector3(-center.x * k, -(b.min.y - go.transform.position.y) * k + model.hover, -center.z * k);
         }
 
-        hitHeight = model.targetHeight * 0.55f;
+        hitHeight = model.targetHeight * 0.55f + model.hover;
+        if (model.glowRange > 0f)
+        {
+            var glow = new GameObject("Glow").AddComponent<Light>();
+            glow.transform.SetParent(go.transform, false);
+            // 体の中に置くと表面を照らせないので、頭の上の手前から照らす(通路の外は地面がなく、照らせるのは体だけのため)
+            glow.transform.localPosition = new Vector3(0f, model.targetHeight + model.hover + 0.8f, 0.6f);
+            glow.type = LightType.Point;
+            glow.color = model.glowColor;
+            glow.range = model.glowRange;
+            glow.intensity = 3f;
+            glow.renderMode = LightRenderMode.ForcePixel;
+            glow.shadows = LightShadows.None;
+        }
         SetupHitFx(model.targetHeight * 0.45f);
         var mats = new System.Collections.Generic.List<Material>();
         foreach (var r in renderers) mats.AddRange(r.materials);

@@ -355,6 +355,11 @@ public class PointerServer : MonoBehaviour
         candidates.Add(Path.Combine(Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? "", @"cloudflared\cloudflared.exe"));
         candidates.Add(Path.Combine(Environment.GetEnvironmentVariable("ProgramFiles") ?? "", @"cloudflared\cloudflared.exe"));
         candidates.Add(Path.Combine(home, @"tools\cloudflared\cloudflared.exe"));
+        // プロジェクトの tools\cloudflared.exe(play_night.bat を使わずに exe を直接起動した時・エディタで再生した時も見つける)
+        string gameDir = Path.GetDirectoryName(Application.dataPath) ?? "";                      // ビルドの exe があるフォルダ / エディタではプロジェクト
+        candidates.Add(Path.Combine(gameDir, "cloudflared.exe"));
+        candidates.Add(Path.GetFullPath(Path.Combine(gameDir, @"..\..\tools\cloudflared.exe"))); // Build\NightForest\ から見たプロジェクトの tools
+        candidates.Add(Path.Combine(gameDir, @"tools\cloudflared.exe"));                           // エディタで再生した時
         foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
             if (dir.Length > 0) candidates.Add(Path.Combine(dir.Trim('"'), "cloudflared.exe"));
         foreach (string c in candidates)

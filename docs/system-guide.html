@@ -213,7 +213,7 @@
       <div class="stats" aria-label="プロジェクトの規模">
         <div class="stat"><b data-count="6024">0</b><span>主要C#コードの行数</span></div>
         <div class="stat"><b data-count="3">0</b><span>マップ(A・B・C)</span></div>
-        <div class="stat"><b data-count="3">0</b><span>敵の種類(Meshy AI製)</span></div>
+        <div class="stat"><b data-count="4">0</b><span>敵の種類(見た目はMeshy AI製の7体)</span></div>
         <div class="stat"><b data-count="7">0</b><span>同時に遊べる灯り役</span></div>
         <div class="stat"><b data-count="2">0</b><span>ESP32コントローラー方式</span></div>
       </div>
@@ -484,14 +484,16 @@ New-NetFirewallRule -DisplayName "ChameleonNight UDP" -Direction Inbound -Protoc
     </section>
 
     <!-- ================= 08 ENEMY ================= -->
-    <section class="theme" id="enemy" data-keywords="敵 ai 経路探索 スタック 角 meshy blender glb fbx 狼 ゴーレム キノコ アニメーション">
+    <section class="theme" id="enemy" data-keywords="敵 ai 経路探索 スタック 角 meshy blender fbx お化け 狼 猪 熊 騎士 狐 妖精 すり抜け リグ アニメーション">
       <div class="theme-head reveal"><div class="num">08</div><h2>敵(AIと3Dモデル)<span class="sub">通路に沿って追いかけ、角で詰まらない</span></h2></div>
       <div class="tablewrap reveal"><table>
         <tr><th>種類</th><th>見た目(Meshy AI)</th><th>速さ</th><th>光HP</th><th>接触ダメージ/秒</th><th>特徴</th><th>出現率</th></tr>
-        <tr><td>群れ型</td><td>リーフバウンド・ウルフ(四足)</td><td>3.5</td><td>34</td><td>11</td><td>速くて弱い</td><td>45%</td></tr>
-        <tr><td>硬い型</td><td>エンバーウッド・コロッサス(ゴーレム)</td><td>2.05</td><td>115</td><td>24</td><td>高さ約5.5。通路をふさぐ大きさ</td><td>25%</td></tr>
-        <tr><td>遠距離型</td><td>マッシュルーム・ガーディアン</td><td>1.8</td><td>60</td><td>8</td><td>9m以内で見通せると立ち止まり、2.5秒ごとに弾を撃つ</td><td>30%</td></tr>
+        <tr><td>群れ型</td><td>月光の狼(四足)・紫の猪</td><td>3.5</td><td>34</td><td>11</td><td>速くて弱い。3体でかたまって出る</td><td>38%</td></tr>
+        <tr><td>硬い型</td><td>狼男のお化け・赤い熊のお化け・鎧のお化け</td><td>2.05</td><td>115</td><td>24</td><td>高さ約4.5。通路をふさぐ大きさ</td><td>25%</td></tr>
+        <tr><td>遠距離型</td><td>狐火の狐</td><td>1.8</td><td>60</td><td>8</td><td>9m以内で見通せると立ち止まり、2.5秒ごとに弾を撃つ</td><td>25%</td></tr>
+        <tr><td>すり抜け型</td><td>ミントの妖精</td><td>2.6</td><td>20(一番低い)</td><td>10</td><td>通路を無視して木や崖をすり抜け、まっすぐ追ってくる。倒しても回復オーブを落とさない。暗い森でも見えるよう緑に光る</td><td>12%</td></tr>
       </table></div>
+      <p class="reveal" style="color:var(--text-2);margin-top:12px">光HPは表の値に全体の倍率0.6とマップ別の倍率がかかります。見た目は種類ごとに順番に使うので、同じ種類でも違うお化けが出てきます。</p>
       <p class="reveal" style="color:var(--text-2);margin-top:12px">出現はプレイヤーから12〜24m離れた通路上。間隔は最初2.4秒で、時間とともに最短0.7秒まで短くなります(門が開いた後はさらに15%速く)。同時に出るのは最大44体です。</p>
 
       <h3 class="reveal" style="margin-top:var(--s3)">追いかけ方(3段構え)</h3>
@@ -500,21 +502,23 @@ New-NetFirewallRule -DisplayName "ChameleonNight UDP" -Direction Inbound -Protoc
         <div class="card reveal"><h3><span class="label l-how">2</span>見通せないなら通路グラフ</h3><p>カーブや分岐の向こうにいるときは、ダイクストラ法で求めた経路の中継点をたどります。経路は0.4秒ごとに引き直します。</p></div>
         <div class="card reveal"><h3><span class="label l-how">3</span>壁に当たったら滑る</h3><p>進みたい方向が通路の外なら、0°→±20°→±40°→±65°→±90°→±125°と少しずつ曲げて、歩ける方向を探します。それでも0.3秒進めなければ、0.8秒だけ直進をやめて経路に従います。</p></div>
       </div>
+      <div class="card reveal" style="margin-top:var(--s2)"><h3><span class="label l-idea">例外</span>すり抜け型だけは通路を無視</h3>
+        <p>すり抜け型(<code>PhaseTowardPlayer</code>)は上の3段構えを使わず、プレイヤーへ一直線に進みます。通路の内側へ戻す処理(<code>ConstrainActor</code>)もかけず、高さだけ近くの地面へなめらかに合わせます(<code>FollowGround</code>)。近道できる分、速さは群れ型より遅い2.6にしています。</p></div>
       <div class="card reveal" style="margin-top:var(--s2)"><h3><span class="label l-hard">難しかった</span>近くの敵が角でスタックする</h3>
         <div class="pcf"><div class="p"><b>症状</b>最短ルートで向かってくる敵が角で止まる</div><div class="c"><b>原因</b>まっすぐ進もうとして通路の外にはみ出し、「内側へ戻す」処理で元の位置に押し戻され続けていた</div><div class="f"><b>対策</b>はみ出す前に、通れる方向へ曲げて壁沿いに滑らせる(上の3)。詰まり検出で経路に切り替え</div></div></div>
 
       <h3 class="reveal" style="margin-top:var(--s4)">3Dモデルの取り込み</h3>
       <div class="grid">
-        <div class="card reveal"><h3><span class="label l-hard">難しかった</span>GLBはUnityで読めない</h3>
-          <p>キノコはGLB形式でした。Unityは標準でGLBを読めないため、インストール済みのBlender 5.2を画面なしで動かし、FBXに変換しました。中に余分な球(マテリアルなし・42頂点)が入っていたので除き、埋め込まれたテクスチャもPNGに書き出しています。</p></div>
-        <div class="card reveal"><h3><span class="label l-idea">工夫</span>大きさを自動でそろえる</h3>
-          <p>モデルごとに単位がバラバラなので、読み込んだ後に見た目の高さを測り、目標の高さ(狼1.6・ゴーレム5.5・キノコ2.2)に自動で拡大縮小し、足元を地面に合わせます。</p></div>
-        <div class="card reveal"><h3><span class="label l-idea">工夫</span>Animatorを作らずにアニメ再生</h3>
-          <p>アニメーションの状態遷移が不要なため、<code>PlayableGraph</code> で歩きクリップを直接ループ再生しています。<code>SetupEnemyModels</code> がループ設定とマテリアルの差し替え(アルベド+法線のStandard)を自動で行います。</p></div>
-        <div class="card reveal"><h3><span class="label l-how">確認</span>正面の向きは本当に正しい?</h3>
-          <p>「敵がこちらを向いていない」という指摘を受け、骨のデータで確かめました。ゴーレムとキノコは顔の前の骨(<code>headfront</code>)が+Z側、狼は実行中に前脚が後脚より進行方向側(+0.46)にあり、3体とも正しいと判断できました。原因は向きではなく追跡の仕方でした。</p></div>
+        <div class="card reveal"><h3><span class="label l-hard">難しかった</span>骨もアニメもないモデル</h3>
+          <p>Meshy AIの「動物×お化け」7体は、骨もアニメもないメッシュだけでした。Blender 5.2を画面なしで動かす <code>blender/enemies/rig_enemy_ghosts.py</code> で、骨8本を自動で置き、頂点の重みを体の高さ・前後・左右の位置から計算して付け、ループするアニメ(Walk)を作ってFBXにしています。</p></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>お化けと四足で動きを分ける</h3>
+          <p>浮くお化け(熊・狼男・騎士・狐・妖精)は、ふわふわ上下に揺れ、しっぽがうねり、腕や翼・狐火が動きます。四足(狼・猪)は対角の脚を交互に出して歩きます。お化けは地面から少し浮かせて表示します。</p></div>
+        <div class="card reveal"><h3><span class="label l-idea">工夫</span>軽くして大きさをそろえる</h3>
+          <p>元は4.5万〜20万面と重いので5000〜8000面に減らし、テクスチャも1024pxにしました。読み込んだ後に見た目の高さを測り、目標の高さ(群れ型1.4〜1.5・硬い型4.4〜4.6・遠距離型2.6・すり抜け型2.1)に自動で拡大縮小します。<code>PlayableGraph</code> で歩きクリップを直接ループ再生します。</p></div>
+        <div class="card reveal"><h3><span class="label l-how">確認</span>向き・動き・重さを自動撮影で確認</h3>
+          <p><code>-nightEnemyGallery</code> で全員を並べて撮影し、正面が+Zを向いていることを確認しました。四足は前脚が進行方向側(+1.0前後)。<code>-nightSpriteTest</code> では、すり抜け型がマップA・B・Cとも4方向から約3秒でプレイヤーに届き、回復オーブを落とさないこと、約90fpsで動くことを確かめました。</p></div>
       </div>
-      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightEnemy.cs</code><code>NightEnemyModels.cs</code><code>NightGame.cs (AdvanceEnemy)</code><code>Assets/Editor/SetupEnemyModels.cs</code><code>Assets/Models/Enemies/</code></div>
+      <div class="files reveal"><span class="label l-file">関連ファイル</span><code>NightEnemy.cs</code><code>NightEnemyModels.cs</code><code>NightGame.cs (AdvanceEnemy)</code><code>Assets/Editor/SetupEnemyModels.cs</code><code>Assets/Models/Enemies/</code><code>blender/enemies/rig_enemy_ghosts.py</code></div>
     </section>
 
     <!-- ================= 09 GIMMICK ================= -->

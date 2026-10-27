@@ -90,11 +90,28 @@ public static class NightSceneBuilder
         gameGO.AddComponent<NightAutoShot>();
         gameGO.AddComponent<NightDemoVideo>();
 
-        // 敵の見た目: 群れ型=狼 / 硬い型=巨人 / 遠距離型=キノコの守り手(いずれもMeshy AI製)
+        // 敵の見た目(動物×お化け、いずれもMeshy AI製)。種類ごとに順番に使う。お化け型は少し浮かせる
         var models = gameGO.AddComponent<NightEnemyModels>();
-        models.moth = MakeEnemyModel(SetupEnemyModels.Wolf, 1.6f);
-        models.brute = MakeEnemyModel(SetupEnemyModels.Colossus, 5.5f);
-        models.shooter = MakeEnemyModel(SetupEnemyModels.Mushroom, 2.2f);
+        models.moth = new[]
+        {
+            MakeEnemyModel(SetupEnemyModels.Frostwolf, 1.5f, 0f, 1.1f),
+            MakeEnemyModel(SetupEnemyModels.Tuskboar, 1.4f, 0f, 1.1f),
+        };
+        models.brute = new[]
+        {
+            MakeEnemyModel(SetupEnemyModels.Specter, 4.6f, 0.35f),
+            MakeEnemyModel(SetupEnemyModels.Bear, 4.4f, 0.35f),
+            MakeEnemyModel(SetupEnemyModels.Knight, 4.6f, 0.35f),
+        };
+        models.shooter = new[]
+        {
+            MakeEnemyModel(SetupEnemyModels.Emberfox, 2.6f, 0.3f),
+        };
+        // 木や崖をすり抜けてくるので、暗い森の中でも見えるよう、まわりをうっすら緑に照らす
+        var sprite = MakeEnemyModel(SetupEnemyModels.Sprite, 2.1f, 0.35f);
+        sprite.glowRange = 4.5f;
+        sprite.glowColor = new Color(0.55f, 1f, 0.75f);
+        models.sprite = new[] { sprite };
 
         if (!Directory.Exists("Assets/Scenes")) Directory.CreateDirectory("Assets/Scenes");
         EditorSceneManager.SaveScene(scene, ScenePath);
@@ -102,11 +119,15 @@ public static class NightSceneBuilder
         Debug.Log("NightSceneBuilder: " + ScenePath + " を作成しました。");
     }
 
-    static NightEnemyModel MakeEnemyModel(SetupEnemyModels.Def def, float height)
+    static NightEnemyModel MakeEnemyModel(SetupEnemyModels.Def def, float height, float hover, float animSpeed = 1f)
     {
         var prefab = SetupEnemyModels.LoadPrefab(def);
         if (prefab == null) Debug.LogWarning("NightSceneBuilder: 敵モデル " + def.name + " が見つかりません。簡易形状で代用します。");
-        return new NightEnemyModel { prefab = prefab, walk = prefab != null ? SetupEnemyModels.LoadClip(def) : null, targetHeight = height };
+        return new NightEnemyModel
+        {
+            prefab = prefab, walk = prefab != null ? SetupEnemyModels.LoadClip(def) : null,
+            targetHeight = height, hover = hover, animSpeed = animSpeed,
+        };
     }
 
     static GameObject[] LoadModels(string[] names)

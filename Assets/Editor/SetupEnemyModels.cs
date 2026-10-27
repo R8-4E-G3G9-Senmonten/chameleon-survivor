@@ -2,27 +2,38 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-// Meshy AIで作った敵キャラ3体(Assets/Models/Enemies/*)を、Unityでそのまま使える状態に整える。
-//   Leafbound Wolf (四足)       … 群れ型     / Emberwood Colossus (二足) … 硬い型 / Mushroom Guardian … 遠距離型
-// Generic リグ + 自分の骨格のアバター、アニメクリップはループ、マテリアルは Albedo+法線の Standard に差し替える。
+// Meshy AIで作った「動物×お化け」の敵キャラ7体(Assets/Models/Enemies/*)を、Unityでそのまま使える状態に整える。
+//   群れ型: Moonlit Frostwolf(四足の狼) / Purple Tuskboar(猪)
+//   硬い型: Moonfang Specter(狼男) / Crimson Spirit Bear(熊) / Spectral Knight(鎧)
+//   遠距離型: Emberfox(狐火の狐) / Minty Sprite(ミントの妖精)
+// 骨とループするアニメ(Walk)は Blender で自動で付けてから FBX にしてある。
+// Generic リグ + 自分の骨格のアバター、アニメクリップはループ、マテリアルは色テクスチャの Standard に差し替える。
 public static class SetupEnemyModels
 {
     public class Def
     {
         public string name;      // フォルダ名 = FBX名
-        public string clipName;  // 再生する歩行クリップ名(部分一致)
+        public string clipName;  // 再生するクリップ名(部分一致)
     }
 
-    public static readonly Def Wolf = new Def { name = "LeafboundWolf", clipName = "" };
-    public static readonly Def Colossus = new Def { name = "EmberwoodColossus", clipName = "Walking" };
-    public static readonly Def Mushroom = new Def { name = "MushroomGuardian", clipName = "Walking" };
+    static Def D(string name) => new Def { name = name, clipName = "Walk" };
+
+    public static readonly Def Frostwolf = D("MoonlitFrostwolf");
+    public static readonly Def Tuskboar = D("PurpleTuskboar");
+    public static readonly Def Specter = D("MoonfangSpecter");
+    public static readonly Def Bear = D("CrimsonSpiritBear");
+    public static readonly Def Knight = D("SpectralKnight");
+    public static readonly Def Emberfox = D("Emberfox");
+    public static readonly Def Sprite = D("MintySprite");
+
+    public static readonly Def[] All = { Frostwolf, Tuskboar, Specter, Bear, Knight, Emberfox, Sprite };
 
     public static string FbxPath(Def d) => "Assets/Models/Enemies/" + d.name + "/" + d.name + ".fbx";
 
     [MenuItem("ChameleonNight/Setup Enemy Models")]
     public static void Run()
     {
-        foreach (var d in new[] { Wolf, Colossus, Mushroom }) Setup(d);
+        foreach (var d in All) Setup(d);
     }
 
     public static GameObject LoadPrefab(Def d) => AssetDatabase.LoadAssetAtPath<GameObject>(FbxPath(d));
@@ -39,16 +50,9 @@ public static class SetupEnemyModels
         string dir = "Assets/Models/Enemies/" + d.name + "/";
         string fbx = FbxPath(d);
         string albedoPath = dir + d.name + "_texture_0.png";
-        string normalPath = dir + d.name + "_normal.png";
         string matPath = dir + d.name + ".mat";
 
         AssetDatabase.ImportAsset(albedoPath, ImportAssetOptions.ForceUpdate);
-        var texImporter = AssetImporter.GetAtPath(normalPath) as TextureImporter;
-        if (texImporter != null && texImporter.textureType != TextureImporterType.NormalMap)
-        {
-            texImporter.textureType = TextureImporterType.NormalMap;
-            texImporter.SaveAndReimport();
-        }
 
         var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
         if (mat == null)
@@ -58,8 +62,6 @@ public static class SetupEnemyModels
         }
         mat.shader = Shader.Find("Standard");
         mat.SetTexture("_MainTex", AssetDatabase.LoadAssetAtPath<Texture2D>(albedoPath));
-        var normal = AssetDatabase.LoadAssetAtPath<Texture2D>(normalPath);
-        if (normal != null) { mat.SetTexture("_BumpMap", normal); mat.EnableKeyword("_NORMALMAP"); }
         mat.SetFloat("_Metallic", 0.05f);
         mat.SetFloat("_Glossiness", 0.3f);
         EditorUtility.SetDirty(mat);
@@ -73,8 +75,8 @@ public static class SetupEnemyModels
         importer.importAnimation = true;
         importer.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
 
-        var clips = importer.clipAnimations;
-        if (clips == null || clips.Length == 0) clips = importer.defaultClipAnimations;
+        // FBX を書き出し直すとクリップ名が変わることがあるので、保存済みの設定ではなく毎回 FBX の中身から作る
+        var clips = importer.defaultClipAnimations;
         foreach (var c in clips) { c.loopTime = true; c.loopPose = true; }
         importer.clipAnimations = clips;
         importer.SaveAndReimport();
