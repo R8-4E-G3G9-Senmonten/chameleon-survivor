@@ -483,7 +483,7 @@ public class SurvivorManager : MonoBehaviour
         GUI.DrawTexture(new Rect(cx - 48, y, 96, 96), markTexLarge);
         y += 96 + Space;
 
-        GUI.Label(new Rect(card.x, y, card.width, 50), "カメレオンナイト", titleStyle);
+        GUI.Label(new Rect(card.x, y, card.width, 50), "カメレオンサバイバー", titleStyle);
         y += 50;
         GUIStyle subTitle = new GUIStyle(subtitleStyle) { fontSize = 16, fontStyle = FontStyle.Bold };
         subTitle.normal.textColor = ColorAccent;

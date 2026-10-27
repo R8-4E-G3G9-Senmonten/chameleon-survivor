@@ -7,6 +7,7 @@ using UnityEngine;
 // 主人公を自動で動かして、マップ選択 → 移動 → 灯り役の光 → 回復オーブ → 擬態 → ランタン → 導きの花 → 蛍の石 → 雷 → 脱出 → ランキング
 // の順に実演し、画面の下に説明の字幕を出す。1フレームずつ JPG に保存するので(30fps固定)、PCの速さに関係なく滑らかな動画になる。
 // 保存した連番画像は tools/make_demo_video.py で動画(WebM)にまとめる。
+// 「-nightDemoClean」も付けると字幕と暗転を出さず(紹介動画の素材用)、各場面が始まったフレーム番号を frames/../chapters.txt に書き出す。
 public class NightDemoVideo : MonoBehaviour
 {
     const int Fps = 30;
@@ -14,6 +15,8 @@ public class NightDemoVideo : MonoBehaviour
     string dir;
     int frame;
     bool recording;
+    bool clean; // 字幕・暗転なし(紹介動画の素材用)
+    string chaptersPath;
 
     string chapter = "", caption = "";
     int chapterNo;
@@ -29,6 +32,9 @@ public class NightDemoVideo : MonoBehaviour
         if (System.Array.IndexOf(args, "-nightDemoVideo") < 0 || i < 0 || i + 1 >= args.Length) { enabled = false; return; }
         dir = Path.Combine(args[i + 1], "frames");
         Directory.CreateDirectory(dir);
+        clean = System.Array.IndexOf(args, "-nightDemoClean") >= 0;
+        chaptersPath = Path.Combine(args[i + 1], "chapters.txt");
+        File.WriteAllText(chaptersPath, "");
         g = NightGame.Instance;
         font = Resources.Load<Font>("Fonts/RocknRollOne-Regular");
         Application.runInBackground = true;
@@ -67,6 +73,7 @@ public class NightDemoVideo : MonoBehaviour
     void Caption(string title, string text)
     {
         chapterNo++;
+        File.AppendAllText(chaptersPath, frame + "\t" + title + "\n");
         chapter = title;
         caption = text;
         captionTime = Time.time;
@@ -160,7 +167,7 @@ public class NightDemoVideo : MonoBehaviour
         recording = true;
 
         // 1. マップ選択
-        Caption("カメレオンナイト", "主人公(カメレオン)と、スマホで光を当てる「灯り役」が協力して、夜の森から脱出するゲーム");
+        Caption("カメレオンサバイバー", "主人公(カメレオン)と、スマホで光を当てる「灯り役」が協力して、夜の森から脱出するゲーム");
         yield return Wait(3.2f);
         Caption("マップを選ぶ", "3つのマップは難易度が違う。A やさしい / B ふつう / C むずかしい。マップごとにランキングがある");
         g.SelectMap("B"); yield return Wait(1.3f);
@@ -314,6 +321,7 @@ public class NightDemoVideo : MonoBehaviour
         float scale = Screen.height / 720f;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
         float W = Screen.width / scale, H = 720f;
+        if (clean) return;
 
         if (fade > 0f)
         {
