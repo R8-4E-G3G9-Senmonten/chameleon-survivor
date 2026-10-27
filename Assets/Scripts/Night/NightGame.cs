@@ -87,11 +87,15 @@ public class NightGame : MonoBehaviour
     public bool Cleared { get; private set; }
     public bool GateOpened => World.Gate != null && World.Gate.opened;
     float idleTimer;
+    const float CamoDelay = 1f;      // 止まってから擬態(無敵)になるまでの秒数
+    const float HealOrbChance = 0.5f; // 敵を倒したときに回復オーブを落とす確率
 
     // ---- 閃光 ----
     const float FlashInterval = 12f, FlashHold = 0.35f, FlashFall = 1f;
     const float FlashTotal = 0.2f + FlashHold + FlashFall;
-    const float FlashDamage = 0.6f, FlashRange = 26f;
+    // FlashDamage: 雷のダメージの倍率。1回の雷(約1.5秒)で、敵の drain × FlashDamage × 約1 のダメージ。
+    // 0.6 では小さい敵が雷だけでほぼ全滅して強すぎたので下げた(0.35 なら小さい敵も少し残る)
+    const float FlashDamage = 0.35f, FlashRange = 26f;
     public float FlashWait { get; private set; } = 9f;
     public float FlashT { get; private set; } = -1f;
     public float FlashLevel { get; private set; }
@@ -125,6 +129,32 @@ public class NightGame : MonoBehaviour
         if (timer > 0f) return false;
         timer = interval;
         return true;
+    }
+
+    // pos に当たっている灯り(スマホ・マウス)の本数を数える。当てているスマホには「当てている」を知らせる(スマホの音・振動用)。
+    // owner: 一番近い光のスマホのid(マウスなら null)、mix: 当たっている光の色を混ぜた色
+    int CountLightsOn(Vector3 pos, out string owner, out Color mix)
+    {
+        var targets = LightTargets;
+        var owners = Flashlight.TargetOwners;
+        var colors = Flashlight.TargetColors;
+        float r2 = Flashlight.LightRadius * Flashlight.LightRadius, best = float.MaxValue;
+        int count = 0;
+        owner = null;
+        mix = Color.black;
+        for (int i = 0; i < targets.Count; i++)
+        {
+            Vector3 t = targets[i];
+            float dx = pos.x - t.x, dz = pos.z - t.z, d2 = dx * dx + dz * dz;
+            if (d2 >= r2 || Mathf.Abs(pos.y - t.y) >= 1.8f) continue;
+            count++;
+            string id = i < owners.Count ? owners[i] : null;
+            if (i < colors.Count) mix += colors[i];
+            if (id != null && PointerServer.Instance != null) PointerServer.Instance.MarkHitting(id);
+            if (d2 < best) { best = d2; owner = id; }
+        }
+        mix = count > 0 ? mix / count : Color.white;
+        return count;
     }
 
     // pos から見て最も近い照準点を返す(どのスマホが照らしても反応させたい箇所向け)
@@ -339,7 +369,7 @@ public class NightGame : MonoBehaviour
             Camp = Mathf.Min(CampMax, Camp + CampRecharge * dt);
             if (CampLocked && Camp >= CampUnlock) CampLocked = false;
         }
-        else if (idleTimer > 0.3f && !CampLocked)
+        else if (idleTimer > CamoDelay && !CampLocked)
         {
             if (!wasCamouflaged && Camp >= CampEnterMin) { Camouflaged = true; OnCamouflageStart(); }
             else if (wasCamouflaged) Camouflaged = true;
@@ -539,24 +569,33 @@ public class NightGame : MonoBehaviour
             if (dist < 0.9f && Mathf.Abs(en.Position.y - pp.y) < 0.9f) contactDps = Mathf.Max(contactDps, en.cfg.contactDps);
 
             // 光: 当て続けるとダウンゲージが減る。プレイヤーのすぐ近く(死角)には効かない。
-            // 接続中のスマホは何人でも同時に照らせるので、どれか1つでも当たっていればヒット扱い。
+            // 接続中のスマホは何人でも同時に照らせる。何本の光が当たっているかを数え、重ねた本数ぶんダメージが増える
+            // (2本なら2倍)。撃破は一番近い光のスマホに数える。
             Vector3 ep = en.Position;
-            Vector3 nearestTarget = NearestLightTargetTo(ep, out string lightOwner);
-            float distToLight = Mathf.Sqrt((ep.x - nearestTarget.x) * (ep.x - nearestTarget.x) + (ep.z - nearestTarget.z) * (ep.z - nearestTarget.z));
-            bool spotHit = distToLight < Flashlight.LightRadius && Mathf.Abs(ep.y - nearestTarget.y) < 1.8f;
+            int lightsOn = CountLightsOn(ep, out string lightOwner, out Color lightMix);
+            bool spotHit = lightsOn > 0;
             bool flashHit = FlashLevel > 0.05f && dist < FlashRange;
             float lantern = LanternDamageAt(ep);
             bool lit = spotHit || flashHit || lantern > 0f;
             if (spotHit)
             {
-                en.lightHp -= en.cfg.drain * LightPower * (Camouflaged ? AmbushLightMultiplier : 1f) * dt;
+                en.lightHp -= en.cfg.drain * LightPower * lightsOn * (Camouflaged ? AmbushLightMultiplier : 1f) * dt;
                 if (Random.value < dt * 8f) Audio.PlayHitBuzz();
                 if (lightOwner != null) { en.litBy = lightOwner; en.litByTime = Time.time; }
+                // 光が重なっている間は、混ざった光の色の輪が足元から広がり、白く強い火花が散る(重ねると効いていると分かるように)
+                if (lightsOn >= 2 && FxTick(ref en.crossFxTimer, dt, 0.15f))
+                {
+                    // 色を混ぜると暗くくすむので、白に寄せて明るくする。重ねた本数が多いほど輪を大きく
+                    Color bright = Color.Lerp(lightMix, Color.white, 0.45f) * 1.25f; bright.a = 1f;
+                    float size = (en.kind == NightEnemy.Kind.Brute ? 4.5f : 3.2f) * (1f + 0.25f * (lightsOn - 2));
+                    AddPulse(new Vector3(ep.x, ep.y + 0.12f, ep.z), 0.3f, 0.55f, bright, 0.35f, size);
+                    SurvivorBurst.Spawn(en.Position + Vector3.up * en.hitHeight, bright, 8);
+                }
             }
             if (flashHit) en.lightHp -= en.cfg.drain * FlashDamage * FlashLevel * dt;
             if (lantern > 0f) en.lightHp -= lantern * dt;
             if (!lit) en.lightHp = Mathf.Min(en.lightHpMax, en.lightHp + en.cfg.regen * dt);
-            en.ApplyGlow(lit);
+            en.ApplyGlow(lit, spotHit && lightsOn >= 2);
             if (lit && FxTick(ref en.fxTimer, dt, 0.12f)) SurvivorBurst.Spawn(en.Position + Vector3.up * en.hitHeight, new Color(1f, 0.15f, 0.08f), 4);
             if (en.lightHp <= 0f) KillEnemy(en);
         }
@@ -640,7 +679,7 @@ public class NightGame : MonoBehaviour
         Vector3 ep = en.Position;
         AddPulse(new Vector3(ep.x, ep.y + 0.1f, ep.z), 0.32f, 0.5f, new Color(1f, 0.9f, 0.6f, 0.85f), 0.35f,
             en.kind == NightEnemy.Kind.Brute ? 5f : 3.2f);
-        DropHealOrb(en);
+        if (Random.value < HealOrbChance) DropHealOrb(en);
     }
 
     // ---- 回復オーブ ----

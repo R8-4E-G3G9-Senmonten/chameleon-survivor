@@ -49,7 +49,8 @@ public class PressureMatServer : MonoBehaviour
 
     readonly object dataLock = new object();
     bool rxFront, rxBack, rxLeft, rxRight;
-    int lastReceiveTimeMs = int.MinValue;
+    int lastReceiveTimeMs;
+    bool everReceived; // 一度でも受信したか(未受信の時刻を int.MinValue にすると、引き算があふれて「今受信した」扱いになるため)
     string rxSource = "";
     string serialStatus = "";
 
@@ -96,6 +97,7 @@ public class PressureMatServer : MonoBehaviour
             rxLeft = (bits & ControllerStreamParser.Left) != 0;
             rxRight = (bits & ControllerStreamParser.Right) != 0;
             lastReceiveTimeMs = Environment.TickCount;
+            everReceived = true;
             rxSource = source;
         }
     }
@@ -246,7 +248,7 @@ public class PressureMatServer : MonoBehaviour
     {
         lock (dataLock)
         {
-            int sinceMs = Environment.TickCount - lastReceiveTimeMs;
+            int sinceMs = everReceived ? Environment.TickCount - lastReceiveTimeMs : int.MaxValue;
             HasMatInput = sinceMs < StaleMs;
             Connected = sinceMs < ConnectedStaleMs;
             Front = HasMatInput && rxFront;

@@ -1,0 +1,7 @@
+node_modules/
+out/
+# ゲームから撮った連番画像と、それをまとめた動画(大きいので Git に入れない。README の手順で作り直せる)
+capture/
+public/footage.mp4
+# BGM・効果音は再配布できない素材なので Git に入れない(download_audio.sh で落とせる)
+public/audio/

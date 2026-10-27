@@ -43,7 +43,7 @@ public class NightEnemy
     public bool dying;
     public float dieTimer;
     public List<Vector3> path;
-    public float navTimer, shootTimer, fxTimer, stuckTimer, noDirectTimer;
+    public float navTimer, shootTimer, fxTimer, crossFxTimer, stuckTimer, noDirectTimer;
     public float hitHeight = 0.4f; // 被ダメージの火花を出す高さ(体の中心あたり)
     public string litBy; // 最後にこの敵を照らしたスマホのid(倒した時に、そのスマホの撃破数に数える)
     public float litByTime;
@@ -100,7 +100,7 @@ public class NightEnemy
         dying = false;
         dieTimer = 0f;
         path = null;
-        navTimer = shootTimer = fxTimer = stuckTimer = noDirectTimer = 0f;
+        navTimer = shootTimer = fxTimer = crossFxTimer = stuckTimer = noDirectTimer = 0f;
         litBy = null;
         litByTime = 0f;
         go.transform.SetPositionAndRotation(pos, Quaternion.identity);
@@ -181,14 +181,16 @@ public class NightEnemy
         ringThick.SetActive(critical);
     }
 
-    public void ApplyGlow(bool lit)
+    // hot: 2本以上の光が重なっている(ダメージが倍になっている)。白く焼けるように光らせて、重ねた効果を見て分かるようにする
+    public void ApplyGlow(bool lit, bool hot = false)
     {
         UpdateHitFx(lit);
         float dmg = 1f - Mathf.Clamp01(lightHp / lightHpMax);
         // ダメージを受けている間は赤く点滅させる(溜まるほど濃い赤)
         float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 28f);
         Color litColor = Color.Lerp(new Color(1f, 0.5f, 0.3f), new Color(1f, 0.08f, 0.04f), Mathf.Clamp01(dmg + pulse * 0.3f));
-        float blend = lit ? Mathf.Lerp(0.8f, 1f, dmg) : dmg * 0.35f;
+        if (lit && hot) litColor = Color.Lerp(litColor, new Color(1f, 0.97f, 0.85f), 0.55f + 0.3f * pulse);
+        float blend = lit ? (hot ? 1f : Mathf.Lerp(0.8f, 1f, dmg)) : dmg * 0.35f;
         if (modelMats != null)
         {
             // テクスチャ付きモデルは「白 × テクスチャ」が元の見た目。光を浴びたら 1 を超える色を掛けて
