@@ -330,7 +330,7 @@ public class NightHud : MonoBehaviour
     void DrawTopRight()
     {
         string badge; Color badgeColor;
-        if (game.Camouflaged) { badge = "擬態中(無敵・光2倍)"; badgeColor = new Color(60 / 255f, 160 / 255f, 200 / 255f, 0.9f); }
+        if (game.Camouflaged) { badge = "擬態中(無敵)"; badgeColor = new Color(60 / 255f, 160 / 255f, 200 / 255f, 0.9f); }
         else if (game.CampLocked) { badge = "ゲージ切れ"; badgeColor = new Color(120 / 255f, 120 / 255f, 120 / 255f, 0.85f); }
         else { badge = "移動中"; badgeColor = new Color(190 / 255f, 110 / 255f, 50 / 255f, 0.9f); }
 
@@ -438,9 +438,11 @@ public class NightHud : MonoBehaviour
         Color oldC = GUI.color;
         // GUI 全体が拡大縮小されているので、回転は今の行列に重ねて組み立てる(RotateAroundPivot だと位置がずれる)
         GUI.matrix = old * Matrix4x4.TRS(new Vector3(c.x, c.y, 0), Quaternion.Euler(0, 0, angle), Vector3.one) * Matrix4x4.TRS(new Vector3(-c.x, -c.y, 0), Quaternion.identity, Vector3.one);
-        GUI.color = new Color(0f, 0f, 0f, 0.55f);
+        // 邪魔にならないよう、ゆっくり(2秒に1回)点滅させる。消えきらずにうっすら残る
+        float blink = 0.1f + 0.9f * (0.5f + 0.5f * Mathf.Cos(Time.time * Mathf.PI));
+        GUI.color = new Color(0f, 0f, 0f, 0.55f * blink);
         GUI.DrawTexture(new Rect(c.x - 31, c.y - 29, 66, 62), tex); // 影(縁取りの代わり)
-        GUI.color = new Color(color.r, color.g, color.b, 0.95f);
+        GUI.color = new Color(color.r, color.g, color.b, 0.95f * blink);
         GUI.DrawTexture(new Rect(c.x - 33, c.y - 30, 62, 56), tex);
         GUI.matrix = old;
         GUI.color = oldC;

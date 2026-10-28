@@ -37,8 +37,8 @@ public class NightGame : MonoBehaviour
     public NightDifficulty Difficulty => NightDifficulty.For(MapId);
 
     // ---- 擬態の連携ルール ----
-    // 擬態中は「待ち伏せ」: 灯り役の光が敵に2倍効く。擬態中に敵を倒すと擬態ゲージが少し戻る。
-    public const float AmbushLightMultiplier = 2f, AmbushKillRefill = 25f;
+    // 擬態中に敵を倒すと擬態ゲージが少し戻る。(擬態中に光が2倍効くルールはなくした)
+    public const float AmbushKillRefill = 25f;
 
     // ---- 能力値(レベルアップは無し。難易度は経過時間で上がる敵の出現ペースだけ) ----
     public const float HpMax = 100f, CampMax = 100f;
@@ -104,9 +104,9 @@ public class NightGame : MonoBehaviour
     bool warned;
 
     static readonly Color FogDark = NightMeshes.Hex(0x02040a), FogBright = NightMeshes.Hex(0x7d90b8);
-    const float FogDensityDark = 0.026f, FogDensityBright = 0.006f;
+    const float FogDensityDark = 0.034f, FogDensityBright = 0.006f;
     // 懐中電灯が無いとほとんど何も見えないくらい暗くする(閃光の時だけ大きく明るくなる)
-    const float AmbientBase = 0.008f, MoonBase = 0.01f; // 灯り(スマホの光・ランタン)がない所はほとんど見えないくらい暗く(最初の約4分の1)
+    const float AmbientBase = 0.004f, MoonBase = 0.005f; // 灯り(スマホの光・ランタン)がない所はほとんど見えないくらい暗く(最初の約8分の1)
     static readonly Color AmbientColor = NightMeshes.Hex(0x223344);
 
     // ---- 敵・弾・衝撃波 ----
@@ -230,6 +230,7 @@ public class NightGame : MonoBehaviour
         bool backToTitle = returnToTitle;
         returnToTitle = false;
         if (System.Array.IndexOf(args, "-skipTitle") >= 0 && !backToTitle) StartGame();
+        if (State == GameState.Title) Audio.PlayLobby(); // タイトル(ロビー)画面のBGM
         if (PointerServer.Instance != null) PointerServer.Instance.ResetKills(); // 次のゲームに続けて参加するスマホの撃破数を 0 に
     }
 
@@ -342,42 +343,27 @@ public class NightGame : MonoBehaviour
         }
     }
 
-    // 次に向かう場所(まだ捕まえていない一番近い蛍の石。蛍が揃ったら入口の門)への方向。主人公のまわりの矢印に使う。
-    // 通路に沿って進めるよう、まっすぐの向きではなく、経路の次の曲がり角の方を指す。経路は0.4秒ごとに計算し直す
-    float objectiveTimer;
-    Vector3 objectiveAim;
-    Color objectiveColor;
-    bool hasObjective;
+    // 次に向かう場所(蛍1 → 蛍2 → 入口の門 の順。捕まえていない蛍のうち番号の小さい方)への方向。主人公のまわりの矢印に使う。
+    // 通路は気にせず、目的地へのまっすぐの向きを指す
     public bool TryObjectiveDirection(out Vector3 aim, out Color color)
     {
-        if (State == GameState.Playing && Time.time >= objectiveTimer)
+        aim = Vector3.zero;
+        color = NightMeshes.Hex(0xffe066); // 「いまやること」と同じ黄色。行き先が変わっても色は同じ
+        if (State != GameState.Playing || CountdownTimer > 0f) return false;
+        if (!GateOpened)
         {
-            objectiveTimer = Time.time + 0.4f;
-            Vector3 from = PlayerPos;
-            List<Vector3> best = null; float bestLen = float.MaxValue; NightOrb bestOrb = null;
-            if (!GateOpened)
+            // 行く順番は 蛍1(index 0) → 蛍2(index 1) → ゴール。まだ捕まえていない蛍のうち番号が一番小さい石を指す
+            NightOrb next = null;
+            foreach (var o in World.Orbs)
             {
-                foreach (var o in World.Orbs)
-                {
-                    if (o.collected) continue;
-                    var path = Map.NavigationPath(from, o.Position);
-                    float len = NightMap.PathLength(from, path);
-                    if (len < bestLen) { bestLen = len; best = path; bestOrb = o; }
-                }
+                if (o.collected) continue;
+                if (next == null || o.index < next.index) next = o;
             }
-            else best = Map.NavigationPath(from, new Vector3(NightMap.Exit.x, 0, NightMap.Exit.y));
-            hasObjective = best != null && best.Count > 0;
-            if (hasObjective)
-            {
-                objectiveAim = best[best.Count - 1];
-                foreach (var p in best) if (NightMap.Flat(p, from) > 1.6f) { objectiveAim = p; break; }
-                objectiveColor = bestOrb == null ? NightMeshes.Hex(0xafffd1) : NightMeshes.Hex(bestOrb.index == 0 ? 0x78c8ff : 0xffcf65);
-                if (NightMap.Flat(objectiveAim, from) < 1.2f) hasObjective = false; // もう着いている
-            }
+            if (next == null) return false;
+            aim = next.Position;
         }
-        aim = objectiveAim;
-        color = objectiveColor;
-        return hasObjective && State == GameState.Playing && CountdownTimer <= 0f;
+        else aim = new Vector3(NightMap.Exit.x, 0, NightMap.Exit.y);
+        return NightMap.Flat(aim, PlayerPos) >= 1.2f; // もう着いていれば出さない
     }
 
     public void ShowToast(string text, float duration = 1.6f)
@@ -525,7 +511,7 @@ public class NightGame : MonoBehaviour
 
         if (AmbushRefillFlash > 0f) AmbushRefillFlash = Mathf.Max(0f, AmbushRefillFlash - dt * 2f);
         Hint = CampLocked ? "擬態ゲージ切れ…動いてゲージを回復しよう"
-            : Camouflaged ? "擬態中(最大3秒):敵はあなたを見失っている！ 灯り役の光が2倍効く"
+            : Camouflaged ? "擬態中(最大3秒):敵はあなたを見失っている！"
             : GateOpened ? "入口の門が開いた！導きの花を照らすと、門への光の道が現れます。" : HintDefault;
 
         UpdatePulses(dt);
@@ -693,7 +679,7 @@ public class NightGame : MonoBehaviour
             bool lit = spotHit || flashHit || lantern > 0f;
             if (spotHit)
             {
-                en.lightHp -= en.cfg.drain * LightPower * lightsOn * (Camouflaged ? AmbushLightMultiplier : 1f) * dt;
+                en.lightHp -= en.cfg.drain * LightPower * lightsOn * dt;
                 if (Random.value < dt * 8f) Audio.PlayHitBuzz();
                 if (lightOwner != null) { en.litBy = lightOwner; en.litByTime = Time.time; }
                 // 光が重なっている間は、混ざった光の色の輪が足元から広がり、白く強い火花が散る(重ねると効いていると分かるように)

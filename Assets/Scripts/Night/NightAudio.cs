@@ -7,7 +7,7 @@ public class NightAudio : MonoBehaviour
     const int SR = 44100;
     public const float FlashWarn = 1.3f;
 
-    AudioSource sfx, ambient, bgm;
+    AudioSource sfx, ambient, bgm, lobby;
     AudioClip hitBuzz, downChime, hurt, pulse, rumble, thunder, clear, gameOver;
 
     void Awake()
@@ -24,6 +24,12 @@ public class NightAudio : MonoBehaviour
         bgm.loop = true;
         bgm.volume = 0.7f;
         bgm.clip = Resources.Load<AudioClip>("Bgm/stage_bgm");
+        // ロビー(タイトル画面)のBGM(Assets/Resources/Bgm/lobby_bgm.mp3 = 時計図書館)
+        lobby = gameObject.AddComponent<AudioSource>();
+        lobby.playOnAwake = false;
+        lobby.loop = true;
+        lobby.volume = 0.7f;
+        lobby.clip = Resources.Load<AudioClip>("Bgm/lobby_bgm");
 
         hitBuzz = Clip("hit", Tone(140, 0.08f, true, 0.05f, 0, 90));
         downChime = Clip("down", Mix(Tone(700, 0.1f, false, 0.09f), Tone(1000, 0.14f, false, 0.08f, 0.07f)));
@@ -44,8 +50,10 @@ public class NightAudio : MonoBehaviour
         ambient.clip = Clip("ambient", Ambient());
     }
 
+    public void PlayLobby() { if (lobby.clip != null && !lobby.isPlaying) lobby.Play(); }
     public void StartAmbient()
     {
+        if (lobby.isPlaying) lobby.Stop(); // ゲームが始まったらロビーのBGMからステージのBGMに切り替える
         if (!ambient.isPlaying) ambient.Play();
         if (bgm.clip != null && !bgm.isPlaying) bgm.Play();
     }

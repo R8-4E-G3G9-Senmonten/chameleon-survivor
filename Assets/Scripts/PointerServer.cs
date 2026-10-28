@@ -1510,7 +1510,7 @@ function handleReply(data) {
   if (data.full) { $('fullOverlay').style.display = 'flex'; return; }
   $('fullOverlay').style.display = 'none';
   if (data.color) applyMyColor(data.color);
-  if (typeof data.kills === 'number') onKills(data.kills);
+  if (typeof data.kills === 'number' && !(joinedNext && data.st === 'end')) onKills(data.kills);
   if (typeof data.px === 'number') onGameView(!!data.play, data.px, data.py);
   if (data.st) onGameState(data);
   if (typeof data.hit === 'boolean') setHitting(data.hit && lightOn);
@@ -1649,9 +1649,10 @@ function setHitting(on) {
 // 次のゲームが始まったら(「プレイ中」に戻ったら)自動で閉じる。ゲームの途中から参加した人にも出す。
 // 終わった後に開いた人(このゲームで遊んでいない人)には出さない。
 var lastSt = null, resultImage = null, resultData = null;
+var joinedNext = false; // 結果画面で「次のゲームも参加する」を押した(PCがまだ結果画面のあいだ、前の撃破数を出さない)
 function fmtTime(sec) { var m = Math.floor(sec / 60), s = sec % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
 function onGameState(d) {
-  if (lastSt === 'end' && d.st !== 'end') { kills = 0; killNum.textContent = 0; } // 次のゲームは 0 から数える
+  if (lastSt === 'end' && d.st !== 'end') { kills = 0; killNum.textContent = 0; joinedNext = false; } // 次のゲームは 0 から数える
   if (d.st === 'end' && lastSt === 'play') showResult(d);
   if (d.st === 'play' && lastSt !== null && lastSt !== 'play') hideResult();
   lastSt = d.st;
@@ -1729,6 +1730,7 @@ $('btnSave').addEventListener('click', function (e) { e.preventDefault(); saveRe
 $('btnNext').addEventListener('click', function (e) {
   e.preventDefault();
   hideResult();
+  joinedNext = true; kills = 0; killNum.textContent = 0; killStatus.textContent = ''; // 次のゲームに参加するので撃破数は 0 から
   toast('次のゲームが始まるまで待っていてね');
 });
 

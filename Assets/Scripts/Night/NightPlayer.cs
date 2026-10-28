@@ -62,8 +62,8 @@ public class NightPlayer : MonoBehaviour
         float flicker = 1f + 0.08f * Mathf.Sin(t * 13f) + 0.05f * Mathf.Sin(t * 29f + 1.3f);
         torchScale = Mathf.Lerp(torchScale, camouflaged ? 0.6f : 1f, Mathf.Min(1f, dt * 6f));
         // 背中のトーチは足元を少し照らす程度(先を見るには灯り役の光が要る)
-        selfGlow.intensity = (camouflaged ? 0.7f : 1.2f) * flicker;
-        selfGlow.range = camouflaged ? 3.8f : 4.5f;
+        selfGlow.intensity = (camouflaged ? 0.45f : 0.85f) * flicker;
+        selfGlow.range = camouflaged ? 3.2f : 3.8f;
         selfGlow.color = Color.Lerp(selfGlow.color, camouflaged ? CamoTorchColor : TorchColor, Mathf.Min(1f, dt * 6f));
         Color fc = camouflaged ? new Color(0.7f, 0.9f, 1f, 0.95f) : new Color(1f, 0.82f, 0.45f, 0.95f);
         flameMat.color = Color.Lerp(flameMat.color, fc, Mathf.Min(1f, dt * 6f));
