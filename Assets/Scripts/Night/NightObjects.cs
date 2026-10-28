@@ -36,6 +36,9 @@ public class NightLamp
         // 点灯後に、継続ダメージが届く範囲を細い輪で示す(どこまで安全か分かるように)
         rangeRing = w.RingObject(DamageRadius - 0.1f, DamageRadius, NightMeshes.Unlit(NightMeshes.Hex(0xffd390, 0.4f)), w.Root, new Vector3(x, height + 0.12f, z), 72);
         rangeRing.SetActive(false);
+        // ランタンは最初から灯っている(周りの敵に継続ダメージを与える)。照らして点ける必要はない
+        lit = true;
+        charge = ChargeTime;
     }
 
     public bool InLight(NightMap map, Vector3 pos, float radius)
@@ -67,7 +70,7 @@ public class NightLamp
         {
             power = Mathf.Min(1f, power + dt * 2.5f);
             light.enabled = true;
-            rangeRing.SetActive(true);
+            // ダメージ範囲の輪(光の縁)は出さない
             light.intensity = power * 2.25f;
             housingMat.SetColor("_EmissionColor", Glow * (0.9f + power * 1.2f));
             progressMat.color = NightMeshes.Hex(0xffd390, 0.45f);
@@ -76,11 +79,12 @@ public class NightLamp
     }
 }
 
-// 導きの植物。合計2秒照らすと、最も近い未回収の球(全部集めた後は入口の門)までの光の道を約7秒示す。
+// 導きの植物。少し照らす(ChargeTime 秒)と、最も近い未回収の球(全部集めた後は入口の門)までの光の道を約7秒示す。
 // 照らした時間はたまっていく(途中で光を外しても減らない)。道を示したらゲージは空に戻り、また貯めれば使える。
 public class NightGuidePlant
 {
-    public const float ChargeTime = 2f;
+    public const float ChargeTime = 0.6f; // 照らす時間は短め(2秒では長かった)
+    const float AimRadius = 2.2f;         // 光がこの距離まで近ければ照らした扱い(ゆるめ)
 
     public readonly float x, z, height;
     public float charge;
@@ -131,7 +135,7 @@ public class NightGuidePlant
     public void Tick(NightGame g, float dt)
     {
         Vector3 lt = g.NearestLightTargetTo(new Vector3(x, height, z));
-        bool aimed = Mathf.Sqrt((x - lt.x) * (x - lt.x) + (z - lt.z) * (z - lt.z)) < 1.05f && Mathf.Abs(lt.y - height) < 1.5f;
+        bool aimed = Mathf.Sqrt((x - lt.x) * (x - lt.x) + (z - lt.z) * (z - lt.z)) < AimRadius && Mathf.Abs(lt.y - height) < 2.5f;
         if (aimed && NightGame.FxTick(ref fxTimer, dt, 0.14f)) SurvivorBurst.Spawn(new Vector3(x, height + 0.8f, z), NightMeshes.Hex(0xc9ffe2), 3);
         if (!aimed) latched = false;
         else if (!latched)

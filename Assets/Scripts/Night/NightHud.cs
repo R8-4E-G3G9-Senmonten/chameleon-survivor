@@ -128,12 +128,15 @@ public class NightHud : MonoBehaviour
         {
             DrawEnemyMarks();
             DrawObjectGauges();
+            DrawObjectiveArrow();
             DrawPlayerBars();
             DrawHud();
             DrawGoalHud();
             DrawTopRight();
             DrawToast();
             DrawThreatAlert();
+            DrawAnnounce();
+            DrawCountdown();
             DrawHint();
         }
         DrawConnectPanel(false);
@@ -253,7 +256,7 @@ public class NightHud : MonoBehaviour
     {
         // HPバー・擬態ゲージは主人公の頭上に出す(DrawPlayerBars)。ここはマップ名・操作・接続状態だけ
         var row = S("hudRow", 10, C(0xdfffe0, 0.82f), TextAnchor.UpperLeft, wrap: true);
-        string rowText = "移動: WASD/矢印　灯り: " + (game.Flashlight.HasPhoneInput ? "スマホ" : "マウス") + "　止まる=擬態　石を照らして蛍を集めよう";
+        string rowText = "移動: WASD/矢印　灯り: " + (game.Flashlight.HasPhoneInput ? "スマホ" : "スマホ未接続") + "　止まる=擬態　石を照らして蛍を集めよう";
         float rowH = row.CalcHeight(new GUIContent(rowText), 220);
         Rect r = new Rect(12, 12, 248, 10 + 21 + rowH + 10);
         Panel(r, PanelTex(), 9);
@@ -313,11 +316,15 @@ public class NightHud : MonoBehaviour
     {
         string text = game.GateOpened ? "門が開いた！入口へ戻ろう" : "蛍 " + game.OrbCount + " / " + NightGame.OrbTotal;
         var style = S("goal", 14, C(0xdfffe0), TextAnchor.MiddleCenter, bold: true);
-        float w = Mathf.Max(250f, style.CalcSize(new GUIContent(text)).x + 30f);
-        Rect r = new Rect(W / 2f - w / 2f, 12, w, 46);
+        // いまやることを、パネルの下の段に常に出す
+        string todo = "いまやること: " + game.Objective;
+        var todoStyle = S("goalTodo", 14, C(0xffe9a0), TextAnchor.MiddleCenter, bold: true);
+        float w = Mathf.Max(250f, style.CalcSize(new GUIContent(text)).x + 30f, todoStyle.CalcSize(new GUIContent(todo)).x + 34f);
+        Rect r = new Rect(W / 2f - w / 2f, 12, w, 68);
         Panel(r, PanelTex(), 9);
         Shadowed(new Rect(r.x, r.y + 8, r.width, 18), text, style);
         Bar(new Rect(W / 2f - 110f, r.y + 30, 220, 8), game.OrbCount / (float)NightGame.OrbTotal, "prog", C(0xffdd55), C(0x9dffb0), null, 0.18f);
+        Shadowed(new Rect(r.x, r.y + 44, r.width, 18), todo, todoStyle);
     }
 
     void DrawTopRight()
@@ -327,24 +334,19 @@ public class NightHud : MonoBehaviour
         else if (game.CampLocked) { badge = "ゲージ切れ"; badgeColor = new Color(120 / 255f, 120 / 255f, 120 / 255f, 0.85f); }
         else { badge = "移動中"; badgeColor = new Color(190 / 255f, 110 / 255f, 50 / 255f, 0.9f); }
 
-        bool flashing = game.FlashT >= 0f;
-        int wait = Mathf.Max(0, Mathf.CeilToInt(game.FlashWait));
-        string flash = flashing ? "閃光!" : "閃光まで " + wait + "s";
-        bool soon = flashing || game.FlashWait <= 3f;
 
         var badgeStyle = S("badge", 12, Color.white, TextAnchor.MiddleCenter, bold: true);
         var killStyle = S("kill", 14, C(0xffb0b0), TextAnchor.MiddleRight);
         var timerStyle = S("timer", 16, C(0xbbccdd), TextAnchor.MiddleRight);
-        var flashStyle = S(soon ? "flashSoon" : "flash", 13, soon ? Color.white : C(0xffe9a0), TextAnchor.MiddleRight, bold: soon);
 
         string kill = "撃破: " + game.KillCount;
         string threat = "脅威 Lv." + game.Threat + (game.Threat >= NightGame.ThreatMax ? " (最大)" : "");
         var threatStyle = S("threat" + Mathf.Min(game.Threat, 5), 13, Color.Lerp(C(0xffd9a0), C(0xff5a4a), (game.Threat - 1) / 4f), TextAnchor.MiddleRight, bold: true);
         string timer = FormatTime(game.Elapsed);
         float bw = badgeStyle.CalcSize(new GUIContent(badge)).x + 20f;
-        float contentW = Mathf.Max(bw, killStyle.CalcSize(new GUIContent(kill)).x, threatStyle.CalcSize(new GUIContent(threat)).x, timerStyle.CalcSize(new GUIContent(timer)).x,
-            S("flashSoon", 13, Color.white, TextAnchor.MiddleRight, bold: true).CalcSize(new GUIContent("閃光まで 12s")).x);
-        Rect r = new Rect(W - 12 - (contentW + 24), 12, contentW + 24, 8 + 22 + 2 + 20 + 2 + 18 + 6 + 2 + 22 + 2 + 18 + 8);
+        float contentW = Mathf.Max(bw, killStyle.CalcSize(new GUIContent(kill)).x, threatStyle.CalcSize(new GUIContent(threat)).x, timerStyle.CalcSize(new GUIContent(timer)).x);
+        // 雷(閃光)までの秒数は出さない(ゴロゴロという予兆の音と画面のちらつきで分かる)
+        Rect r = new Rect(W - 12 - (contentW + 24), 12, contentW + 24, 8 + 22 + 2 + 20 + 2 + 18 + 6 + 2 + 22 + 8);
         Panel(r, PanelTex(), 9);
         float x = r.x + 12, y = r.y + 8, w = contentW;
 
@@ -364,13 +366,11 @@ public class NightHud : MonoBehaviour
         Fill(new Rect(x + w - 90, y, 90 * Mathf.Clamp01(game.ThreatProgress), 4), new Color(1f, 0.45f, 0.3f, 0.85f));
         y += 5 + 2;
         Shadowed(new Rect(x, y, w, 22), timer, timerStyle);
-        y += 22 + 2;
-        Shadowed(new Rect(x, y, w, 18), flash, flashStyle);
     }
 
     void DrawToast()
     {
-        if (toastAlpha <= 0.001f) return;
+        if (toastAlpha <= 0.001f || game.AnnounceTimer > 0f || game.CountdownTimer > 0f) return; // 大きなお知らせの間は、小さいお知らせを重ねない
         var style = S("toast", 20, C(0xffe9a0), TextAnchor.MiddleCenter, bold: true);
         float y = H * 0.22f;
         if (game.AlertTimer > 0f) y = Mathf.Max(y, AlertTop + AlertHeight + 10f); // 警告の帯と重ならないように
@@ -421,6 +421,51 @@ public class NightHud : MonoBehaviour
 
     // 主人公の頭上に HPバー(太い・緑) と 擬態ゲージ(細い・水色)。文字は出さず、色と長さだけで伝える。
     // 回復したときはHPバーが、擬態ゲージが戻ったときは擬態ゲージが一瞬光る。擬態の残りが1秒を切ると赤く点滅。
+    // 主人公のまわりに、次に向かう場所(蛍の石・ゴールの門)の方向を指す矢印を出す。色は行き先の色(青・黄の石 / 緑の門)
+    void DrawObjectiveArrow()
+    {
+        if (!game.TryObjectiveDirection(out Vector3 aim, out Color color)) return;
+        Vector3 from = game.PlayerPos + Vector3.up * 0.1f; // 足元を中心に回す
+        Vector3 dir = aim - game.PlayerPos; dir.y = 0f;
+        if (dir.sqrMagnitude < 0.01f) return;
+        if (!ToHud(from, out var p0) || !ToHud(from + dir.normalized * 2f, out var p1)) return;
+        Vector2 d = (p1 - p0).normalized;
+        float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+        float bob = 6f * Mathf.Sin(Time.time * 5f); // 少し前後に動かして目立たせる
+        Vector2 c = p0 + d * (95f + bob);
+        var tex = Tex("objArrow", () => ArrowTex(64));
+        Matrix4x4 old = GUI.matrix;
+        Color oldC = GUI.color;
+        // GUI 全体が拡大縮小されているので、回転は今の行列に重ねて組み立てる(RotateAroundPivot だと位置がずれる)
+        GUI.matrix = old * Matrix4x4.TRS(new Vector3(c.x, c.y, 0), Quaternion.Euler(0, 0, angle), Vector3.one) * Matrix4x4.TRS(new Vector3(-c.x, -c.y, 0), Quaternion.identity, Vector3.one);
+        GUI.color = new Color(0f, 0f, 0f, 0.55f);
+        GUI.DrawTexture(new Rect(c.x - 31, c.y - 29, 66, 62), tex); // 影(縁取りの代わり)
+        GUI.color = new Color(color.r, color.g, color.b, 0.95f);
+        GUI.DrawTexture(new Rect(c.x - 33, c.y - 30, 62, 56), tex);
+        GUI.matrix = old;
+        GUI.color = oldC;
+    }
+
+    // 右向きの矢印(三角)のテクスチャ
+    static Texture2D ArrowTex(int size)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var px = new Color[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float u = (x + 0.5f) / size, v = (y + 0.5f) / size - 0.5f;
+                // 先が右を向いた三角形。根元を少しへこませて矢じりの形にする
+                float half = 0.5f * (1f - u);
+                bool inside = Mathf.Abs(v) < half && u > 0.08f + 0.25f * (1f - Mathf.Abs(v) / 0.5f) * 0f && !(u < 0.32f && Mathf.Abs(v) < 0.5f * (0.32f - u) / 0.32f * 0.9f);
+                float edge = Mathf.Clamp01((half - Mathf.Abs(v)) * size * 0.5f);
+                px[y * size + x] = new Color(1, 1, 1, inside ? edge : 0f);
+            }
+        tex.SetPixels(px);
+        tex.Apply();
+        return tex;
+    }
+
     void DrawPlayerBars()
     {
         if (!ToHud(game.PlayerPos + Vector3.up * game.Player.HeadHeight, out var p)) return;
@@ -474,7 +519,7 @@ public class NightHud : MonoBehaviour
         Fill(new Rect(bar.x, bar.y, w * Mathf.Clamp01(ratio), h), color);
     }
 
-    const float AlertTop = 66f, AlertHeight = 78f;
+    const float AlertTop = 88f, AlertHeight = 62f;
 
     // 「敵が増えた！」の警告。ドンと拡大して出て、赤く脈打ち、最後にふわっと消える
     void DrawThreatAlert()
@@ -484,7 +529,7 @@ public class NightHud : MonoBehaviour
         float appear = EaseOutBack(t / 0.35f);
         float alpha = Mathf.Clamp01(t / 0.12f) * Mathf.Clamp01(game.AlertTimer / 0.45f);
         float pulse = 0.5f + 0.5f * Mathf.Sin(t * 14f);
-        float w = 420f, h = AlertHeight;
+        float w = 330f, h = AlertHeight;
         // 画面の中央をふさがないよう、上の「蛍」パネルのすぐ下に出す
         Rect r = new Rect(W / 2f - w / 2f, AlertTop, w, h);
 
@@ -499,10 +544,50 @@ public class NightHud : MonoBehaviour
         Fill(new Rect(r.x + 18, r.y + 4, r.width - 36, 2), line);
         Fill(new Rect(r.x + 18, r.yMax - 6, r.width - 36, 2), line);
         GUI.color = new Color(1f, 1f, 1f, alpha);
-        Shadowed(new Rect(r.x, r.y + 10, r.width, 34), game.AlertText, S("alertMain", 28, C(0xfff0e0), TextAnchor.MiddleCenter, bold: true), 2f);
-        Shadowed(new Rect(r.x, r.y + 46, r.width, 20), game.AlertSub, S("alertSub", 13, C(0xffd0c0), TextAnchor.MiddleCenter), 1f);
+        Shadowed(new Rect(r.x, r.y + 8, r.width, 28), game.AlertText, S("alertMain", 20, C(0xfff0e0), TextAnchor.MiddleCenter, bold: true), 2f);
+        Shadowed(new Rect(r.x, r.y + 36, r.width, 20), game.AlertSub, S("alertSub", 13, C(0xffd0c0), TextAnchor.MiddleCenter), 1f);
         GUI.color = oldC;
         GUI.matrix = old;
+    }
+
+    // 蛍を捕まえた・門が開いた の大きなお知らせ。画面の中央より少し上に、ポンと大きく出す
+    void DrawAnnounce()
+    {
+        if (game.AnnounceTimer <= 0f) return;
+        float t = NightGame.AnnounceDuration - game.AnnounceTimer;
+        float appear = EaseOutBack(t / 0.4f);
+        float alpha = Mathf.Clamp01(t / 0.1f) * Mathf.Clamp01(game.AnnounceTimer / 0.5f);
+        Rect r = new Rect(0, H * 0.27f, W, 120);
+        Matrix4x4 old = GUI.matrix;
+        Color oldC = GUI.color;
+        Vector2 c = r.center;
+        float sc = Mathf.Lerp(0.4f, 1f, appear);
+        GUI.matrix = old * Matrix4x4.TRS(new Vector3(c.x, c.y, 0), Quaternion.identity, new Vector3(sc, sc, 1f)) * Matrix4x4.TRS(new Vector3(-c.x, -c.y, 0), Quaternion.identity, Vector3.one);
+        GUI.color = new Color(1f, 1f, 1f, alpha);
+        Shadowed(new Rect(r.x, r.y, r.width, 72), game.AnnounceText, S("announce", 58, C(0xffe066), TextAnchor.MiddleCenter, bold: true), 4f);
+        Shadowed(new Rect(r.x, r.y + 76, r.width, 30), game.AnnounceSub, S("announceSub", 22, C(0xfff6d0), TextAnchor.MiddleCenter, bold: true), 2f);
+        GUI.color = oldC;
+        GUI.matrix = old;
+    }
+
+    // 始まる前の 3・2・1 のカウントダウン。数字が大きく出て縮みながら消える
+    void DrawCountdown()
+    {
+        if (game.CountdownTimer <= 0f) return;
+        int n = Mathf.CeilToInt(game.CountdownTimer);
+        float f = game.CountdownTimer - (n - 1); // 1 → 0 に減る
+        float sc = Mathf.Lerp(1f, 1.8f, Mathf.Clamp01((f - 0.75f) / 0.25f)); // 出た瞬間は大きく、すぐ普通の大きさに
+        Fill(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.35f));
+        Rect r = new Rect(0, H / 2f - 90, W, 180);
+        Matrix4x4 old = GUI.matrix;
+        Color oldC = GUI.color;
+        Vector2 c = r.center;
+        GUI.matrix = old * Matrix4x4.TRS(new Vector3(c.x, c.y, 0), Quaternion.identity, new Vector3(sc, sc, 1f)) * Matrix4x4.TRS(new Vector3(-c.x, -c.y, 0), Quaternion.identity, Vector3.one);
+        GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01(f * 3f));
+        Shadowed(r, n.ToString(), S("countdown", 150, C(0xffe066), TextAnchor.MiddleCenter, bold: true), 5f);
+        GUI.color = oldC;
+        GUI.matrix = old;
+        Shadowed(new Rect(0, H / 2f + 100, W, 30), "灯り役はスマホの「ライトON」を押して準備しよう", S("countdownSub", 20, C(0xfff6d0), TextAnchor.MiddleCenter, bold: true), 2f);
     }
 
     void DrawHint()
@@ -568,7 +653,7 @@ public class NightHud : MonoBehaviour
         LabelFx(new Rect(0, y, W, 50), win ? "門を抜けて脱出した！" : "力尽きた…",
             S(win ? "endWin" : "endLose", 38, win ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleCenter, bold: true), Mathf.Lerp(1.6f, 1f, EaseOutBack(tp)), tp);
         y += 56;
-        LabelFx(new Rect(0, y, W, 20), game.PlayerName + "  /  " + game.MapId + ". " + game.Map.Name + "  /  " + (win ? "クリアタイム " : "生存 ") + FormatTime(game.Elapsed) + "  /  蛍 " + game.OrbCount + " / " + NightGame.OrbTotal,
+        LabelFx(new Rect(0, y, W, 20), (game.Registered ? game.PlayerName + "  /  " : "") + game.MapId + ". " + game.Map.Name + "  /  " + (win ? "クリアタイム " : "生存 ") + FormatTime(game.Elapsed) + "  /  蛍 " + game.OrbCount + " / " + NightGame.OrbTotal,
             S("endMap", 13, new Color(1, 1, 1, 0.75f), TextAnchor.MiddleCenter), 1f, Seg(t, 0.6f, 0.3f));
         y += 30;
 
@@ -615,9 +700,14 @@ public class NightHud : MonoBehaviour
         float tRank = rowsEnd + 1.5f;
         float rk = Seg(t, tRank, 0.55f);
         var top = NightRanking.Top(game.MapId);
-        string rankText = game.Rank > 0 ? game.MapId + "マップ  " + game.Rank + "位  TOP" + NightRanking.MaxEntries + " 入り！"
+        // 登録前は「このスコアなら何位か」を見せ、名前を入れてもらう。登録しなかった時はそう表示する
+        bool done = game.RankingDone;
+        int rankNow = done ? game.Rank : NightRanking.RankIfAdded(game.MapId, game.Score, game.ScoreSeconds);
+        bool celebrate = done && game.Registered && game.Rank > 0;
+        string rankText = done && !game.Registered ? "ランキングには登録しませんでした"
+            : rankNow > 0 ? game.MapId + "マップ  " + (done ? rankNow + "位  TOP" + NightRanking.MaxEntries + " 入り！" : "このスコアなら " + rankNow + "位！")
             : game.MapId + "マップ  ランク外" + (top.Count >= NightRanking.MaxEntries ? "(" + NightRanking.MaxEntries + "位は " + top[top.Count - 1].score.ToString("N0") + "点)" : "");
-        if (game.Rank > 0 && game.Rank <= 3 && rk > 0f)
+        if (rankNow > 0 && rankNow <= 3 && rk > 0f && (!done || celebrate))
         {
             float glow = 0.35f + 0.25f * Mathf.Sin(Time.unscaledTime * 4f);
             Color oldG = GUI.color;
@@ -625,11 +715,19 @@ public class NightHud : MonoBehaviour
             GUI.DrawTexture(new Rect(cx - 260, y - 30, 520, 100), Tex("glow", () => GlowTex()));
             GUI.color = oldG;
         }
-        LabelFx(new Rect(0, y, W, 34), rankText, S(game.Rank > 0 ? "endRankOn" : "endRankOff", 22, game.Rank > 0 ? C(0x9dffb0) : C(0xb5c8bd), TextAnchor.MiddleCenter, bold: true),
+        bool rankOn = rankNow > 0 && (!done || game.Registered);
+        LabelFx(new Rect(0, y, W, 34), rankText, S(rankOn ? "endRankOn" : "endRankOff", 22, rankOn ? C(0x9dffb0) : C(0xb5c8bd), TextAnchor.MiddleCenter, bold: true),
             Mathf.Lerp(2.2f, 1f, EaseOutBack(rk)), rk);
-        if (t >= tRank && !endPopSfx && game.Rank > 0) { endPopSfx = true; game.Audio.PlayDownChime(); }
-        if (game.Rank > 0 && t > tRank) DrawConfetti(t - tRank);
+        if (celebrate && !endPopSfx) { endPopSfx = true; endCelebrateStart = Time.unscaledTime; game.Audio.PlayDownChime(); }
+        if (celebrate) DrawConfetti(Time.unscaledTime - endCelebrateStart);
         y += 54;
+
+        // ランキングに載せる名前の入力(入れた人だけ登録する)
+        if (!done)
+        {
+            if (t > tRank + 0.5f) DrawEndNameEntry(cx, y, Seg(t, tRank + 0.5f, 0.4f));
+            return;
+        }
 
         // ボタン(最後にふわっと出る)
         float ba = Seg(t, tRank + 0.5f, 0.4f);
@@ -646,6 +744,46 @@ public class NightHud : MonoBehaviour
         GUI.color = prev;
         if (GUI.Button(btn, GUIContent.none, GUIStyle.none)) game.Restart();
         if (GUI.Button(btn2, GUIContent.none, GUIStyle.none)) game.BackToTitle();
+    }
+
+    float endCelebrateStart;
+    string endName = "";
+    float endNameShown = -1f;
+
+    // 結果画面の名前入力。Enter または「登録する」で登録、何も入れずに進めば登録しない
+    void DrawEndNameEntry(float cx, float y, float alpha)
+    {
+        if (endNameShown < 0f || endNameShown < endStart) { endNameShown = Time.unscaledTime; endName = ""; }
+        Color prev = GUI.color;
+        GUI.color = new Color(1, 1, 1, alpha);
+        Label(new Rect(0, y, W, 24), "ランキングに名前を残す？(" + NightRanking.MaxNameLength + "文字まで・名前を入れた人だけ載ります)",
+            S("endNameTitle", 15, C(0xe6f5e9), TextAnchor.MiddleCenter, bold: true));
+        y += 30;
+
+        // Enter で登録(名前入力の画面と同じく、日本語の変換を確定する Enter では登録しない)
+        if (Input.compositionString.Length > 0) lastImeTime = Time.unscaledTime;
+        Event ev = Event.current;
+        bool enter = ev.type == EventType.KeyDown && (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter || ev.character == '\n');
+        bool imeBusy = Input.compositionString.Length > 0 || Time.unscaledTime - lastImeTime < 0.15f;
+        if (enter && !imeBusy && Time.unscaledTime - endNameShown > 0.3f) { ev.Use(); game.SubmitRanking(endName); GUI.color = prev; return; }
+
+        var fieldStyle = new GUIStyle(GUI.skin.textField) { font = uiFont, fontSize = 22, alignment = TextAnchor.MiddleCenter };
+        fieldStyle.normal.textColor = Color.white; fieldStyle.focused.textColor = Color.white;
+        GUI.SetNextControlName("endName");
+        endName = GUI.TextField(new Rect(cx - 140, y, 280, 44), endName, NightRanking.MaxNameLength, fieldStyle);
+        if (Time.unscaledTime - endNameShown < 0.4f) GUI.FocusControl("endName");
+        y += 54;
+
+        Rect ok = new Rect(cx - 110, y, 220, 42);
+        bool ho = ok.Contains(Event.current.mousePosition);
+        Panel(ok, Tex("endBtn" + ho, () => RoundedBox(32, 8, ho ? C(0x46a058) : C(0x3a8a4a), ho ? C(0x46a058) : C(0x3a8a4a), 0)), 8);
+        Label(ok, endName.Trim().Length > 0 ? "登録する (Enter)" : "登録しないで進む (Enter)", S("endBtnText", 15, Color.white, TextAnchor.MiddleCenter));
+        if (GUI.Button(ok, GUIContent.none, GUIStyle.none)) game.SubmitRanking(endName);
+        Rect skip = new Rect(cx - 110, y + 50, 220, 28);
+        bool hs = skip.Contains(Event.current.mousePosition);
+        Label(skip, "登録しない", S(hs ? "neGuestH" : "neGuest", 14, hs ? Color.white : C(0xa9c4b8), TextAnchor.MiddleCenter));
+        if (GUI.Button(skip, GUIContent.none, GUIStyle.none)) game.SubmitRanking("");
+        GUI.color = prev;
     }
 
     static Texture2D GlowTex()

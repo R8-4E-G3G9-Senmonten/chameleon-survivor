@@ -61,8 +61,9 @@ public class NightPlayer : MonoBehaviour
         // 炎のゆらぎ(2つの周期を重ねて、規則的に見えないようにする)
         float flicker = 1f + 0.08f * Mathf.Sin(t * 13f) + 0.05f * Mathf.Sin(t * 29f + 1.3f);
         torchScale = Mathf.Lerp(torchScale, camouflaged ? 0.6f : 1f, Mathf.Min(1f, dt * 6f));
-        selfGlow.intensity = (camouflaged ? 0.9f : 1.9f) * flicker;
-        selfGlow.range = camouflaged ? 5f : 7f;
+        // 背中のトーチは足元を少し照らす程度(先を見るには灯り役の光が要る)
+        selfGlow.intensity = (camouflaged ? 0.7f : 1.2f) * flicker;
+        selfGlow.range = camouflaged ? 3.8f : 4.5f;
         selfGlow.color = Color.Lerp(selfGlow.color, camouflaged ? CamoTorchColor : TorchColor, Mathf.Min(1f, dt * 6f));
         Color fc = camouflaged ? new Color(0.7f, 0.9f, 1f, 0.95f) : new Color(1f, 0.82f, 0.45f, 0.95f);
         flameMat.color = Color.Lerp(flameMat.color, fc, Mathf.Min(1f, dt * 6f));
@@ -149,6 +150,8 @@ public class NightPlayer : MonoBehaviour
         return input;
     }
 
+    static readonly float[] WallSlideAngles = { 15f, -15f, 30f, -30f, 45f, -45f, 60f, -60f, 75f, -75f };
+
     public void Move(NightGame g, float dt, out float oldX, out float oldZ)
     {
         var map = g.World.Map;
@@ -174,9 +177,21 @@ public class NightPlayer : MonoBehaviour
 
         if (!map.Walkable(pos.x, pos.z))
         {
-            if (map.Walkable(pos.x, oldZ)) pos.z = oldZ;
-            else if (map.Walkable(oldX, pos.z)) pos.x = oldX;
-            else { pos.x = oldX; pos.z = oldZ; Velocity = Vector3.zero; }
+            // 斜めの道の壁にぶつかったら、進みたい向きに近い順に向きを少しずつ曲げて、歩ける向きへ滑らせる
+            // (前後左右だけで入力しても、斜めの通路の壁に沿って進める)
+            float step = Mathf.Sqrt(Velocity.x * Velocity.x + Velocity.z * Velocity.z) * dt;
+            float baseAngle = Mathf.Atan2(Velocity.x, Velocity.z);
+            bool slid = false;
+            foreach (float deg in WallSlideAngles)
+            {
+                float a = baseAngle + deg * Mathf.Deg2Rad;
+                float len = step * Mathf.Cos(deg * Mathf.Deg2Rad); // 曲げるほど遅く(壁に沿った分だけ進む)
+                float nx = oldX + Mathf.Sin(a) * len, nz = oldZ + Mathf.Cos(a) * len;
+                if (!map.Walkable(nx, nz)) continue;
+                pos.x = nx; pos.z = nz; slid = true;
+                break;
+            }
+            if (!slid) { pos.x = oldX; pos.z = oldZ; Velocity = Vector3.zero; }
         }
         ResolveTerrainCollision(g.World, ref pos, oldX, oldZ);
         map.ConstrainActor(ref pos);

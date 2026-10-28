@@ -30,7 +30,25 @@ public class NightAutoShot : MonoBehaviour
         if (System.Array.IndexOf(args, "-nightEnemyGallery") >= 0) { StartCoroutine(EnemyGallery()); return; }
         if (System.Array.IndexOf(args, "-nightSpriteTest") >= 0) { StartCoroutine(SpriteTest()); return; }
         if (System.Array.IndexOf(args, "-nightBench") >= 0) { StartCoroutine(Bench()); return; }
+        if (System.Array.IndexOf(args, "-nightEndNameTest") >= 0) { StartCoroutine(EndNameTest()); return; }
         StartCoroutine(m >= 0 && m + 1 < args.Length ? Tour(args[m + 1]) : Run());
+    }
+
+    // 結果画面での名前入力の確認: 名前なしで始めて終わらせ、名前入力の画面 → 登録後の画面を撮る(テスト用のランキングに入る)
+    IEnumerator EndNameTest()
+    {
+        yield return new WaitForSeconds(1f);
+        g.StartGame();
+        yield return new WaitForSeconds(1.2f);
+        yield return Shot("countdown");
+        yield return new WaitForSeconds(3f);
+        g.SendMessage("End", true);
+        yield return new WaitForSeconds(6f);
+        yield return Shot("end_name_prompt");
+        g.SubmitRanking("テスト名");
+        yield return new WaitForSeconds(1.5f);
+        yield return Shot("end_name_done");
+        Application.Quit();
     }
 
     // 重さの計測: マップCで敵を大量に出し、光を当て続けた時と雷の時のフレーム時間を bench.txt に書く(軽量化の前後比較用)。

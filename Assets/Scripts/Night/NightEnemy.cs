@@ -12,6 +12,7 @@ public class NightEnemy
     public struct Config
     {
         public float speed, contactDps, lightHp, drain, regen, scale;
+        public float body;      // 体の中心の当たり判定の半径。主人公はここを通り抜けられない(群れの中を押し通りにくくする)
         public Color color;
         public bool ranged;
         public bool phasing;    // 通路を無視して壁や木をすり抜ける
@@ -24,15 +25,16 @@ public class NightEnemy
     // 難しすぎる・簡単すぎる時はこの1つの数字で調整する(マップ別の倍率は NightDifficulty.enemyHp)。
     const float HpScale = 0.6f;
 
+    // 移動速度は体の大きさで段階をつける(小さいほど速い): 群れ型 > すり抜け型 > 遠距離型 > 硬い型
     public static Config ConfigOf(Kind k)
     {
         switch (k)
         {
-            case Kind.Brute: return new Config { speed = 2.05f, contactDps = 24, lightHp = 115 * HpScale, drain = 38, regen = 20, color = NightMeshes.Hex(0x8a3b3b), scale = 1f };
-            case Kind.Shooter: return new Config { speed = 1.8f, contactDps = 8, lightHp = 60 * HpScale, drain = 35, regen = 15, color = NightMeshes.Hex(0xff8c00), scale = 0.8f, ranged = true };
+            case Kind.Brute: return new Config { speed = 1.5f, body = 0.8f, contactDps = 24, lightHp = 115 * HpScale, drain = 38, regen = 20, color = NightMeshes.Hex(0x8a3b3b), scale = 1f };
+            case Kind.Shooter: return new Config { speed = 2.3f, body = 0.5f, contactDps = 8, lightHp = 60 * HpScale, drain = 35, regen = 15, color = NightMeshes.Hex(0xff8c00), scale = 0.8f, ranged = true };
             // 近道してくる分、足は群れ型より遅め
-            case Kind.Sprite: return new Config { speed = 2.6f, contactDps = 10, lightHp = 20 * HpScale, drain = 44, regen = 16, color = NightMeshes.Hex(0x7fe0b0), scale = 0.6f, phasing = true, noHealDrop = true };
-            default: return new Config { speed = 3.5f, contactDps = 11, lightHp = 34 * HpScale, drain = 44, regen = 16, color = NightMeshes.Hex(0x8a4b8a), scale = 0.55f };
+            case Kind.Sprite: return new Config { speed = 3.1f, body = 0.4f, contactDps = 10, lightHp = 20 * HpScale, drain = 44, regen = 16, color = NightMeshes.Hex(0x7fe0b0), scale = 0.6f, phasing = true, noHealDrop = true };
+            default: return new Config { speed = 4.0f, body = 0.35f, contactDps = 11, lightHp = 34 * HpScale, drain = 44, regen = 16, color = NightMeshes.Hex(0x8a4b8a), scale = 0.55f };
         }
     }
 
@@ -50,6 +52,7 @@ public class NightEnemy
     public float dieTimer;
     public List<Vector3> path;
     public float navTimer, shootTimer, fxTimer, crossFxTimer, stuckTimer, noDirectTimer;
+    public float sightTimer; public bool sightCached; // 主人公が見通せるかの結果を少しの間使い回す(毎フレーム調べると重いため)
     public float hitHeight = 0.4f; // 被ダメージの火花を出す高さ(体の中心あたり)
     public string litBy; // 最後にこの敵を照らしたスマホのid(倒した時に、そのスマホの撃破数に数える)
     public float litByTime;
@@ -106,7 +109,7 @@ public class NightEnemy
         dying = false;
         dieTimer = 0f;
         path = null;
-        navTimer = shootTimer = fxTimer = crossFxTimer = stuckTimer = noDirectTimer = 0f;
+        navTimer = shootTimer = fxTimer = crossFxTimer = stuckTimer = noDirectTimer = sightTimer = 0f;
         litBy = null;
         litByTime = 0f;
         go.transform.SetPositionAndRotation(pos, Quaternion.identity);

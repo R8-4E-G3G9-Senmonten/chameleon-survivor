@@ -1413,15 +1413,16 @@ function unlockAudio() {
       audioOut.attack.value = 0.002;
       audioOut.release.value = 0.12;
       audioOut.connect(audioCtx.destination);
-      loadSfx();
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
   } catch (e) {}
 }
 // スマホの効果音(撃破音・当てている間の音)を鳴らすか。音を決め直すまで、いったん鳴らさない(振動はそのまま)
-var SoundEnabled = false;
+var SoundEnabled = true;
 var sfx = {}; // 名前 → 読み込んだ音(AudioBuffer)
-var SfxFiles = { kill: 'kyupiin1.mp3', hit: 'message-display2.mp3' }; // 「キュピーン1」/「メッセージ表示音2」(ピピピピ)
+// 音のファイル(効果音ラボなど)は使わず、ブラウザの中で作る音(撃破は「ピロン」、当てている間は「ジジジ」)で鳴らす。
+// ファイルの音に戻すときは、ここに名前を書いて unlockAudio() の中で loadSfx() を呼ぶ
+var SfxFiles = {};
 function loadSfx() {
   Object.keys(SfxFiles).forEach(function (name) {
     fetch('/sfx/' + SfxFiles[name]).then(function (r) {
@@ -1486,7 +1487,7 @@ function onKills(n) {
     restart(killNum, 'pop'); restart(killPlus, 'show');
     blinkFrame();
     playKillSound();
-    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+    if (navigator.vibrate) navigator.vibrate(200); // 撃破は大きく1回ブルッ
     killStatus.textContent = n + '体撃破しました';
   }
   kills = n;
@@ -1600,7 +1601,7 @@ function startHitSound() {
     hitNodes = { oscs: [src], gain: g };
     return;
   }
-  var base = (ColorPitch[(myColor || '').toLowerCase()] || 784) / 4; // 撃破音より2オクターブ低い、うなるような音
+  var base = 784 / 4; // 当てている音は全員同じ高さ(撃破音より2オクターブ低い、うなるような音)
   var osc = audioCtx.createOscillator(), osc2 = audioCtx.createOscillator();
   osc.type = 'sawtooth'; osc.frequency.setValueAtTime(base, t);
   osc2.type = 'square'; osc2.frequency.setValueAtTime(base * 1.01, t); // 少しずらして重ね、ザラついた電気の音にする
@@ -1608,10 +1609,10 @@ function startHitSound() {
   filter.type = 'lowpass'; filter.frequency.setValueAtTime(1400, t);
   var gain = audioCtx.createGain();
   gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.35, t + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.12, t + 0.03); // 当てている音は撃破音のじゃまをしないよう控えめに(0.35 → 0.22 → 0.12 と下げた)
   // 「ジジジ」と細かく震えるように、音量を1秒に22回揺らす
   var lfo = audioCtx.createOscillator(), lfoGain = audioCtx.createGain();
-  lfo.frequency.setValueAtTime(22, t); lfoGain.gain.setValueAtTime(0.15, t);
+  lfo.frequency.setValueAtTime(22, t); lfoGain.gain.setValueAtTime(0.05, t);
   lfo.connect(lfoGain); lfoGain.connect(gain.gain);
   osc.connect(filter); osc2.connect(filter); filter.connect(gain); gain.connect(audioOut);
   osc.start(t); osc2.start(t); lfo.start(t);
@@ -1632,8 +1633,9 @@ function setHitting(on) {
   if (on) {
     startHitSound();
     if (navigator.vibrate) {
-      navigator.vibrate([25, 55, 25, 55, 25, 55, 25, 55, 25, 55]);
-      hitBuzzTimer = setInterval(function () { navigator.vibrate([25, 55, 25, 55, 25, 55, 25, 55, 25, 55]); }, 400);
+      // 当てている間は、ごく短い振動を細かくくり返す(撃破の振動と区別できるよう弱め)
+      navigator.vibrate([8, 92, 8, 92, 8, 92, 8, 92]);
+      hitBuzzTimer = setInterval(function () { navigator.vibrate([8, 92, 8, 92, 8, 92, 8, 92]); }, 400);
     }
   } else {
     stopHitSound();
@@ -1649,6 +1651,7 @@ function setHitting(on) {
 var lastSt = null, resultImage = null, resultData = null;
 function fmtTime(sec) { var m = Math.floor(sec / 60), s = sec % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
 function onGameState(d) {
+  if (lastSt === 'end' && d.st !== 'end') { kills = 0; killNum.textContent = 0; } // 次のゲームは 0 から数える
   if (d.st === 'end' && lastSt === 'play') showResult(d);
   if (d.st === 'play' && lastSt !== null && lastSt !== 'play') hideResult();
   lastSt = d.st;
