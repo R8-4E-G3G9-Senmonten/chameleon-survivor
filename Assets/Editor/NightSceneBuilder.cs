@@ -90,28 +90,17 @@ public static class NightSceneBuilder
         gameGO.AddComponent<NightAutoShot>();
         gameGO.AddComponent<NightDemoVideo>();
 
-        // 敵の見た目(動物×お化け、いずれもMeshy AI製)。種類ごとに順番に使う。お化け型は少し浮かせる
+        // 敵の見た目(動物×お化け、いずれもMeshy AI製)。お化け型は少し浮かせる
+        // 使うのは4体だけ。猪(Tuskboar)・狼男(Specter)・鎧(Knight)は予備としてファイルと SetupEnemyModels の定義を残してある
         var models = gameGO.AddComponent<NightEnemyModels>();
-        models.moth = new[]
-        {
-            MakeEnemyModel(SetupEnemyModels.Frostwolf, 1.5f, 0f, 1.1f),
-            MakeEnemyModel(SetupEnemyModels.Tuskboar, 1.4f, 0f, 1.1f),
-        };
-        models.brute = new[]
-        {
-            MakeEnemyModel(SetupEnemyModels.Specter, 4.6f, 0.35f),
-            MakeEnemyModel(SetupEnemyModels.Bear, 4.4f, 0.35f),
-            MakeEnemyModel(SetupEnemyModels.Knight, 4.6f, 0.35f),
-        };
-        models.shooter = new[]
-        {
-            MakeEnemyModel(SetupEnemyModels.Emberfox, 2.6f, 0.3f),
-        };
+        models.moth = new[] { MakeEnemyModel(SetupEnemyModels.Frostwolf, 1.5f, 0f, 1.1f) };   // 小型(群れ)
+        models.brute = new[] { MakeEnemyModel(SetupEnemyModels.Bear, 4.4f, 0.35f) };          // 大型
+        models.shooter = new[] { MakeEnemyModel(SetupEnemyModels.Emberfox, 2.6f, 0.3f) };     // 遠距離
         // 木や崖をすり抜けてくるので、暗い森の中でも見えるよう、まわりをうっすら緑に照らす
         var sprite = MakeEnemyModel(SetupEnemyModels.Sprite, 2.1f, 0.35f);
         sprite.glowRange = 4.5f;
         sprite.glowColor = new Color(0.55f, 1f, 0.75f);
-        models.sprite = new[] { sprite };
+        models.sprite = new[] { sprite };                                                      // 道を無視して貫通
 
         if (!Directory.Exists("Assets/Scenes")) Directory.CreateDirectory("Assets/Scenes");
         EditorSceneManager.SaveScene(scene, ScenePath);
@@ -126,6 +115,8 @@ public static class NightSceneBuilder
         return new NightEnemyModel
         {
             prefab = prefab, walk = prefab != null ? SetupEnemyModels.LoadClip(def) : null,
+            attack = prefab != null ? SetupEnemyModels.LoadClip(def, "Attack") : null,
+            shoot = prefab != null ? SetupEnemyModels.LoadClip(def, "Shoot") : null,
             targetHeight = height, hover = hover, animSpeed = animSpeed,
         };
     }

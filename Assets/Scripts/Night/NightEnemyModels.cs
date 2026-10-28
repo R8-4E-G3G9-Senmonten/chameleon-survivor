@@ -7,6 +7,8 @@ public class NightEnemyModel
 {
     public GameObject prefab;
     public AnimationClip walk;
+    public AnimationClip attack; // プレイヤーのすぐそばで繰り返す攻撃(ループ)。無ければ歩きのまま
+    public AnimationClip shoot;  // 弾を撃つときの1回きりの動き(遠距離型)
     public float targetHeight = 1f; // 読み込んだモデルをこの高さ(ユニット)に自動で拡縮する
     public float yaw;               // モデルの正面が +Z とずれている場合の補正(度)
     public float animSpeed = 1f;

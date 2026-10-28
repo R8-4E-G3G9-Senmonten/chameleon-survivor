@@ -3,11 +3,9 @@ using UnityEditor;
 using UnityEngine;
 
 // Meshy AIで作った「動物×お化け」の敵キャラ7体(Assets/Models/Enemies/*)を、Unityでそのまま使える状態に整える。
-//   群れ型: Moonlit Frostwolf(四足の狼) / Purple Tuskboar(猪)
-//   硬い型: Moonfang Specter(狼男) / Crimson Spirit Bear(熊) / Spectral Knight(鎧)
-//   遠距離型: Emberfox(狐火の狐) / Minty Sprite(ミントの妖精)
-// 骨とループするアニメ(Walk)は Blender で自動で付けてから FBX にしてある。
-// Generic リグ + 自分の骨格のアバター、アニメクリップはループ、マテリアルは色テクスチャの Standard に差し替える。
+// ゲームで使うのは4体(群れ型=狼 / 遠距離型=狐 / 硬い型=熊 / すり抜け型=妖精)。猪・狼男・鎧は予備として残してある。
+// 骨とアニメは Blender で自動で付けてから FBX にしてある。Walk は全員、Attack は狼・熊・妖精、Shoot は狐だけにある。
+// Generic リグ + 自分の骨格のアバター、アニメクリップはループ(Shoot だけは1回きり)、マテリアルは色テクスチャの Standard に差し替える。
 public static class SetupEnemyModels
 {
     public class Def
@@ -45,6 +43,11 @@ public static class SetupEnemyModels
         return match != null ? match : clips.FirstOrDefault();
     }
 
+    // Walk 以外の動き("Attack" / "Shoot")。そのモデルに無ければ null
+    public static AnimationClip LoadClip(Def d, string clipName) =>
+        AssetDatabase.LoadAllAssetsAtPath(FbxPath(d)).OfType<AnimationClip>()
+            .FirstOrDefault(c => !c.name.Contains("__preview__") && c.name.Contains(clipName));
+
     static void Setup(Def d)
     {
         string dir = "Assets/Models/Enemies/" + d.name + "/";
@@ -77,7 +80,7 @@ public static class SetupEnemyModels
 
         // FBX を書き出し直すとクリップ名が変わることがあるので、保存済みの設定ではなく毎回 FBX の中身から作る
         var clips = importer.defaultClipAnimations;
-        foreach (var c in clips) { c.loopTime = true; c.loopPose = true; }
+        foreach (var c in clips) { c.loopTime = c.loopPose = !c.name.Contains("Shoot"); }
         importer.clipAnimations = clips;
         importer.SaveAndReimport();
 

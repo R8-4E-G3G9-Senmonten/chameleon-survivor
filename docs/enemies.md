@@ -1,16 +1,16 @@
 # 敵キャラの詳細(夜の森モード)
 
-敵は「動物×お化け」の7体(見た目)を、4つのタイプ(強さ・動き方)に割り振っています。
-見た目は同じタイプの中で、出てくるたびに順番に入れ替わります。
+敵は「動物×お化け」の見た目4体を、4つのタイプ(強さ・動き方)に1体ずつ割り振っています。
+猪(`PurpleTuskboar`)・狼男(`MoonfangSpecter`)・鎧(`SpectralKnight`)は今は使っていませんが、予備としてファイルと `SetupEnemyModels` の定義を残しています(`NightSceneBuilder.cs` の一覧に足せばまた出てきます)。
 
 ## タイプと見た目
 
 | タイプ | 見た目(英名 / フォルダ) | 高さ | 浮き | 主な特徴 |
 |---|---|---|---|---|
-| 群れ型 `Moth` | 月光の狼(四足)/ `MoonlitFrostwolf`<br>紫の猪 / `PurpleTuskboar` | 1.5<br>1.4 | なし | 速くて弱い。3体でかたまって出てくる |
-| 硬い型 `Brute` | 狼男のお化け / `MoonfangSpecter`<br>赤い熊のお化け / `CrimsonSpiritBear`<br>鎧のお化け / `SpectralKnight` | 4.6<br>4.4<br>4.6 | 0.35 | 遅いが硬くて痛い。通路をふさぐ大きさ |
+| 群れ型(小型)`Moth` | 月光の狼(四足)/ `MoonlitFrostwolf` | 1.5 | なし | 速くて弱い。3体でかたまって出てくる |
+| 硬い型(大型)`Brute` | 赤い熊のお化け / `CrimsonSpiritBear` | 4.4 | 0.35 | 遅いが硬くて痛い。通路をふさぐ大きさ |
 | 遠距離型 `Shooter` | 狐火の狐 / `Emberfox` | 2.6 | 0.3 | 9m以内で見通せると立ち止まり、2.5秒ごとに弾を撃つ |
-| すり抜け型 `Sprite` | ミントの妖精 / `MintySprite` | 2.1 | 0.35 | 通路を無視して木や崖をすり抜け、まっすぐ追ってくる近距離型。体力が一番低く、倒しても回復オーブを落とさない。暗い森でも見えるよう、まわりをうっすら緑に照らす |
+| すり抜け型(道を貫通)`Sprite` | ミントの妖精 / `MintySprite` | 2.1 | 0.35 | 通路を無視して木や崖をすり抜け、まっすぐ追ってくる近距離型。体力が一番低く、倒しても回復オーブを落とさない。暗い森でも見えるよう、まわりをうっすら緑に照らす |
 
 - 高さ・浮きの単位はゲーム内のメートル(ユニット)。モデルは読み込み時にこの高さへ自動で拡大縮小し、浮きの分だけ地面から持ち上げます。
 
@@ -45,6 +45,20 @@ Meshy AI のモデルには骨もアニメもないので、`blender/enemies/rig
 - **四足(狼・猪)**: 0.8秒で1周。対角の脚を交互に出して歩き、頭と尻尾も揺れます。ゲームでは1.1倍速で再生します。
 - 面の数は5000〜8000に減らし(元は4.5万〜20万)、テクスチャは1024pxです。
 
+使っている4体には、`blender/enemies/add_enemy_motions.py` で歩き以外の動きも足しています。
+
+| 動き | 誰に | 長さ | いつ再生するか |
+|---|---|---|---|
+| `Attack`(ループ) | 狼=前足を浮かせて噛みつく / 熊=ゆっくり体を横にひねってためてから右パンチ / 妖精=後ろに引いてから体当たり | 0.6秒(熊は1.2秒) | プレイヤーとの距離が 1.8 より近い間(`NightGame.AttackAnimRange`)。擬態中は見失っているので攻撃しない |
+| `Shoot`(1回きり) | 狐=体をそらして両側の狐火を後ろへ引き、前へ投げる | 0.8秒 | 弾を撃つ0.4秒前に始め、投げる姿勢のところで弾が出る(`NightEnemy.ShootLead`) |
+
+- 熊の手先と爪は体のずっと前に突き出ていて、自動の重み付けでは胸の骨に付いてしまう(腕を動かすと爪だけ置き去りになる)。`add_enemy_motions.py` の `FIX_ARMS` で、前に突き出た部分を腕の骨に付け直している。
+- 歩きと攻撃・発射は、0.13秒ほどかけてなめらかに切り替えます(`NightEnemy.Animate`)。
+- 骨付きの `.blend` は `blender/enemies/blend/<名前>_anim.blend` に置いてあります。動きを直すときは、`add_enemy_motions.py` の数字を変えて次のように書き出し直します:
+  ```
+  "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b blender\enemies\blend\<名前>_anim.blend --python blender\enemies\add_enemy_motions.py -- <名前> Assets\Models\Enemies\<名前> blender\enemies\blend\<名前>_anim.blend
+  ```
+
 ## 関係するファイル
 
 | ファイル | 役割 |
@@ -53,9 +67,11 @@ Meshy AI のモデルには骨もアニメもないので、`blender/enemies/rig
 | `Assets/Scripts/Night/NightGame.cs` | 出現率(`PickType`)、追いかけ方、回復オーブ |
 | `Assets/Scripts/Night/NightEnemyModels.cs` | タイプごとの見た目の一覧と、順番に使う仕組み |
 | `Assets/Editor/NightSceneBuilder.cs` | どの見た目をどのタイプに使うか・高さ・浮き・光 |
-| `Assets/Editor/SetupEnemyModels.cs` | FBXの読み込み設定(ループ・マテリアル) |
+| `Assets/Editor/SetupEnemyModels.cs` | FBXの読み込み設定(ループ・マテリアル)。予備の3体の定義もここに残してある |
 | `Assets/Models/Enemies/<名前>/` | FBX(骨・アニメ入り)と色のテクスチャ |
-| `blender/enemies/rig_enemy_ghosts.py` | 骨・重み・アニメを付けてFBXに書き出す |
+| `blender/enemies/rig_enemy_ghosts.py` | 骨・重み・歩きのアニメを付けてFBXに書き出す |
+| `blender/enemies/add_enemy_motions.py` | 攻撃(Attack)・発射(Shoot)の動きを足してFBXを書き出し直す |
+| `blender/enemies/blend/` | 7体ぶんの骨付き `.blend`(動きを直すときの元データ) |
 | `blender/enemies/preview_enemy_anim.py` | アニメのコマを撮って確認する |
 
 ## 見た目を差し替える・増やす手順

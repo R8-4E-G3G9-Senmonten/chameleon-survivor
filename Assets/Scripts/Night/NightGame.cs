@@ -96,6 +96,7 @@ public class NightGame : MonoBehaviour
     // FlashDamage: 雷のダメージの倍率。1回の雷(約1.5秒)で、敵の drain × FlashDamage × 約1 のダメージ。
     // 0.6 では小さい敵が雷だけでほぼ全滅して強すぎたので下げた(0.35 なら小さい敵も少し残る)
     const float FlashDamage = 0.35f, FlashRange = 26f;
+    const float AttackAnimRange = 1.8f; // 敵がこの距離より近いと攻撃の動きにする(体が大きいので触れる距離 0.9 より手前から)
     public float FlashWait { get; private set; } = 9f;
     public float FlashT { get; private set; } = -1f;
     public float FlashLevel { get; private set; }
@@ -665,7 +666,11 @@ public class NightGame : MonoBehaviour
             {
                 // 遠距離型は一定距離で立ち止まって弾を撃つ
                 en.go.transform.rotation = Quaternion.Euler(0, Mathf.Atan2(toPlayer.x, toPlayer.z) * Mathf.Rad2Deg, 0);
+                // 撃つ少し前から、狐火を振りかぶって投げる動きを始める
+                if (en.shootTimer > NightEnemy.ShootLead && en.shootTimer - dt <= NightEnemy.ShootLead) en.PlayShoot();
                 en.shootTimer -= dt;
+                // 初めて見つけたときなど、振りかぶらずに撃とうとしたら、まず振りかぶってから撃つ
+                if (en.shootTimer <= 0f && !en.ShootReady) { en.PlayShoot(); en.shootTimer = NightEnemy.ShootLead; }
                 if (en.shootTimer <= 0f) { SpawnBullet(pos, pp); en.shootTimer = 2.5f; }
             }
             else if (en.knock.magnitude < 2.5f && dist > 0.7f)
@@ -674,6 +679,8 @@ public class NightGame : MonoBehaviour
                 else AdvanceEnemy(en, dt);
             }
             if (dist < 0.9f && Mathf.Abs(en.Position.y - pp.y) < 0.9f) contactDps = Mathf.Max(contactDps, en.cfg.contactDps);
+            // 触れる少し手前から攻撃の動きにする(擬態中は見失っているので攻撃しない)
+            en.Animate(dt, !Camouflaged && dist < AttackAnimRange);
 
             // 光: 当て続けるとダウンゲージが減る。プレイヤーのすぐ近く(死角)には効かない。
             // 接続中のスマホは何人でも同時に照らせる。何本の光が当たっているかを数え、重ねた本数ぶんダメージが増える

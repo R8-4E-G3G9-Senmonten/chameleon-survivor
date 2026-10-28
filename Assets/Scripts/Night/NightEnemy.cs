@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 
-// 敵: 群れ型(moth)・硬い型(brute)・遠距離型(shooter)・すり抜け型(sprite)。通路グラフに沿ってプレイヤーを追う。
+// 敵: 群れ型(moth=小型の狼)・硬い型(brute=大型の熊)・遠距離型(shooter=狐)・すり抜け型(sprite=妖精)。通路グラフに沿ってプレイヤーを追う。
 // すり抜け型だけは通路を無視して、木や崖を突き抜けてまっすぐ追ってくる(近距離型・体力は一番低い・回復オーブを落とさない)。
 // 光(懐中電灯・閃光・点灯したランタン)を浴び続けると lightHp が減って倒れる。
 public class NightEnemy
@@ -116,6 +118,9 @@ public class NightEnemy
         go.transform.localScale = Vector3.one;
         go.SetActive(true);
         ApplyGlow(false);
+        shootLeft = 0f;
+        actionWeight = 0f;
+        if (actionClip != null) { mixer.SetInputWeight(0, 1f); mixer.SetInputWeight(1, 0f); }
     }
 
     public NightEnemy(Kind kind, Vector3 pos)
@@ -213,7 +218,7 @@ public class NightEnemy
     }
 
     Material[] modelMats;
-    UnityEngine.Playables.PlayableGraph graph;
+    PlayableGraph graph;
 
     // Meshy AI の3Dモデルを読み込み、指定の高さに合わせて地面に立たせ、歩行アニメを再生する。
     void BuildModel(NightEnemyModel model)
@@ -261,9 +266,61 @@ public class NightEnemy
         animator.applyRootMotion = false;
         if (model.walk != null)
         {
-            UnityEngine.Playables.AnimationPlayableUtilities.PlayClip(animator, model.walk, out graph);
-            var root = graph.GetRootPlayable(0); UnityEngine.Playables.PlayableExtensions.SetSpeed(root, model.animSpeed);
+            // 歩き(0番)と、攻撃または発射(1番)を重みで混ぜて再生する。ふだんは歩きだけ
+            graph = PlayableGraph.Create("Enemy_" + kind);
+            graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+            var output = AnimationPlayableOutput.Create(graph, "Anim", animator);
+            mixer = AnimationMixerPlayable.Create(graph, 2);
+            output.SetSourcePlayable(mixer);
+            var walk = AnimationClipPlayable.Create(graph, model.walk);
+            walk.SetSpeed(model.animSpeed);
+            graph.Connect(walk, 0, mixer, 0);
+            mixer.SetInputWeight(0, 1f);
+            actionClip = model.shoot != null ? model.shoot : model.attack;
+            actionLoops = model.shoot == null;
+            if (actionClip != null)
+            {
+                action = AnimationClipPlayable.Create(graph, actionClip);
+                graph.Connect(action, 0, mixer, 1);
+            }
+            mixer.SetInputWeight(1, 0f);
+            graph.Play();
         }
+    }
+
+    // ---- 攻撃・発射の動き ----
+    AnimationMixerPlayable mixer;
+    AnimationClipPlayable action;
+    AnimationClip actionClip;
+    bool actionLoops;   // true: 攻撃(そばにいる間くり返す) / false: 発射(1回きり)
+    float actionWeight; // 1番(攻撃・発射)の混ぜ具合
+    float shootLeft;    // 発射の動きの残り時間
+
+    // 弾を撃つこの秒数前に PlayShoot を呼ぶ(狐火を振りかぶって、ちょうど投げる姿勢で弾が出る)
+    public const float ShootLead = 0.4f;
+    public void PlayShoot()
+    {
+        if (actionClip == null || actionLoops) return;
+        action.SetTime(0);
+        shootLeft = actionClip.length;
+    }
+
+    // 発射の動きの途中か(発射の動きが無いモデルは、いつでも撃ってよい)
+    public bool ShootReady => actionClip == null || actionLoops || shootLeft > 0f;
+
+    // 毎フレーム呼ぶ。attacking: プレイヤーのすぐそばで攻撃している
+    public void Animate(float dt, bool attacking)
+    {
+        if (actionClip == null) return;
+        bool on;
+        if (actionLoops) on = attacking;
+        else { shootLeft -= dt; on = shootLeft > 0.15f; } // 終わりぎわに歩きへ戻し始める
+        float before = actionWeight;
+        actionWeight = Mathf.MoveTowards(actionWeight, on ? 1f : 0f, dt * 8f);
+        // 攻撃を始めるときは、ため(振りかぶり)から見せる
+        if (actionLoops && before <= 0f && actionWeight > 0f) action.SetTime(0);
+        mixer.SetInputWeight(0, 1f - actionWeight);
+        mixer.SetInputWeight(1, actionWeight);
     }
 
     // 倒れた敵を片付ける。捨てずに隠して取っておき、Spawn で使い回す。
