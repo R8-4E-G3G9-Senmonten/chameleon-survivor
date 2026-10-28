@@ -121,6 +121,14 @@ public static class NightRanking
         return list;
     }
 
+    // 登録する前に「このスコアなら何位か」を返す(10位以内に入れなければ 0)。結果画面で名前を入れてもらう前に見せる
+    public static int RankIfAdded(string map, int score, int seconds)
+    {
+        var probe = new Entry { map = map, score = score, seconds = seconds, time = DateTime.Now };
+        int ahead = Top(map).FindAll(e => Compare(e, probe) < 0).Count;
+        return ahead < MaxEntries ? ahead + 1 : 0;
+    }
+
     // 登録して、そのマップでの順位(1始まり。10位以内に入れなければ 0)を返す。
     public static int Add(string map, string name, int score, int seconds, int kills, bool cleared, out Entry entry)
     {

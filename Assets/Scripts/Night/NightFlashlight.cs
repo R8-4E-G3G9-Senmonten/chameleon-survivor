@@ -18,7 +18,9 @@ public class NightFlashlight : MonoBehaviour
     // Targets と同じ並びで、その光を出しているスマホのid(マウス・自動テストの光は null)。倒した敵をスマホごとに数えるため
     public List<string> TargetOwners { get; } = new List<string>();
     public List<Color> TargetColors { get; } = new List<Color>(); // Targets と同じ並びで、その光の色
-    public Vector3 Target => Targets.Count > 0 ? Targets[0] : Vector3.zero;
+    // 光がひとつもない時は、どこにも当たらない遠くの点にする(原点の物が照らされた扱いにならないように)
+    public static readonly Vector3 NoTarget = new Vector3(0f, -1000f, 0f);
+    public Vector3 Target => Targets.Count > 0 ? Targets[0] : NoTarget;
     public bool HasPhoneInput { get; private set; }
     public Vector2? DebugAim; // 自動テスト用: 指定するとマウス/スマホの代わりにこの位置(上端原点のビューポート座標)を照らす
 
@@ -133,12 +135,8 @@ public class NightFlashlight : MonoBehaviour
                 return result;
             }
         }
+        // マウスの光は使わない(灯り役のスマホが照らす。スマホがつながっていなければ光なし)
         HasPhoneInput = false;
-        result.Add(new PointerServer.PointerSample
-        {
-            pos = new Vector2(Input.mousePosition.x / Screen.width, 1f - Input.mousePosition.y / Screen.height),
-            color = MouseColor
-        });
         return result;
     }
 }

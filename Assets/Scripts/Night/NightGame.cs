@@ -61,7 +61,7 @@ public class NightGame : MonoBehaviour
     // 敵を倒すと回復オーブを落とす(近づくと吸い寄せられ、触れるとHPが回復)。
     // その代わり「回復した量」と「蛍の回収」で脅威レベルが上がり、敵の出る数・速さが増えていく。
     public const int ThreatMax = 9;
-    const float HealPerThreat = 45f;          // これだけ回復するごとに脅威レベル+1
+    const float HealPerThreat = 90f;          // これだけ回復するごとに脅威レベル+1(45 では増えすぎたので倍にした)
     const float HealOrbLife = 14f, HealMagnet = 3.2f, HealPickup = 0.8f;
     public int Threat { get; private set; } = 1;
     public float HealedTotal { get; private set; }
@@ -80,8 +80,8 @@ public class NightGame : MonoBehaviour
     int MaxEnemiesNow => Mathf.RoundToInt((Difficulty.maxEnemies + 5 * (Threat - 1)) * MaxEnemiesScale);
 
     // ---- 敵の多さ(たくさん出して、まとめて倒せる爽快感を出す) ----
-    const float SpawnPace = 2f;         // 出現ペースの倍率(2 = 元の2倍の頻度で出る)
-    const float MaxEnemiesScale = 1.5f; // 同時に出る敵の上限の倍率
+    const float SpawnPace = 1.5f;       // 出現ペースの倍率(1.5 = 元の1.5倍の頻度で出る。2 だと多すぎたので減らした)
+    const float MaxEnemiesScale = 1.1f; // 同時に出る敵の上限の倍率(1.5 から減らした)
     const int MothSwarm = 3;            // 群れ型(小さい敵)は、この数でかたまって出てくる
     public int OrbCount { get; private set; }
     public bool Cleared { get; private set; }
@@ -106,7 +106,7 @@ public class NightGame : MonoBehaviour
     static readonly Color FogDark = NightMeshes.Hex(0x02040a), FogBright = NightMeshes.Hex(0x7d90b8);
     const float FogDensityDark = 0.026f, FogDensityBright = 0.006f;
     // 懐中電灯が無いとほとんど何も見えないくらい暗くする(閃光の時だけ大きく明るくなる)
-    const float AmbientBase = 0.035f, MoonBase = 0.05f;
+    const float AmbientBase = 0.008f, MoonBase = 0.01f; // 灯り(スマホの光・ランタン)がない所はほとんど見えないくらい暗く(最初の約4分の1)
     static readonly Color AmbientColor = NightMeshes.Hex(0x223344);
 
     // ---- 敵・弾・衝撃波 ----
@@ -182,7 +182,7 @@ public class NightGame : MonoBehaviour
     // ---- 表示用 ----
     public string ToastText { get; private set; } = "";
     public float ToastTimer { get; private set; }
-    public const string HintDefault = "花を合計2秒照らすと、まだ蛍のいる石まで光の道が現れます。ランタンは敵を撃退。倒した敵の緑のオーブでHP回復。";
+    public const string HintDefault = "花を照らすと、まだ蛍のいる石まで光の道が現れます。ランタンのまわりは敵が弱る。倒した敵の緑のオーブでHP回復。";
     public string Hint { get; private set; } = HintDefault;
 
     // ---- カメラ(進行方向の少し先を狙い、遅れて追従する) ----
@@ -230,6 +230,7 @@ public class NightGame : MonoBehaviour
         bool backToTitle = returnToTitle;
         returnToTitle = false;
         if (System.Array.IndexOf(args, "-skipTitle") >= 0 && !backToTitle) StartGame();
+        if (PointerServer.Instance != null) PointerServer.Instance.ResetKills(); // 次のゲームに続けて参加するスマホの撃破数を 0 に
     }
 
     void BuildMap()
@@ -257,12 +258,14 @@ public class NightGame : MonoBehaviour
 
     // コース(マップ)を決めたあと、ゲームを始める前に名前を入力する画面へ進む。
     public string PlayerName { get; private set; } = NightRanking.DefaultName;
+    const float CountdownSeconds = 3f;
+    public float CountdownTimer { get; private set; } // 0 より大きい間はカウントダウン中
     public float NameEntryTime { get; private set; }
     public void StartGame()
     {
         if (State != GameState.Title) return;
-        State = GameState.NameEntry;
-        NameEntryTime = Time.unscaledTime;
+        // 名前はゲームの最後(結果画面)で聞くので、ここではすぐに始める
+        BeginPlay("");
     }
 
     // 名前入力の画面から、タイトル(コース選択)へ戻る
@@ -276,6 +279,8 @@ public class NightGame : MonoBehaviour
         if (name.Length > NightRanking.MaxNameLength) name = name.Substring(0, NightRanking.MaxNameLength);
         PlayerName = name.Length == 0 ? NightRanking.DefaultName : name;
         State = GameState.Playing;
+        // 人が遊ぶときは 3・2・1 のカウントダウンから(自動テスト・紹介動画は名前を渡して始めるので、すぐ始める)
+        CountdownTimer = PlayerName == NightRanking.DefaultName ? CountdownSeconds : 0f;
         if (PointerServer.Instance != null) PointerServer.Instance.ResetKills(); // スマホの撃破数はゲームごとに数え直す
         Audio.StartAmbient();
         ShowToast(MapId + ". " + Map.Name + " — 2つの石を照らして蛍を集め、入口の門から脱出しよう");
@@ -314,6 +319,67 @@ public class NightGame : MonoBehaviour
         PlayerPrefs.SetFloat(VolumeKey, Volume);
     }
 
+    // 大事な出来事(蛍を捕まえた・門が開いた)の大きなお知らせ。「敵が増えた」より目立たせる
+    public const float AnnounceDuration = 2.6f;
+    public string AnnounceText { get; private set; } = "";
+    public string AnnounceSub { get; private set; } = "";
+    public float AnnounceTimer { get; private set; }
+    void Announce(string text, string sub)
+    {
+        AnnounceText = text;
+        AnnounceSub = sub;
+        AnnounceTimer = AnnounceDuration;
+    }
+
+    // いまやること(画面上の目標パネルに常に出す)
+    public string Objective
+    {
+        get
+        {
+            if (GateOpened) return "入口の門へ戻って脱出しよう";
+            foreach (var o in World.Orbs) if (o.materialized && !o.collected) return "光った石に近づいて、蛍を捕まえよう";
+            return "石を照らして蛍を呼ぼう(迷ったら導きの花を照らす)";
+        }
+    }
+
+    // 次に向かう場所(まだ捕まえていない一番近い蛍の石。蛍が揃ったら入口の門)への方向。主人公のまわりの矢印に使う。
+    // 通路に沿って進めるよう、まっすぐの向きではなく、経路の次の曲がり角の方を指す。経路は0.4秒ごとに計算し直す
+    float objectiveTimer;
+    Vector3 objectiveAim;
+    Color objectiveColor;
+    bool hasObjective;
+    public bool TryObjectiveDirection(out Vector3 aim, out Color color)
+    {
+        if (State == GameState.Playing && Time.time >= objectiveTimer)
+        {
+            objectiveTimer = Time.time + 0.4f;
+            Vector3 from = PlayerPos;
+            List<Vector3> best = null; float bestLen = float.MaxValue; NightOrb bestOrb = null;
+            if (!GateOpened)
+            {
+                foreach (var o in World.Orbs)
+                {
+                    if (o.collected) continue;
+                    var path = Map.NavigationPath(from, o.Position);
+                    float len = NightMap.PathLength(from, path);
+                    if (len < bestLen) { bestLen = len; best = path; bestOrb = o; }
+                }
+            }
+            else best = Map.NavigationPath(from, new Vector3(NightMap.Exit.x, 0, NightMap.Exit.y));
+            hasObjective = best != null && best.Count > 0;
+            if (hasObjective)
+            {
+                objectiveAim = best[best.Count - 1];
+                foreach (var p in best) if (NightMap.Flat(p, from) > 1.6f) { objectiveAim = p; break; }
+                objectiveColor = bestOrb == null ? NightMeshes.Hex(0xafffd1) : NightMeshes.Hex(bestOrb.index == 0 ? 0x78c8ff : 0xffcf65);
+                if (NightMap.Flat(objectiveAim, from) < 1.2f) hasObjective = false; // もう着いている
+            }
+        }
+        aim = objectiveAim;
+        color = objectiveColor;
+        return hasObjective && State == GameState.Playing && CountdownTimer <= 0f;
+    }
+
     public void ShowToast(string text, float duration = 1.6f)
     {
         ToastText = text;
@@ -338,9 +404,20 @@ public class NightGame : MonoBehaviour
                 if (Input.GetKeyDown(KeyCode.T)) BackToTitle();
                 return;
             case GameState.Ended:
+                // 名前を入力している間は R / T の文字を打てるように、ショートカットは登録が終わってから
+                if (!RankingDone) return;
                 if (Input.GetKeyDown(KeyCode.R)) Restart();
                 if (Input.GetKeyDown(KeyCode.T)) BackToTitle();
                 return;
+        }
+
+        // 始まる前のカウントダウン中は、ゲームを進めない(カメラだけ主人公に合わせる)
+        if (CountdownTimer > 0f)
+        {
+            CountdownTimer -= Time.deltaTime;
+            if (CountdownTimer <= 0f) Audio.PlayDownChime();
+            PlaceCamera();
+            return;
         }
 
         if (Input.GetKeyDown(KeyCode.Escape))
@@ -416,6 +493,7 @@ public class NightGame : MonoBehaviour
 
         // --- 敵 ---
         float contactDps = UpdateEnemies(dt);
+        PushPlayerOutOfEnemies();
 
         // --- 被ダメージ(擬態中は無敵) ---
         HurtNow = contactDps > 0f && !Camouflaged;
@@ -431,6 +509,7 @@ public class NightGame : MonoBehaviour
         UpdateHealOrbs(dt);
         if (HealFlash > 0f) HealFlash = Mathf.Max(0f, HealFlash - dt * 1.5f);
         if (AlertTimer > 0f) AlertTimer -= dt;
+        if (AnnounceTimer > 0f) AnnounceTimer -= dt;
 
         // --- 蛍の石・門 ---
         foreach (var orb in World.Orbs) orb.Tick(this, dt);
@@ -520,6 +599,30 @@ public class NightGame : MonoBehaviour
         return damage;
     }
 
+    // 敵の体の中心(cfg.body の半径)には入れないように、主人公を押し戻す。
+    // 敵の群れに突っ込んでも、すり抜けてごり押しで進むことはできない(押し戻された先が通れない所なら動かさない)。
+    const float PlayerBodyRadius = 0.3f;
+    void PushPlayerOutOfEnemies()
+    {
+        Vector3 p = PlayerPos;
+        Vector3 push = Vector3.zero;
+        foreach (var en in Enemies)
+        {
+            if (en.dying || Mathf.Abs(en.Position.y - p.y) > 1.2f) continue;
+            float min = en.cfg.body + PlayerBodyRadius;
+            float dx = p.x - en.Position.x, dz = p.z - en.Position.z, d = Mathf.Sqrt(dx * dx + dz * dz);
+            if (d >= min) continue;
+            if (d < 0.001f) { dx = 0f; dz = 1f; d = 1f; }
+            push.x += dx / d * (min - d);
+            push.z += dz / d * (min - d);
+        }
+        if (push.sqrMagnitude < 1e-6f) return;
+        Vector3 q = p + push;
+        if (!Map.Walkable(q.x, q.z, 0.3f)) return;
+        q.y = p.y;
+        Player.transform.position = q;
+    }
+
     float UpdateEnemies(float dt)
     {
         float contactDps = 0f;
@@ -559,7 +662,7 @@ public class NightGame : MonoBehaviour
                 // 擬態中はプレイヤーを見失い、その場の近くをうろうろする(弾も撃たない)
                 WanderEnemy(en, dt);
             }
-            else if (en.cfg.ranged && dist < 9f && Map.ClearSight(pos, pp))
+            else if (en.cfg.ranged && dist < 9f && SeesPlayer(en, pos, pp))
             {
                 // 遠距離型は一定距離で立ち止まって弾を撃つ
                 en.go.transform.rotation = Quaternion.Euler(0, Mathf.Atan2(toPlayer.x, toPlayer.z) * Mathf.Rad2Deg, 0);
@@ -618,6 +721,17 @@ public class NightGame : MonoBehaviour
     // それでも詰まったら、しばらく通路グラフの経路だけに従って回り込む。
     static readonly float[] SlideAngles = { 0f, 20f, -20f, 40f, -40f, 65f, -65f, 90f, -90f, 125f, -125f };
 
+    // 敵から主人公が見通せるか。通路の判定をたくさん呼ぶ重い処理なので、結果を0.15秒ずつ使い回す
+    bool SeesPlayer(NightEnemy en, Vector3 pos, Vector3 pp)
+    {
+        if (Time.time >= en.sightTimer)
+        {
+            en.sightCached = Map.ClearSight(pos, pp);
+            en.sightTimer = Time.time + 0.15f + Random.value * 0.05f; // 全員が同じフレームに調べないよう少しずらす
+        }
+        return en.sightCached;
+    }
+
     void AdvanceEnemy(NightEnemy en, float dt)
     {
         Vector3 pos = en.Position;
@@ -625,7 +739,7 @@ public class NightGame : MonoBehaviour
         en.noDirectTimer -= dt;
 
         Vector3 target;
-        if (en.noDirectTimer <= 0f && Map.ClearSight(pos, pp))
+        if (en.noDirectTimer <= 0f && SeesPlayer(en, pos, pp))
         {
             target = pp;
             en.path = null;
@@ -800,7 +914,7 @@ public class NightGame : MonoBehaviour
         if (healedSinceThreat >= HealPerThreat && Threat < ThreatMax)
         {
             healedSinceThreat -= HealPerThreat;
-            RaiseThreat("回復した分だけ、敵も集まってきた…", 2);
+            RaiseThreat("回復した分だけ、敵も集まってきた…", 1);
         }
     }
 
@@ -1015,7 +1129,7 @@ public class NightGame : MonoBehaviour
             orb = targetOrb,
             group = new GameObject("GuidePath"),
             material = NightMeshes.Unlit(new Color(color.r, color.g, color.b, 0.8f)),
-            time = 7f,
+            time = float.PositiveInfinity, // 一度示したら、その蛍を捕まえる(門なら脱出する)まで消さない
         };
         var leaf = NightMeshes.GuideLeaf();
         var path2 = new List<Vector3> { from };
@@ -1070,14 +1184,14 @@ public class NightGame : MonoBehaviour
     {
         OrbCount++;
         World.Gate.UpdateSockets(World.Orbs);
-        ShowToast("蛍を捕まえた！ " + OrbCount + " / " + OrbTotal);
+        if (OrbCount < OrbTotal) Announce("蛍をゲット！", OrbCount + " / " + OrbTotal + "  あと" + (OrbTotal - OrbCount) + "匹");
         Audio.PlayDownChime();
         RaiseThreat("蛍を捕まえた…森がざわめき出した", 3 + Threat);
         if (OrbCount >= OrbTotal && !World.Gate.opened)
         {
             World.Gate.Open();
             ClearGuidance();
-            ShowToast("蛍が揃った！入口の門が開いた！", 3.5f);
+            Announce("門が開いた！", "蛍が揃った！入口へ戻ろう");
             Audio.PlayPulse();
         }
     }
@@ -1144,6 +1258,22 @@ public class NightGame : MonoBehaviour
     public int ScoreSeconds { get; private set; }
     public int Rank { get; private set; }            // このマップでの順位(10位以内なら1〜10、圏外は0)
     public NightRanking.Entry MyEntry { get; private set; }
+    // ランキングへの登録は結果画面で名前を入れてから。名前を入れなければ登録しない
+    public bool RankingDone { get; private set; }   // 登録した、または登録しないと決めた
+    public bool Registered { get; private set; }    // ランキングに登録した
+
+    public void SubmitRanking(string name)
+    {
+        if (State != GameState.Ended || RankingDone) return;
+        name = (name ?? "").Trim();
+        if (name.Length > NightRanking.MaxNameLength) name = name.Substring(0, NightRanking.MaxNameLength);
+        RankingDone = true;
+        if (name.Length == 0) return; // 名無しはランキングに追加しない
+        PlayerName = name;
+        Registered = true;
+        Rank = NightRanking.Add(MapId, PlayerName, Score, ScoreSeconds, KillCount, Cleared, out var entry);
+        MyEntry = entry;
+    }
 
     void End(bool win)
     {
@@ -1152,8 +1282,11 @@ public class NightGame : MonoBehaviour
         Cleared = win;
         ScoreSeconds = Mathf.FloorToInt(Elapsed);
         Score = NightRanking.ScoreOf(win, ScoreSeconds, KillCount);
-        Rank = NightRanking.Add(MapId, PlayerName, Score, ScoreSeconds, KillCount, win, out var entry);
-        MyEntry = entry;
+        Rank = 0;
+        MyEntry = null;
+        RankingDone = Registered = false;
+        // 自動テスト・紹介動画の撮影は、始めるときに名前を渡しているので、そのまま登録する(テスト用のファイルに入る)
+        if (PlayerName != NightRanking.DefaultName) SubmitRanking(PlayerName);
         Player.SetAnimating(false);
         Audio.StopBgm();
         if (win) Audio.PlayClear(); else Audio.PlayGameOver();
