@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ルールと仕組み</title>
+<link rel="stylesheet" href="common.css">
+<style>
+@page { size: 1280px 720px; margin: 0; }
+:root { --bg: #fbfaf6; --ink: #14213d; --ink-2: #3d4a63; --soft: #eef1f6; --rule: #cfd6e2;
+  --cg: #1f8a4c; --cy: #9a6400; --cb: #1769aa; --cr: #c0392b; --cv: #6a45c2; --yl: #ffe27a; }
+body { background: var(--bg); color: var(--ink); }
+.slide { width: 1280px; height: 720px; position: relative; overflow: hidden; page-break-after: always; padding: 46px 72px 50px; display: flex; flex-direction: column; background: var(--bg); }
+.slide::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 12px; background: var(--bar, var(--cy)); }
+.p1 { --bar: #f2b705; } .p2 { --bar: var(--cg); } .p3 { --bar: var(--cb); }
+.slide:last-child { page-break-after: auto; }
+.no { position: absolute; right: 34px; bottom: 16px; font-size: 20px; color: var(--ink-2); }
+.part { position: absolute; left: 72px; bottom: 16px; font-size: 20px; color: var(--ink-2); }
+h2 { font-family: "Pop", sans-serif; font-weight: 400; font-size: 52px; line-height: 1.25; margin: 6px 0 20px; }
+.body { margin: auto 0; }
+.cols { display: grid; gap: 36px; align-items: center; }
+.shot { width: 100%; border-radius: 16px; }
+ul.dot { list-style: none; }
+ul.dot li { position: relative; padding-left: 40px; margin: 14px 0; font-size: 34px; line-height: 1.4; font-weight: 700; }
+ul.dot li::before { content: ""; position: absolute; left: 4px; top: .42em; width: 20px; height: 20px; border-radius: 50%; background: var(--bar, #f2b705); }
+ul.dot li small { display: block; font-size: 26px; font-weight: 400; color: var(--ink-2); margin-top: 2px; }
+.mark { background: linear-gradient(transparent 55%, var(--yl) 55%); }
+.g { color: var(--cg); } .y { color: var(--cy); } .b { color: var(--cb); } .r { color: var(--cr); } .v { color: var(--cv); }
+.card { background: #fff; border: 3px solid var(--rule); border-radius: 22px; padding: 26px 30px; }
+.card h3 { font-family: "Pop", sans-serif; font-weight: 400; font-size: 38px; margin-bottom: 10px; }
+.card p { font-size: 30px; line-height: 1.45; font-weight: 700; }
+.card p small { display: block; font-size: 25px; font-weight: 400; color: var(--ink-2); margin-top: 6px; }
+.step { display: flex; align-items: center; gap: 18px; margin: 16px 0; font-size: 34px; font-weight: 700; line-height: 1.35; }
+.num { flex: none; width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; font-family: "Pop", sans-serif; font-size: 30px; background: var(--ink); color: #fff; }
+.cap { font-size: 30px; font-weight: 700; margin-top: 12px; text-align: center; line-height: 1.35; }
+code { font-family: "Consolas", monospace; font-size: .85em; background: var(--soft); padding: 1px 8px; border-radius: 6px; color: var(--cb); font-weight: 700; }
+/* 区切り */
+.divider { justify-content: center; }
+.divider .k { font-size: 30px; color: var(--ink-2); font-weight: 700; }
+.divider .big { font-family: "Pop", sans-serif; font-size: 96px; margin: 6px 0 14px; color: var(--bar); }
+.divider p { font-size: 36px; font-weight: 700; }
+/* 図 */
+.flow { display: flex; align-items: center; justify-content: center; gap: 0; }
+.node { background: #fff; border: 3px solid var(--rule); border-radius: 22px; padding: 24px 30px; text-align: center; white-space: nowrap; min-width: 220px; }
+.node b { display: block; font-size: 34px; }
+.node span { display: block; font-size: 25px; color: var(--ink-2); margin-top: 6px; line-height: 1.35; }
+.arr { flex: none; width: 150px; text-align: center; font-size: 22px; font-weight: 700; color: var(--ink-2); line-height: 1.25; }
+.arr::before { content: "→"; display: block; font-size: 60px; line-height: 1; color: var(--ink); }
+</style>
+</head>
+<body>
+
+<!-- 表紙 -->
+<section class="slide p1" style="justify-content:center;align-items:center;text-align:center;">
+  <img src="img/logo.png" style="width:900px;margin-bottom:22px;">
+  <div class="pop" style="font-size:64px;margin-bottom:34px;">ルールと仕組み</div>
+  <div style="display:flex;gap:26px;font-size:32px;font-weight:700;">
+    <div class="card" style="border-color:#f2b705;padding:16px 30px;">1 ルール</div>
+    <div class="card" style="border-color:var(--cg);padding:16px 30px;">2 仕組み かんたん</div>
+    <div class="card" style="border-color:var(--cb);padding:16px 30px;">3 仕組み くわしく</div>
+  </div>
+  <div class="no">1</div>
+</section>
+
+<!-- ===== PART 1 ===== -->
+<section class="slide p1 divider">
+  <div class="k">PART 1</div><div class="big">ルール</div>
+  <p>みんなで協力して、夜の森から脱出する</p>
+  <div class="no">2</div>
+</section>
+
+<section class="slide p1">
+  <h2>役は2つ</h2>
+  <div class="body cols" style="grid-template-columns:1fr 1fr;">
+    <div class="card" style="border-color:var(--cg);">
+      <img class="shot" src="img/camo.jpg" style="margin-bottom:16px;">
+      <h3 class="g">カメレオン役(1人)</h3>
+      <p><span class="mark">足でマットを踏んで</span>歩く</p>
+    </div>
+    <div class="card" style="border-color:#f2b705;">
+      <img class="shot" src="img/light.jpg" style="margin-bottom:16px;">
+      <h3 class="y">灯り役(7人まで)</h3>
+      <p><span class="mark">スマホが懐中電灯</span>になる</p>
+    </div>
+  </div>
+  <div class="part">1 ルール</div><div class="no">3</div>
+</section>
+
+<section class="slide p1">
+  <h2><span class="g">カメレオン役</span>のやること</h2>
+  <div class="body cols" style="grid-template-columns:1.05fr 1fr;">
+    <ul class="dot">
+      <li>踏んだ向きに歩く<small>前・後・左・右の4枚</small></li>
+      <li><span class="mark">止まると、隠れられる</span><small>敵から見えなくなる。3秒まで</small></li>
+      <li>緑のバーがなくなると負け</li>
+    </ul>
+    <img class="shot" src="img/camo.jpg">
+  </div>
+  <div class="part">1 ルール</div><div class="no">4</div>
+</section>
+
+<section class="slide p1">
+  <h2><span class="y">灯り役</span>のやること</h2>
+  <div class="body cols" style="grid-template-columns:1.05fr 1fr;">
+    <ul class="dot">
+      <li>QRコードを読む<small>アプリはいらない</small></li>
+      <li>スマホを傾けて、ボタンを押す</li>
+      <li><span class="mark">敵を照らし続けて倒す</span><small>何人かで同じ敵を照らすと速い</small></li>
+    </ul>
+    <img class="shot" src="img/light.jpg">
+  </div>
+  <div class="part">1 ルール</div><div class="no">5</div>
+</section>
+
+<section class="slide p1">
+  <h2>ゴール：<span class="mark">蛍を2匹</span>集めて脱出</h2>
+  <div class="body cols" style="grid-template-columns:repeat(3,1fr);gap:28px;align-items:start;">
+    <div><img class="shot" src="img/stone.jpg"><div class="cap">① 石を照らす</div></div>
+    <div><img class="shot" src="img/firefly.jpg"><div class="cap">② さわって蛍をゲット</div></div>
+    <div><img class="shot" src="img/play.jpg"><div class="cap">③ 開いた門から出る</div></div>
+  </div>
+  <div class="part">1 ルール</div><div class="no">6</div>
+</section>
+
+<section class="slide p1">
+  <h2>敵は<span class="r">4種類</span></h2>
+  <div class="body cols" style="grid-template-columns:repeat(4,1fr);gap:22px;align-items:start;">
+    <div><img class="shot" src="img/enemy_wolf.jpg" style="height:250px;object-fit:cover;"><div class="cap">狼<br><span style="font-weight:400;font-size:26px;">速い・群れ</span></div></div>
+    <div><img class="shot" src="img/enemy_fox.jpg" style="height:250px;object-fit:cover;"><div class="cap">狐<br><span style="font-weight:400;font-size:26px;">火の玉を投げる</span></div></div>
+    <div><img class="shot" src="img/enemy_bear3d.jpg" style="height:250px;object-fit:cover;"><div class="cap">熊<br><span style="font-weight:400;font-size:26px;">大きくて強い</span></div></div>
+    <div><img class="shot" src="img/enemy_sprite.jpg" style="height:250px;object-fit:cover;"><div class="cap">妖精<br><span style="font-weight:400;font-size:26px;">木をすり抜ける</span></div></div>
+  </div>
+  <div class="part">1 ルール</div><div class="no">7</div>
+</section>
+
+<section class="slide p1">
+  <h2>助けてくれるもの・気をつけること</h2>
+  <div class="body cols" style="grid-template-columns:1fr 1fr;align-items:start;">
+    <ul class="dot">
+      <li><span class="g">花</span>を照らすと、道が光る</li>
+      <li><span class="y">ランタン</span>の近くでは敵が弱る</li>
+      <li><span class="b">雷</span>が鳴ると、敵にダメージ</li>
+    </ul>
+    <div class="card" style="border-color:var(--cr);">
+      <h3 class="r">注意</h3>
+      <p>蛍を取ると、敵が増える<small>後半ほどむずかしい。声をかけ合おう</small></p>
+    </div>
+  </div>
+  <div class="part">1 ルール</div><div class="no">8</div>
+</section>
+
+<!-- ===== PART 2 ===== -->
+<section class="slide p2 divider">
+  <div class="k">PART 2</div><div class="big">仕組み かんたん</div>
+  <p>足とスマホで、どうやってゲームが動くの？</p>
+  <div class="no">9</div>
+</section>
+
+<section class="slide p2">
+  <h2>パソコンが<span class="g">真ん中</span></h2>
+  <div class="body">
+    <div class="flow">
+      <div style="display:flex;flex-direction:column;gap:22px;">
+        <div class="node"><b>マット</b><span>足の動き</span></div>
+        <div class="node"><b>スマホ</b><span>向きとボタン</span></div>
+      </div>
+      <div class="arr">送る</div>
+      <div class="node" style="border-color:var(--cg);padding:34px 30px;"><b>パソコン</b><span>ゲームを計算</span></div>
+      <div class="arr">映す</div>
+      <div class="node"><b>大きな画面</b><span>森とカメレオン</span></div>
+    </div>
+  </div>
+  <div class="part">2 仕組み かんたん</div><div class="no">10</div>
+</section>
+
+<section class="slide p2">
+  <h2>スマホが<span class="y">懐中電灯</span>になるわけ</h2>
+  <div class="body">
+    <div class="step"><div class="num">1</div>QRで開くのは、ふつうのWebページ</div>
+    <div class="step"><div class="num">2</div>スマホの<span class="mark">傾きセンサー</span>で向きを知る</div>
+    <div class="step"><div class="num">3</div>向きを、すぐパソコンへ送る</div>
+    <div class="step"><div class="num">4</div>パソコンが、森の中の光の位置にする</div>
+  </div>
+  <div class="part">2 仕組み かんたん</div><div class="no">11</div>
+</section>
+
+<section class="slide p2">
+  <h2>マットの仕組み</h2>
+  <div class="body cols" style="grid-template-columns:1fr 1fr;">
+    <ul class="dot">
+      <li>マットの中は<span class="mark">4つのスイッチ</span></li>
+      <li>小さなコンピューター(<b>ESP32</b>)が、どれが踏まれたか読む</li>
+      <li>USBケーブルでパソコンへ送る</li>
+    </ul>
+    <div class="card" style="text-align:center;border-color:var(--cg);">
+      <div style="display:grid;grid-template-columns:repeat(3,96px);grid-template-rows:repeat(3,96px);gap:10px;justify-content:center;font-family:'Pop',sans-serif;font-size:34px;">
+        <div></div><div class="card" style="padding:0;display:grid;place-items:center;">前</div><div></div>
+        <div class="card" style="padding:0;display:grid;place-items:center;">左</div><div style="display:grid;place-items:center;"><img src="img/chameleon.png" style="width:86px;"></div><div class="card" style="padding:0;display:grid;place-items:center;">右</div>
+        <div></div><div class="card" style="padding:0;display:grid;place-items:center;">後</div><div></div>
+      </div>
+    </div>
+  </div>
+  <div class="part">2 仕組み かんたん</div><div class="no">12</div>
+</section>
+
+<section class="slide p2">
+  <h2>敵とキャラクター</h2>
+  <div class="body cols" style="grid-template-columns:1fr 1fr;align-items:stretch;">
+    <div class="card" style="border-color:var(--cr);">
+      <h3 class="r">敵の動き</h3>
+      <p>見えたら、まっすぐ来る<br>見えないと、道を探して来る<small>隠れると、見失ってうろうろ</small></p>
+    </div>
+    <div class="card" style="border-color:var(--cv);">
+      <h3 class="v">キャラクター</h3>
+      <p>AIで描いた絵を、AIで3Dにした<small>歩く・パンチなどの動きは自動で付けた</small></p>
+    </div>
+  </div>
+  <div class="part">2 仕組み かんたん</div><div class="no">13</div>
+</section>
+
+<!-- ===== PART 3 ===== -->
+<section class="slide p3 divider">
+  <div class="k">PART 3</div><div class="big">仕組み くわしく</div>
+  <p>使っている技術と工夫</p>
+  <div class="no">14</div>
+</section>
+
+<section class="slide p3">
+  <h2>システム構成</h2>
+  <div class="body">
+    <div class="flow">
+      <div style="display:flex;flex-direction:column;gap:22px;">
+        <div class="node"><b>ESP32</b><span>USBシリアル</span></div>
+        <div class="node"><b>スマホのブラウザ</b><span>WebSocket</span></div>
+      </div>
+      <div class="arr">入力</div>
+      <div class="node" style="border-color:var(--cb);padding:30px;"><b>Unity 6(C#)</b><span>ゲーム本体</span></div>
+      <div class="arr">記録</div>
+      <div class="node"><b>ranking.csv</b><span>Excelで開ける</span></div>
+    </div>
+    <p style="font-size:28px;text-align:center;margin-top:34px;">スマホは <b>Cloudflare トンネル</b> 経由で、5Gからも参加できる</p>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">15</div>
+</section>
+
+<section class="slide p3">
+  <h2>スマホとの通信</h2>
+  <div class="body">
+    <ul class="dot">
+      <li>PCの中に<span class="mark">自作の小さなWebサーバー</span><small>管理者の権限なしで動く</small></li>
+      <li>起動すると、インターネット用のURLを作ってQRにする<small>cloudflared を使う。ネットがない会場では同じWi-Fiで</small></li>
+      <li>向きが変わるたびに WebSocket で送信<small>止まっていても0.1〜0.25秒ごとに送る</small></li>
+    </ul>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">16</div>
+</section>
+
+<section class="slide p3">
+  <h2>通信でつまずいた所</h2>
+  <div class="body cols" style="grid-template-columns:1fr 1fr;align-items:stretch;">
+    <div class="card" style="border-color:var(--cb);">
+      <h3 class="b">iPhone の傾きセンサー</h3>
+      <p>許可は HTTPS のページでしか出ない<small>→ 自分で証明書を作り、HTTPS を用意した</small></p>
+    </div>
+    <div class="card" style="border-color:var(--cb);">
+      <h3 class="b">光が遅れる</h3>
+      <p>送るたびに接続し直していた<small>→ 接続を使い回す(Keep-Alive)、すぐ送る(NoDelay)</small></p>
+    </div>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">17</div>
+</section>
+
+<section class="slide p3">
+  <h2>光の当たり判定</h2>
+  <div class="body">
+    <div class="step"><div class="num">1</div>スマホの傾きを、画面上の位置に変える</div>
+    <div class="step"><div class="num">2</div>カメラからその位置へ<span class="mark">見えない線</span>を飛ばす</div>
+    <div class="step"><div class="num">3</div>地面に当たった所が「照らしている場所」</div>
+    <div class="step"><div class="num">4</div>光の中の敵は体力が減り、0で倒れる</div>
+    <p style="font-size:26px;color:var(--ink-2);margin-top:14px;">人数が多いほど、1人分の光は小さくなる(半径 3m × 1/√人数、最小1.1m)</p>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">18</div>
+</section>
+
+<section class="slide p3">
+  <h2>マットとESP32</h2>
+  <div class="body">
+    <ul class="dot">
+      <li>踏まれ方を<span class="mark">1バイト</span>で送る<small>例：<code>0xA9</code> ＝ 前＋右(上の4ビットは目印)</small></li>
+      <li>変わった瞬間と、0.2秒ごとに送る</li>
+      <li>つなぐと自動で見つける<small>抜けても2秒ごとに探し直す</small></li>
+      <li>キーボードのWASDと同じ扱い</li>
+    </ul>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">19</div>
+</section>
+
+<section class="slide p3">
+  <h2>敵のAI(追いかけ方)</h2>
+  <div class="body">
+    <div class="step"><div class="num">1</div>見通せるなら、まっすぐ進む</div>
+    <div class="step"><div class="num">2</div>見えないなら、<span class="mark">最短の道</span>を計算する<span style="font-size:26px;font-weight:400;color:var(--ink-2);">(ダイクストラ法)</span></div>
+    <div class="step"><div class="num">3</div>壁に当たったら、少しずつ向きを変えて滑る</div>
+    <p style="font-size:26px;color:var(--ink-2);margin-top:14px;">妖精だけは道を無視して一直線。蛍を取るほど、敵の数と出る速さが上がる</p>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">20</div>
+</section>
+
+<section class="slide p3">
+  <h2>3Dモデルと動き</h2>
+  <div class="body">
+    <div class="flow" style="margin-bottom:34px;">
+      <div class="node"><b>画像生成AI</b><span>絵</span></div>
+      <div class="arr" style="width:64px;"></div>
+      <div class="node"><b>Meshy AI</b><span>3Dにする</span></div>
+      <div class="arr" style="width:64px;"></div>
+      <div class="node"><b>Blender</b><span>骨と動きを付ける</span></div>
+      <div class="arr" style="width:64px;"></div>
+      <div class="node"><b>Unity</b><span>ゲームへ</span></div>
+    </div>
+    <ul class="dot">
+      <li>20万面 → 8000面以下に軽くした</li>
+      <li>歩き ⇔ 攻撃を、なめらかに切り替える</li>
+    </ul>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">21</div>
+</section>
+
+<section class="slide p3">
+  <h2>スコアの計算</h2>
+  <div class="body cols" style="grid-template-columns:1fr 1fr;align-items:stretch;">
+    <div class="card" style="border-color:var(--cg);">
+      <h3 class="g">脱出できたら</h3>
+      <p>5000点<br>＋ 倒した数 × 100点<br>＋ 早さボーナス<small>(10分より1秒早いごとに10点)</small></p>
+    </div>
+    <div class="card" style="border-color:var(--cr);">
+      <h3 class="r">力尽きたら</h3>
+      <p>倒した数 × 100点<br>＋ 生きた秒数 × 5点<small>必ず脱出より低くなる</small></p>
+    </div>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">22</div>
+</section>
+
+<section class="slide p3">
+  <h2>開発の工夫</h2>
+  <div class="body">
+    <ul class="dot">
+      <li>画面の配置は<span class="mark">コードで組み立てる</span><small>いつでも同じ状態を作り直せる</small></li>
+      <li>自動でプレイして、画面を撮って確認</li>
+      <li>ダブルクリックで、ビルドから起動まで</li>
+      <li>効果音は、音のファイルなしでコードで作る</li>
+    </ul>
+  </div>
+  <div class="part">3 仕組み くわしく</div><div class="no">23</div>
+</section>
+
+</body>
+</html>
