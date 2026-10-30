@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
 <style>
-/* レイアウト: 白地にコーポレートブルー(大同生命のサイトを参考)。左に常に見える目次、右に本文の2段組。
-   スマホでは目次を上の固定バーに畳む。見出しは丸い矢印アイコン付きの左寄せ。明るい配色だけで作る */
+/* レイアウト: 白地にコーポレートブルー(大同生命のサイトを参考)の1段組。
+   目次は上の固定バーの三本線から、いつでも開ける。長い説明は折りたたみ(details)にまとめる。見出しは丸い矢印アイコン付きの左寄せ。明るい配色だけで作る */
 :root {
   --bg: #ffffff;
   --panel: #f2f6fa;
@@ -30,7 +30,6 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 16px; }
-@media (max-width: 900px) { html { scroll-padding-top: 64px; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 16px; line-height: 1.9; margin: 0; padding-block: 0; }
 a { color: var(--blue); }
@@ -42,44 +41,36 @@ ul, ol { margin: 0; padding-left: 1.4em; }
 li + li { margin-top: 0.3em; }
 .wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
-/* ヘッダー(ブランドだけ。スマホでは目次ボタンも入れて上に固定) */
-.site-head { border-bottom: 1px solid var(--line); padding: 12px max(16px, env(safe-area-inset-left, 0px)); display: flex; align-items: center; gap: 12px; background: var(--bg); }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); min-width: 0; }
-.brand .mark { width: 36px; height: 36px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; flex: none; }
-.brand b { display: block; font-size: 18px; line-height: 1.25; }
-.brand small { display: block; font-size: 11px; color: var(--sub); }
+/* ヘッダー: 左に三本線(目次)、まん中に今読んでいる章、右に「すべて開く」。どの画面幅でも上に固定 */
+.site-head { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; background: var(--bg); border-bottom: 1px solid var(--line); padding: 6px max(12px, env(safe-area-inset-right, 0px)) 6px max(12px, env(safe-area-inset-left, 0px)); min-height: 56px; }
+.burger { width: 44px; height: 44px; flex: none; display: grid; align-content: center; justify-items: center; gap: 5px; border: 0; border-radius: 8px; background: var(--blue); cursor: pointer; padding: 0; }
+.burger span { display: block; width: 20px; height: 2px; background: #fff; border-radius: 1px; }
+.burger:hover { background: var(--blue-dark); }
+.brand { display: flex; align-items: center; text-decoration: none; color: var(--text); min-width: 0; flex: 1; }
+.brand > span { min-width: 0; }
+.brand b { display: block; font-size: 15px; line-height: 1.3; }
+.brand small { display: block; font-size: 12px; color: var(--blue); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.expand-all { flex: none; font: inherit; font-size: 13px; font-weight: 700; border: 2px solid var(--blue); background: #fff; color: var(--blue); border-radius: 999px; padding: 4px 14px; min-height: 36px; cursor: pointer; }
+.expand-all[aria-pressed="true"] { background: var(--blue); color: #fff; }
 
-/* 目次 */
-.toc-list ol { list-style: none; margin: 0 0 14px; padding: 0; }
+/* 目次(左から出る) */
+.drawer-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 30; }
+.drawer { position: fixed; top: 0; bottom: 0; left: 0; width: min(320px, 86vw); background: var(--bg); z-index: 31; overflow-y: auto; padding: 0 8px 24px max(8px, env(safe-area-inset-left, 0px)); box-shadow: 4px 0 16px rgba(0, 0, 0, 0.15); }
+.drawer-head { position: sticky; top: 0; background: var(--bg); display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 8px 12px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.drawer-close { width: 44px; height: 44px; border: 0; background: transparent; font-size: 26px; line-height: 1; color: var(--sub); cursor: pointer; }
+.toc-list ol { list-style: none; margin: 0 0 12px; padding: 0; }
 .toc-list li { margin: 0; }
-.toc-list a { display: block; padding: 6px 12px; border-left: 3px solid transparent; color: var(--text); text-decoration: none; font-size: 14px; line-height: 1.5; }
+.toc-list a { display: flex; align-items: center; min-height: 44px; padding: 4px 12px; border-left: 3px solid transparent; color: var(--text); text-decoration: none; font-size: 15px; line-height: 1.4; }
 .toc-list a:hover { color: var(--blue); background: var(--blue-soft); }
 .toc-list a[aria-current="true"] { border-left-color: var(--blue); color: var(--blue); background: var(--blue-soft); font-weight: 700; }
-.toc-title { font-weight: 700; color: var(--blue); font-size: 15px; margin-bottom: 10px; padding-left: 12px; }
-.toc-group { font-size: 12px; color: var(--sub); font-weight: 700; padding: 0 12px 2px; }
-.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; max-height: 100dvh; overflow-y: auto; padding: 24px 8px 24px 0; border-right: 1px solid var(--line); }
-.toc-mobile { display: none; }
+.toc-title { font-weight: 700; color: var(--blue); font-size: 16px; }
+.toc-group { font-size: 12px; color: var(--sub); font-weight: 700; padding: 4px 12px 2px; }
+@media (max-width: 480px) { .brand b { font-size: 13px; } }
 
 /* 本文 */
-.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; max-width: 1200px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-main { max-width: 860px; min-width: 0; display: grid; gap: 72px; padding-block: 32px 120px; }
-@media (max-width: 900px) {
-  .site-head { position: sticky; top: 0; z-index: 20; padding-block: 8px; }
-  .brand small { display: none; }
-  .brand b { font-size: 15px; }
-  .layout { grid-template-columns: minmax(0, 1fr); }
-  .toc { display: none; }
-  .toc-mobile { display: block; margin-left: auto; min-width: 0; }
-  .toc-mobile summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 44px; }
-  .toc-mobile summary::-webkit-details-marker { display: none; }
-  .toc-btn { background: var(--blue); color: #fff; font-weight: 700; font-size: 14px; padding: 6px 16px; border-radius: 999px; flex: none; }
-  .toc-btn::after { content: " ▾"; }
-  .toc-mobile[open] .toc-btn::after { content: " ▴"; }
-  .toc-current { font-size: 13px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 9em; }
-  .toc-mobile .toc-list { position: absolute; left: 0; right: 0; top: 100%; background: var(--bg); border-bottom: 2px solid var(--blue); box-shadow: 0 8px 16px rgba(0,0,0,.12); max-height: calc(100dvh - 70px); overflow-y: auto; padding: 14px max(16px, env(safe-area-inset-left, 0px)) 6px; }
-  .toc-mobile .toc-list ol { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .toc-mobile .toc-list a { min-height: 44px; display: flex; align-items: center; }
-}
+.layout { max-width: 900px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { min-width: 0; display: grid; gap: 64px; padding-block: 28px 120px; }
+html { scroll-padding-top: 68px !important; }
 
 /* 表紙 */
 .kv { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px 36px; align-items: start; border-bottom: 2px solid var(--blue); padding-bottom: 32px; }
@@ -103,8 +94,8 @@ h3 { font-size: 1.1rem; }
 .oneline::before { content: "ポイント"; background: var(--blue); color: #fff; font-size: 13px; padding: 10px 14px; display: flex; align-items: center; }
 .oneline { padding: 0; }
 .oneline { column-gap: 16px; }
-.say { background: var(--panel); padding: 18px 22px; display: grid; gap: 6px; border-left: 4px solid var(--blue); }
-.say .tag { color: var(--blue); font-weight: 700; font-size: 14px; }
+.deep.say { border-left: 4px solid var(--blue); background: var(--panel); }
+.deep.say .body { padding-top: 4px; }
 .caution { background: var(--red-soft); padding: 14px 20px; font-size: 15px; border-left: 4px solid var(--red); }
 .caution b { display: block; color: var(--red); }
 
@@ -114,6 +105,7 @@ h3 { font-size: 1.1rem; }
 .deep summary::after { content: "＋"; margin-left: auto; color: var(--blue); font-size: 18px; flex: none; }
 .deep[open] summary::after { content: "－"; }
 .deep[open] summary { border-bottom: 1px solid var(--line); }
+.deep summary .tag-say { background: #2e7d32; }
 .deep summary .tag { font-size: 12px; color: #fff; background: var(--blue); padding: 1px 10px; white-space: nowrap; }
 .deep .body { padding: 14px 18px 16px; display: grid; gap: 10px; }
 
@@ -159,9 +151,7 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space:
 .seg button[aria-pressed="true"] { background: var(--blue); color: #fff; }
 
 /* 苦労した話 */
-.stories { display: grid; gap: 16px; }
-.story { border: 1px solid var(--line); padding: 16px 22px; display: grid; gap: 8px; }
-.story h3 { color: var(--blue); }
+.stories { display: grid; gap: 10px; }
 .story dl { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 15px; line-height: 1.8; }
 .story dt { font-weight: 700; font-size: 13px; padding-top: 0.2em; color: var(--sub); }
 .story dd { margin: 0; min-width: 0; }
@@ -200,7 +190,7 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space:
 .refs span { font-size: 14px; color: var(--sub); }
 .refs .url { font-family: var(--mono); font-size: 12px; color: var(--blue); overflow-wrap: anywhere; }
 
-@media (max-width: 900px) { .qa-tools { top: 61px; } }
+.qa-tools { top: 56px; }
 
 footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
 
@@ -209,45 +199,15 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
 <body>
 
 <header class="site-head" id="top">
-  <a class="brand" href="#top"><span class="mark" aria-hidden="true">カ</span><span><b>カメサバ説明ガイド</b><small>専門展 説明担当用</small></span></a>
-  <details class="toc-mobile" id="tocMobile">
-    <summary><span class="toc-btn">目次</span><span class="toc-current" id="tocCurrent">最初に覚えること</span></summary>
-    <nav class="toc-list" aria-label="目次(スマホ)">
-        <p class="toc-group">まずはここから</p>
-        <ol>
-          <li><a href="#start">最初に覚えること</a></li>
-          <li><a href="#aim">展示での意図</a></li>
-          <li><a href="#system">全体の構成</a></li>
-        </ol>
-        <p class="toc-group">仕組み</p>
-        <ol>
-          <li><a href="#mat">圧力マットとESP32</a></li>
-          <li><a href="#phone">スマホが懐中電灯になる仕組み</a></li>
-          <li><a href="#light">光の当たり判定</a></li>
-          <li><a href="#camo">擬態</a></li>
-          <li><a href="#enemy">敵のAI</a></li>
-          <li><a href="#model">3Dモデルと動き</a></li>
-          <li><a href="#balance">難しさとスコア</a></li>
-        </ol>
-        <p class="toc-group">本番の準備</p>
-        <ol>
-          <li><a href="#dev">作り方の工夫</a></li>
-          <li><a href="#stories">苦労した話</a></li>
-          <li><a href="#qa">想定Q&amp;A</a></li>
-          <li><a href="#trouble">当日のトラブル</a></li>
-          <li><a href="#words">用語ミニ辞典</a></li>
-        </ol>
-        <p class="toc-group">その他</p>
-        <ol>
-          <li><a href="#refs">参考にしたサイト</a></li>
-        </ol>
-    </nav>
-  </details>
+  <button type="button" class="burger" id="tocOpen" aria-controls="tocDrawer" aria-expanded="false" aria-label="目次を開く">
+    <span></span><span></span><span></span>
+  </button>
+  <a class="brand" href="#top"><span><b>カメサバ説明ガイド</b><small id="tocCurrent">最初に覚えること</small></span></a>
+  <button type="button" class="expand-all" id="expandAll" aria-pressed="false">すべて開く</button>
 </header>
-<div class="layout">
-  <aside class="toc" aria-label="目次">
-    <nav class="toc-list">
-      <p class="toc-title">目次</p>
+<div class="drawer-bg" id="tocBg" hidden></div>
+<nav class="drawer toc-list" id="tocDrawer" aria-label="目次" hidden>
+  <div class="drawer-head"><span class="toc-title">目次</span><button type="button" class="drawer-close" id="tocClose" aria-label="目次を閉じる">×</button></div>
         <p class="toc-group">まずはここから</p>
         <ol>
           <li><a href="#start">最初に覚えること</a></li>
@@ -276,14 +236,14 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
         <ol>
           <li><a href="#refs">参考にしたサイト</a></li>
         </ol>
-    </nav>
-  </aside>
+</nav>
+<div class="layout">
   <main>
     <div class="kv">
       <div class="kv-text">
         <h1>カメレオンサバイバー<small>技術説明ガイド</small></h1>
-        <p>このページは、専門展で技術の説明を担当する班員のための資料です。読み終えた班員の誰もが、「このゲームがどうやって動いているのか」を自分の言葉で説明でき、来場者の質問にも答えられることを目標にしています。</p>
-        <p class="kv-how"><b>読み方</b>: まず「最初に覚えること」と「展示での意図」を読み(約5分)、次に自分が担当するテーマの章を読み、最後に「想定Q&amp;A」で答える練習をしてください。「最初に覚えること」の表と30秒の話す例は、班の全員が言えるようにしておいてください。</p>
+        <p>専門展で技術を説明する班員向けの資料です。仕組みを自分の言葉で説明し、質問に答えられることを目標にしています。</p>
+        <p class="kv-how"><b>読み方</b>: 「最初に覚えること」→「展示での意図」→ 担当の章 →「想定Q&amp;A」で練習。＋の付いた帯は押すと開きます。</p>
         <p class="note">このページの内容は、<time>2026年10月31日</time>時点の最新版(最新コミット <code>51d4542</code>)のプログラムをもとにしています。</p>
       </div>
       <div class="kv-side">
@@ -301,7 +261,6 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="start">
       <div class="sec-head">
         <h2>最初に覚えること</h2>
-        <p class="lead">来場者に聞かれたとき、班の全員がすぐに言えるようにしておきたい内容です。</p>
       </div>
 
       <div class="tbl"><table class="keynums">
@@ -316,17 +275,16 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
         </tbody>
       </table></div>
 
-      <div class="say">
-        <div class="tag">話す例(30秒)</div>
-        <p>このゲームは、Unity というゲームエンジンで作りました。プレイヤーの入力は2つあります。1つ目は足元のマットです。前・後・左・右の4枚のマットのどれが踏まれているかを、ESP32 というマイコンが読み取り、USBシリアル通信でパソコンに送っています。2つ目はスマホです。来場者がQRコードを読むとWebページが開き、そのページがスマホの傾きセンサーで向きを測って、1秒に約30回パソコンへ送ります。パソコンは受け取った向きからレイキャストで「森のどこを照らしているか」を計算し、光の範囲にいる敵の体力を減らしています。</p>
-      </div>
+      <details class="deep say" open>
+        <summary><span class="tag tag-say">話す例</span>来場者への説明(30秒)</summary>
+        <div class="body"><p>このゲームは、Unity というゲームエンジンで作りました。プレイヤーの入力は2つあります。1つ目は足元のマットです。前・後・左・右の4枚のマットのどれが踏まれているかを、ESP32 というマイコンが読み取り、USBシリアル通信でパソコンに送っています。2つ目はスマホです。来場者がQRコードを読むとWebページが開き、そのページがスマホの傾きセンサーで向きを測って、1秒に約30回パソコンへ送ります。パソコンは受け取った向きからレイキャストで「森のどこを照らしているか」を計算し、光の範囲にいる敵の体力を減らしています。</p></div>
+      </details>
     </section>
 
     <!-- 展示での意図 -->
     <section id="aim">
       <div class="sec-head">
         <h2>展示での意図</h2>
-        <p class="lead">「なぜこういう作りにしたのか」を聞かれたときのために、専門展で見せることを前提にした工夫をまとめました。</p>
       </div>
       <p class="oneline">このゲームは、専門展の会場で、初めて会った来場者どうしがすぐに参加し、協力して遊べることを目指して作っています。</p>
 
@@ -345,10 +303,10 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
         </tbody>
       </table></div>
 
-      <div class="say">
-        <div class="tag">話す例</div>
-        <p>専門展では、初めて会った人どうしでもすぐに一緒に遊べることを大事にしました。灯り役はQRコードを読むだけで参加でき、アプリは要りません。カメレオン役は敵を倒せず、灯り役はゴールに進めないので、お互いに協力しないとクリアできません。足でマットを踏む動きやスマホを向ける動きは、周りで見ている人にも分かりやすいので、見ているだけでも楽しめるようにしています。</p>
-      </div>
+      <details class="deep say">
+        <summary><span class="tag tag-say">話す例</span>来場者への説明</summary>
+        <div class="body"><p>専門展では、初めて会った人どうしでもすぐに一緒に遊べることを大事にしました。灯り役はQRコードを読むだけで参加でき、アプリは要りません。カメレオン役は敵を倒せず、灯り役はゴールに進めないので、お互いに協力しないとクリアできません。足でマットを踏む動きやスマホを向ける動きは、周りで見ている人にも分かりやすいので、見ているだけでも楽しめるようにしています。</p></div>
+      </details>
       <p class="note">この表は、班の資料(<code>docs/project-overview.html</code>)と、プログラムの作りから読み取れる意図をまとめたものです。班で話し合って決めた意図が別にあれば、そちらを優先して話してください。</p>
     </section>
 
@@ -356,7 +314,6 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="system">
       <div class="sec-head">
         <h2>全体の構成</h2>
-        <p class="lead">マットとスマホの情報が、どこからどこへ流れているかを説明します。</p>
       </div>
       <p class="oneline">パソコンが全体の中心です。パソコンはマットとスマホから届く情報を集めてゲームの計算をし、その結果を大きな画面に映します。</p>
 
@@ -415,10 +372,10 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
         </svg>
       </div>
 
-      <div class="say">
-        <div class="tag">話す例</div>
-        <p>パソコンの中でゲームが動いていて、そこに2つの入力が届きます。マットの情報は ESP32 からUSBケーブルで届き、スマホの情報はインターネットか、パソコンと同じWi-Fiを通って届きます。ゲームループを管理する <code>NightGame</code> が、1フレームごとに、カメレオンの移動、光の計算、敵の移動、ダメージの計算、画面の描画を、この順番で処理しています。</p>
-      </div>
+      <details class="deep say">
+        <summary><span class="tag tag-say">話す例</span>来場者への説明</summary>
+        <div class="body"><p>パソコンの中でゲームが動いていて、そこに2つの入力が届きます。マットの情報は ESP32 からUSBケーブルで届き、スマホの情報はインターネットか、パソコンと同じWi-Fiを通って届きます。ゲームループを管理する <code>NightGame</code> が、1フレームごとに、カメレオンの移動、光の計算、敵の移動、ダメージの計算、画面の描画を、この順番で処理しています。</p></div>
+      </details>
 
       <details class="deep">
         <summary><span class="tag">深掘り</span>ゲームの中のプログラムの分け方</summary>
@@ -461,23 +418,27 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="mat">
       <div class="sec-head">
         <h2>圧力マットとESP32</h2>
-        <p class="lead">マットを踏んだ向きが、どのようにゲームまで届くかを説明します。</p>
       </div>
       <p class="oneline">足元には、前・後・左・右に1枚ずつ、合わせて4枚のマットがあります。ESP32 がどのマットが踏まれているかを GPIO で読み取り、1バイトのデータにまとめてUSBシリアル通信でパソコンに送ります。</p>
 
-      <div class="say">
-        <div class="tag">話す例</div>
-        <p>足元には、前・後・左・右の4枚のマットが置いてあります。どのマットも、踏むと導通する(ONになる)スイッチとして働きます。ESP32 というマイコンが、4枚のマットのどれが踏まれているかを GPIO(入出力ピン)で読み取ります。ESP32 はその結果を8ビット(1バイト)のデータにまとめて、USBシリアル通信でパソコンに送っています。プレイヤーが前と右のマットを同時に踏めば、カメレオンは斜め右前に進みます。</p>
-      </div>
+      <details class="deep say">
+        <summary><span class="tag tag-say">話す例</span>来場者への説明</summary>
+        <div class="body"><p>足元には、前・後・左・右の4枚のマットが置いてあります。どのマットも、踏むと導通する(ONになる)スイッチとして働きます。ESP32 というマイコンが、4枚のマットのどれが踏まれているかを GPIO(入出力ピン)で読み取ります。ESP32 はその結果を8ビット(1バイト)のデータにまとめて、USBシリアル通信でパソコンに送っています。プレイヤーが前と右のマットを同時に踏めば、カメレオンは斜め右前に進みます。</p></div>
+      </details>
 
-      <ol class="steps">
-        <li><div>各マットから出ている2本の線のうち、1本を ESP32 の GPIO に、もう1本を GND につなぎます。GPIO は <code>INPUT_PULLUP</code>(内蔵プルアップ抵抗を有効にした入力)に設定してあるので、マットを踏んでいない間は HIGH です。マットを踏むと GPIO が GND と導通して LOW になります。ESP32 は LOW を「踏まれた」と判定します(アクティブLOW)。</div></li>
-        <li><div>踏んだ瞬間や足を離した瞬間には、ON と OFF が短時間に何度も入れ替わるチャタリングが起きます。ESP32 は、同じ状態が<b>15ミリ秒続いたときだけ</b>その状態を確定させるデバウンス処理で、チャタリングを取り除きます。</div></li>
-        <li><div>ESP32 は4枚の状態を、1バイトのデータにまとめます。<b>上位4ビットは識別用のマーカー <code>1010</code>(0xA0)、下位4ビットは前・後・左・右</b>の状態を表すビットフラグです。</div></li>
-        <li><div>ESP32 は、状態が<b>変化した瞬間</b>と、変化がなくても<b>0.2秒ごと</b>(ハートビート)に、このデータをシリアル通信で送ります。ボーレート(通信速度)は115200bpsです。</div></li>
-        <li><div>パソコンのゲームは、ESP32 がどの COMポートにつながっているかを自動で探します。正しい形式のデータを3回受信すると、ゲームはそのポートを ESP32 だと判定します。</div></li>
-        <li><div>ゲームは、受け取った向きをキーボードの WASD キーと<b>同じように扱います</b>。マットとキーボードのどちらかで押されていれば、カメレオンはその向きに進みます。</div></li>
-      </ol>
+      <details class="deep flow">
+        <summary><span class="tag">流れ</span>ESP32 の処理の流れ(6段階)</summary>
+        <div class="body">
+        <ol class="steps">
+          <li><div>各マットから出ている2本の線のうち、1本を ESP32 の GPIO に、もう1本を GND につなぎます。GPIO は <code>INPUT_PULLUP</code>(内蔵プルアップ抵抗を有効にした入力)に設定してあるので、マットを踏んでいない間は HIGH です。マットを踏むと GPIO が GND と導通して LOW になります。ESP32 は LOW を「踏まれた」と判定します(アクティブLOW)。</div></li>
+          <li><div>踏んだ瞬間や足を離した瞬間には、ON と OFF が短時間に何度も入れ替わるチャタリングが起きます。ESP32 は、同じ状態が<b>15ミリ秒続いたときだけ</b>その状態を確定させるデバウンス処理で、チャタリングを取り除きます。</div></li>
+          <li><div>ESP32 は4枚の状態を、1バイトのデータにまとめます。<b>上位4ビットは識別用のマーカー <code>1010</code>(0xA0)、下位4ビットは前・後・左・右</b>の状態を表すビットフラグです。</div></li>
+          <li><div>ESP32 は、状態が<b>変化した瞬間</b>と、変化がなくても<b>0.2秒ごと</b>(ハートビート)に、このデータをシリアル通信で送ります。ボーレート(通信速度)は115200bpsです。</div></li>
+          <li><div>パソコンのゲームは、ESP32 がどの COMポートにつながっているかを自動で探します。正しい形式のデータを3回受信すると、ゲームはそのポートを ESP32 だと判定します。</div></li>
+          <li><div>ゲームは、受け取った向きをキーボードの WASD キーと<b>同じように扱います</b>。マットとキーボードのどちらかで押されていれば、カメレオンはその向きに進みます。</div></li>
+        </ol>
+        </div>
+      </details>
 
       <div class="tbl"><table>
         <thead><tr><th>例</th><th>2進数</th><th>意味</th></tr></thead>
@@ -538,22 +499,27 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="phone">
       <div class="sec-head">
         <h2>スマホが懐中電灯になる仕組み</h2>
-        <p class="lead">来場者からの質問がいちばん多いテーマです。担当でない人も読んでおいてください。</p>
+        <p class="lead">いちばん質問が多い章です。担当でなくても読んでください。</p>
       </div>
       <p class="oneline">スマホがQRコードで開くのは、ふつうのWebページです。そのページが JavaScript でスマホのジャイロセンサー(傾きセンサー)の値を読み、常時接続の通信(WebSocket)でパソコンへ送り続けます。</p>
 
-      <div class="say">
-        <div class="tag">話す例</div>
-        <p>パソコンの中では、班で作った小さなWebサーバーが動いています。来場者がQRコードを読むと、そのサーバーからWebページが届くので、アプリを入れる必要はありません。ページはスマホのジャイロセンサーを読み、狙っている画面座標を1秒に約30回パソコンへ送ります。QRコードのURLは、Cloudflare Tunnel というサービスを使ってインターネット上に公開しています。そのため来場者は、会場のWi-Fiにつながなくても、5G回線のままで参加できます。</p>
-      </div>
+      <details class="deep say">
+        <summary><span class="tag tag-say">話す例</span>来場者への説明</summary>
+        <div class="body"><p>パソコンの中では、班で作った小さなWebサーバーが動いています。来場者がQRコードを読むと、そのサーバーからWebページが届くので、アプリを入れる必要はありません。ページはスマホのジャイロセンサーを読み、狙っている画面座標を1秒に約30回パソコンへ送ります。QRコードのURLは、Cloudflare Tunnel というサービスを使ってインターネット上に公開しています。そのため来場者は、会場のWi-Fiにつながなくても、5G回線のままで参加できます。</p></div>
+      </details>
 
-      <ol class="steps">
-        <li><div>ゲームを起動すると、<code>cloudflared</code> というプログラムが自動で動き、<code>https://〜.trycloudflare.com/</code> というURLが作られます。ゲームは<b>そのURLが本当に外から開けるかを確かめてから</b>、URLをQRコードにして画面に出します。ここまでに30秒〜1分かかります。</div></li>
-        <li><div>来場者がスマホでQRコードを読むとページが開くので、「タップして始める」を押してもらいます。光の色は、8色のうち、いま誰も使っていない色が自動で割り当てられます(参加は最大7人なので、色が重なることはありません)。名前を入力する必要はありません。</div></li>
-        <li><div>来場者がスマホを傾けると、画面の狙いが動きます。狙いの上下はスマホの前後の傾き(ピッチ)で、左右はスマホを水平に回した角度(ヨー)で決まります。「中心をリセット」を押すと、その時の向きが基準(キャリブレーション)になり、画面の真ん中に対応します。</div></li>
-        <li><div>光がつくのは、来場者が「ライトON」を押している間だけです。ページは、スマホの向きとライトのON/OFFを、WebSocket で最大1秒に約30回送ります。</div></li>
-        <li><div>パソコンは、スマホへ「今、敵に光が当たっている」「敵を倒した」という情報を返します。それを受け取ったスマホは、音を鳴らして震え、画面の撃破数を1つ増やします。</div></li>
-      </ol>
+      <details class="deep flow">
+        <summary><span class="tag">流れ</span>スマホが参加するまでの流れ(5段階)</summary>
+        <div class="body">
+        <ol class="steps">
+          <li><div>ゲームを起動すると、<code>cloudflared</code> というプログラムが自動で動き、<code>https://〜.trycloudflare.com/</code> というURLが作られます。ゲームは<b>そのURLが本当に外から開けるかを確かめてから</b>、URLをQRコードにして画面に出します。ここまでに30秒〜1分かかります。</div></li>
+          <li><div>来場者がスマホでQRコードを読むとページが開くので、「タップして始める」を押してもらいます。光の色は、8色のうち、いま誰も使っていない色が自動で割り当てられます(参加は最大7人なので、色が重なることはありません)。名前を入力する必要はありません。</div></li>
+          <li><div>来場者がスマホを傾けると、画面の狙いが動きます。狙いの上下はスマホの前後の傾き(ピッチ)で、左右はスマホを水平に回した角度(ヨー)で決まります。「中心をリセット」を押すと、その時の向きが基準(キャリブレーション)になり、画面の真ん中に対応します。</div></li>
+          <li><div>光がつくのは、来場者が「ライトON」を押している間だけです。ページは、スマホの向きとライトのON/OFFを、WebSocket で最大1秒に約30回送ります。</div></li>
+          <li><div>パソコンは、スマホへ「今、敵に光が当たっている」「敵を倒した」という情報を返します。それを受け取ったスマホは、音を鳴らして震え、画面の撃破数を1つ増やします。</div></li>
+        </ol>
+        </div>
+      </details>
 
       <div class="two">
         <div>
@@ -646,17 +612,21 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="light">
       <div class="sec-head">
         <h2>光の当たり判定</h2>
-        <p class="lead">スマホの向きが森の中のどの場所になるのか、そして光でなぜ敵が倒れるのかを説明します。</p>
       </div>
       <p class="oneline">ゲームは、スマホが狙っている画面座標から、カメラの奥へレイ(半直線)を飛ばします(レイキャスト)。レイが地面と交差した点が「照らしている場所」になります。</p>
 
-      <ol class="steps">
-        <li><div>ゲームは、スマホから届いた狙いの位置を受け取ります。この位置は、画面の横と縦をそれぞれ0〜1で表した正規化座標(ビューポート座標)です。</div></li>
-        <li><div>ゲームは、カメラからその座標の方向へレイを飛ばします。この処理をレイキャストといい、Unity の <code>Physics.Raycast</code> を使っています。</div></li>
-        <li><div>レイが地面や物のコライダー(当たり判定の形)と交差した点(ワールド座標)が、そのスマホの「照らしている場所」です。ゲームはそこに、スポットライトとスマホごとの色の輪を表示します。</div></li>
-        <li><div>照らしている場所から<b>半径の内側</b>にいて、高さの差が1.8未満の敵は、「光の体力」が減っていきます。光の体力が0になると、その敵は倒れます。</div></li>
-        <li><div>複数の人が同じ敵を照らすと、<b>重ねた人数の分だけダメージが増えます</b>(2人なら2倍)。途中で光を外しても、敵の体力は元に戻りません。</div></li>
-      </ol>
+      <details class="deep flow">
+        <summary><span class="tag">流れ</span>当たり判定の流れ(5段階)</summary>
+        <div class="body">
+        <ol class="steps">
+          <li><div>ゲームは、スマホから届いた狙いの位置を受け取ります。この位置は、画面の横と縦をそれぞれ0〜1で表した正規化座標(ビューポート座標)です。</div></li>
+          <li><div>ゲームは、カメラからその座標の方向へレイを飛ばします。この処理をレイキャストといい、Unity の <code>Physics.Raycast</code> を使っています。</div></li>
+          <li><div>レイが地面や物のコライダー(当たり判定の形)と交差した点(ワールド座標)が、そのスマホの「照らしている場所」です。ゲームはそこに、スポットライトとスマホごとの色の輪を表示します。</div></li>
+          <li><div>照らしている場所から<b>半径の内側</b>にいて、高さの差が1.8未満の敵は、「光の体力」が減っていきます。光の体力が0になると、その敵は倒れます。</div></li>
+          <li><div>複数の人が同じ敵を照らすと、<b>重ねた人数の分だけダメージが増えます</b>(2人なら2倍)。途中で光を外しても、敵の体力は元に戻りません。</div></li>
+        </ol>
+        </div>
+      </details>
 
       <div class="calc" id="radiusCalc">
         <div class="calc-title">計算してみる：人数と光の大きさ</div>
@@ -669,10 +639,10 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
         <p class="note">1人分の光の半径は、3.0m × 1/√人数 で決まります(ただし1.1mより小さくはなりません)。人数が増えたときにゲームが簡単になりすぎないよう、1人分の光を小さくしています。人数でそのまま割らずに√を使ったのは、人数が増えたときに光が急に小さくならないようにするためです。</p>
       </div>
 
-      <div class="say">
-        <div class="tag">話す例</div>
-        <p>スマホが狙っている画面の位置から、カメラの奥へレイを飛ばすレイキャストという方法で、レイが地面と交わった点を「照らしている場所」にしています。光の円の中にいる敵は体力が減っていき、0になると倒れます。参加する人数が多いほど1人分の光が小さくなるので、何人で遊んでもちょうどいい難しさになります。</p>
-      </div>
+      <details class="deep say">
+        <summary><span class="tag tag-say">話す例</span>来場者への説明</summary>
+        <div class="body"><p>スマホが狙っている画面の位置から、カメラの奥へレイを飛ばすレイキャストという方法で、レイが地面と交わった点を「照らしている場所」にしています。光の円の中にいる敵は体力が減っていき、0になると倒れます。参加する人数が多いほど1人分の光が小さくなるので、何人で遊んでもちょうどいい難しさになります。</p></div>
+      </details>
 
       <details class="deep">
         <summary><span class="tag">深掘り</span>光のほかに敵にダメージを与えるもの</summary>
@@ -705,7 +675,6 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="camo">
       <div class="sec-head">
         <h2>擬態(カメレオンらしさ)</h2>
-        <p class="lead">カメレオン役は敵を攻撃できません。その代わりにカメレオン役が使える技が「擬態」です。</p>
       </div>
       <p class="oneline">カメレオンが1秒止まると、体がまわりの色に変わって擬態します。擬態している最大3秒の間、敵はカメレオンを見つけられず、カメレオンはダメージも受けません。</p>
 
@@ -722,10 +691,10 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
         </tbody>
       </table></div>
 
-      <div class="say">
-        <div class="tag">話す例</div>
-        <p>カメレオンが1秒止まると、体の色が近くの木や岩、地面の色に変わって擬態します。擬態している間、敵はカメレオンを見失って「？」を出し、あたりをうろうろします。カメレオンもダメージを受けません。ただし擬態は最大3秒しか続かないので、ずっと隠れていることはできません。カメレオン役が擬態で敵を足止めしている間に、灯り役が敵を照らして倒す、という協力プレイになっています。</p>
-      </div>
+      <details class="deep say">
+        <summary><span class="tag tag-say">話す例</span>来場者への説明</summary>
+        <div class="body"><p>カメレオンが1秒止まると、体の色が近くの木や岩、地面の色に変わって擬態します。擬態している間、敵はカメレオンを見失って「？」を出し、あたりをうろうろします。カメレオンもダメージを受けません。ただし擬態は最大3秒しか続かないので、ずっと隠れていることはできません。カメレオン役が擬態で敵を足止めしている間に、灯り役が敵を照らして倒す、という協力プレイになっています。</p></div>
+      </details>
 
       <details class="deep">
         <summary><span class="tag">深掘り</span>色の決め方と、敵が見失う仕組み</summary>
@@ -741,15 +710,20 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="enemy">
       <div class="sec-head">
         <h2>敵のAI(追いかけ方)</h2>
-        <p class="lead">ここでいう「AI」は、敵の追いかけ方を決めるプログラムのことです。学習するタイプのAIではありません。</p>
+        <p class="lead">ここでの「AI」は追いかけ方を決めるプログラムで、学習するAIではありません。</p>
       </div>
       <p class="oneline">敵は、カメレオンへの視線が通れば直進します。通らなければダイクストラ法で最短経路を探索して回り込みます。壁に当たったときは、進む角度を少しずつ変えて壁沿いに進みます。</p>
 
-      <ol class="steps">
-        <li><div><b>視線が通るときは直進する</b>: 敵とカメレオンを結ぶ線分がすべて歩行可能な領域にあれば(視線判定、ライン・オブ・サイト)、敵はカメレオンに向かって直進します。視線判定は計算コストが高いので、結果を0.15秒間キャッシュしています。</div></li>
-        <li><div><b>視線が通らないときは経路探索する</b>: ゲームはマップの通路を、ノード(分岐点・曲がり角)とエッジ(通路)からなる<b>グラフ</b>で表し、<b>ダイクストラ法</b>で最短経路を求めます。敵はその経路のウェイポイント(中継点)を順にたどります。経路は0.4秒ごとに再計算します。</div></li>
-        <li><div><b>壁に当たったら沿って進む(ウォールスライド)</b>: 進みたい方向が通路の外になるとき、敵は向きを 0° → ±20° → ±40° → ±65° → ±90° → ±125° の順に曲げて、歩ける向きを探します。それでも0.3秒以上進めなかった場合は、0.8秒の間だけ、計算した道に従って進みます。</div></li>
-      </ol>
+      <details class="deep flow">
+        <summary><span class="tag">流れ</span>敵の動きの決め方(3段階)</summary>
+        <div class="body">
+        <ol class="steps">
+          <li><div><b>視線が通るときは直進する</b>: 敵とカメレオンを結ぶ線分がすべて歩行可能な領域にあれば(視線判定、ライン・オブ・サイト)、敵はカメレオンに向かって直進します。視線判定は計算コストが高いので、結果を0.15秒間キャッシュしています。</div></li>
+          <li><div><b>視線が通らないときは経路探索する</b>: ゲームはマップの通路を、ノード(分岐点・曲がり角)とエッジ(通路)からなる<b>グラフ</b>で表し、<b>ダイクストラ法</b>で最短経路を求めます。敵はその経路のウェイポイント(中継点)を順にたどります。経路は0.4秒ごとに再計算します。</div></li>
+          <li><div><b>壁に当たったら沿って進む(ウォールスライド)</b>: 進みたい方向が通路の外になるとき、敵は向きを 0° → ±20° → ±40° → ±65° → ±90° → ±125° の順に曲げて、歩ける向きを探します。それでも0.3秒以上進めなかった場合は、0.8秒の間だけ、計算した道に従って進みます。</div></li>
+        </ol>
+        </div>
+      </details>
 
       <div class="tbl"><table>
         <thead><tr><th>敵</th><th>タイプ</th><th class="n">速さ</th><th class="n">光の体力</th><th class="n">倒すまで<br>(1人で照らす)</th><th class="n">出る割合</th><th>特徴</th></tr></thead>
@@ -762,10 +736,10 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
       </table></div>
       <p class="note">表の数字は、難しさ「ふつう」のマップBの値です。比べる目安として、カメレオンの速さは4.8です。敵は、カメレオンから12〜24m離れた通路の上に現れます。</p>
 
-      <div class="say">
-        <div class="tag">話す例</div>
-        <p>敵は、カメレオンが見えればまっすぐ向かってきます。木や壁にさえぎられて視線が通らないときは、ダイクストラ法という経路探索アルゴリズムで通路の最短経路を計算し、回り込んできます。また、曲がり角で引っかからないように、敵は壁に当たると進む角度を少しずつ変え、壁に沿って進みます。妖精だけは道を無視して、木をすり抜けながら一直線に向かってきます。</p>
-      </div>
+      <details class="deep say">
+        <summary><span class="tag tag-say">話す例</span>来場者への説明</summary>
+        <div class="body"><p>敵は、カメレオンが見えればまっすぐ向かってきます。木や壁にさえぎられて視線が通らないときは、ダイクストラ法という経路探索アルゴリズムで通路の最短経路を計算し、回り込んできます。また、曲がり角で引っかからないように、敵は壁に当たると進む角度を少しずつ変え、壁に沿って進みます。妖精だけは道を無視して、木をすり抜けながら一直線に向かってきます。</p></div>
+      </details>
 
       <details class="deep">
         <summary><span class="tag">深掘り</span>ダイクストラ法を一言で</summary>
@@ -810,22 +784,27 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="model">
       <div class="sec-head">
         <h2>3Dモデルと動き</h2>
-        <p class="lead">キャラクターの作り方を説明します。どの工程でAIを使ったのかを、正確に言えるようにしておいてください。</p>
+        <p class="lead">どの工程でAIを使ったかを、正確に言えるように。</p>
       </div>
       <p class="oneline">画像生成AIでキャラクターの絵を描き、Meshy AI で3Dモデルにしました。次に、Blender を Python スクリプトで操作してポリゴン数を削減し、リグ(ボーン)とアニメーションを付けてから、Unity にインポートしています。</p>
 
-      <ol class="steps">
-        <li><div><b>画像生成AI</b>を使って、「動物×お化け」のキャラクターの絵を作りました。</div></li>
-        <li><div><b>Meshy AI</b> を使って、その絵から3Dモデルを作りました。ただし、この時点のモデルにはリグもアニメーションもなく、メッシュ(形)とテクスチャ(色)のデータしかありません。</div></li>
-        <li><div>元のモデルは4.5万〜20万ポリゴンと重かったので、<b>Blender</b>(3DCGソフト)をヘッドレス(GUIなし)で実行する Python スクリプト(<code>blender/enemies/rig_enemy_ghosts.py</code>)で、<b>5,000〜8,000ポリゴン</b>まで削減しました。テクスチャも1024×1024pxに縮小しています。削減の方法は、下の「深掘り」で説明します。</div></li>
-        <li><div>同じスクリプトが、モデルにボーンを8本自動で配置します(リギング)。スクリプトは各頂点の位置から「どのボーンがどの頂点をどれだけ動かすか」(スキンウェイト)を計算して割り当て、歩く・噛みつく・パンチする・火の玉を投げるアニメーションもキーフレームで自動生成します。</div></li>
-        <li><div>Unity はモデルを読み込んだ後に高さを測り、種類ごとに決めた大きさ(熊4.4・狐2.6・妖精2.1・狼1.5)に自動でそろえます。歩くアニメーションと攻撃するアニメーションは、0.13秒のクロスフェードで切り替えます。</div></li>
-      </ol>
+      <details class="deep flow">
+        <summary><span class="tag">流れ</span>モデルを作る流れ(5段階)</summary>
+        <div class="body">
+        <ol class="steps">
+          <li><div><b>画像生成AI</b>を使って、「動物×お化け」のキャラクターの絵を作りました。</div></li>
+          <li><div><b>Meshy AI</b> を使って、その絵から3Dモデルを作りました。ただし、この時点のモデルにはリグもアニメーションもなく、メッシュ(形)とテクスチャ(色)のデータしかありません。</div></li>
+          <li><div>元のモデルは4.5万〜20万ポリゴンと重かったので、<b>Blender</b>(3DCGソフト)をヘッドレス(GUIなし)で実行する Python スクリプト(<code>blender/enemies/rig_enemy_ghosts.py</code>)で、<b>5,000〜8,000ポリゴン</b>まで削減しました。テクスチャも1024×1024pxに縮小しています。削減の方法は、下の「深掘り」で説明します。</div></li>
+          <li><div>同じスクリプトが、モデルにボーンを8本自動で配置します(リギング)。スクリプトは各頂点の位置から「どのボーンがどの頂点をどれだけ動かすか」(スキンウェイト)を計算して割り当て、歩く・噛みつく・パンチする・火の玉を投げるアニメーションもキーフレームで自動生成します。</div></li>
+          <li><div>Unity はモデルを読み込んだ後に高さを測り、種類ごとに決めた大きさ(熊4.4・狐2.6・妖精2.1・狼1.5)に自動でそろえます。歩くアニメーションと攻撃するアニメーションは、0.13秒のクロスフェードで切り替えます。</div></li>
+        </ol>
+        </div>
+      </details>
 
-      <div class="say">
-        <div class="tag">話す例</div>
-        <p>キャラクターは、まず画像生成AIで絵を描き、Meshy というAIでその絵を3Dモデルにしました。ただ、そのままではリグもアニメーションもないので、Blender という3DCGソフトを Python で操作してボーンを入れ、歩いたり攻撃したりするアニメーションを自動で付けています。また、元のデータはポリゴン数が多すぎたので、Blender の Decimate という機能でポリゴン数を元の数十分の1まで削減しました。これで、敵がたくさん出てきてもゲームが重くなりません。</p>
-      </div>
+      <details class="deep say">
+        <summary><span class="tag tag-say">話す例</span>来場者への説明</summary>
+        <div class="body"><p>キャラクターは、まず画像生成AIで絵を描き、Meshy というAIでその絵を3Dモデルにしました。ただ、そのままではリグもアニメーションもないので、Blender という3DCGソフトを Python で操作してボーンを入れ、歩いたり攻撃したりするアニメーションを自動で付けています。また、元のデータはポリゴン数が多すぎたので、Blender の Decimate という機能でポリゴン数を元の数十分の1まで削減しました。これで、敵がたくさん出てきてもゲームが重くなりません。</p></div>
+      </details>
 
       <details class="deep" open>
         <summary><span class="tag">深掘り</span>ポリゴン数をどうやって減らしたのか</summary>
@@ -877,13 +856,12 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="balance">
       <div class="sec-head">
         <h2>難しさとスコア</h2>
-        <p class="lead">遊ぶほど難しくなる仕組みと、スコアの付け方を説明します。</p>
       </div>
       <p class="oneline">カメレオンがホタルをつかまえたり、体力を回復したりするたびに「脅威レベル」が上がり、敵が多く、速く出てくるようになります。</p>
 
-      <div class="two">
-        <div>
-          <h3>ゴールまでの流れ</h3>
+      <details class="deep" open>
+        <summary><span class="tag">流れ</span>ゴールまでの流れ</summary>
+        <div class="body">
           <ol>
             <li>灯り役が、ホタルの石を1人なら合計10秒照らします。照らす人数が多いほど早くたまり、2人なら5秒です。途中で光を外しても、それまでに照らした時間は残ります。</li>
             <li>ホタルが集まった石にカメレオンがさわると、ホタルを1匹つかまえられます。</li>
@@ -891,8 +869,10 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
           </ol>
           <p>道に迷ったときは、灯り役が導きの花を0.6秒照らします。すると、いちばん近い石(ホタルが2匹そろった後は門)までの光の道が地面に出ます。また、カメレオンのまわりには、行き先の方向を指す矢印も表示されます。</p>
         </div>
-        <div>
-          <h3>だんだん難しくなる仕組み</h3>
+      </details>
+      <details class="deep">
+        <summary><span class="tag">仕組み</span>だんだん難しくなる仕組み</summary>
+        <div class="body">
           <ul>
             <li>敵が現れる間隔は、最初は2.4秒です。時間がたつにつれて短くなり、最短で0.7秒になります。</li>
             <li>カメレオンがホタルをつかまえると、脅威レベルが1上がり、その場に敵の群れが押し寄せます。</li>
@@ -900,10 +880,11 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
             <li>脅威レベルは最大9です。レベルが1上がるごとに、敵が現れるペースが16%上がり、同時に出せる敵の数の上限が5体増えます。</li>
           </ul>
         </div>
-      </div>
-
-      <h3>チュートリアル(練習モード)</h3>
-      <p>タイトル画面では、まず「チュートリアルから始める」を選べます(「スキップ」で本番の難易度選択へ進むこともできます)。チュートリアルは専用のマップ「チュートリアルの森」で、次の4つのステップを順に進めます。</p>
+      </details>
+      <details class="deep">
+        <summary><span class="tag">練習</span>チュートリアル(練習モード)の4ステップ</summary>
+        <div class="body">
+          <p>タイトル画面では、まず「チュートリアルから始める」を選べます(「スキップ」で本番の難易度選択へ進むこともできます)。チュートリアルは専用のマップ「チュートリアルの森」で、次の4つのステップを順に進めます。</p>
       <ol class="steps">
         <li><div><b>移動しよう</b>: カメレオン役が、マットを踏んで広場のまん中の光るスポットまで歩きます。</div></li>
         <li><div><b>敵を倒そう</b>: 台座の上に4種類の敵が1体ずつ現れます。灯り役がライトで合計10体倒します。練習の敵は追いかけてこず、倒すと4秒後に同じ場所に復活します。</div></li>
@@ -911,6 +892,8 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
         <li><div><b>門から脱出しよう</b>: 開いた門をくぐるとクリアです。</div></li>
       </ol>
       <p>チュートリアルには、雷・脅威レベル・ダメージ・回復オーブ・ランキングはありません。終わると、そのまま難易度(マップ)を選んで本番を始められます。スマホはつながったままなので、灯り役はQRコードを読み直す必要がありません。</p>
+        </div>
+      </details>
 
       <div class="calc" id="scoreCalc">
         <div class="calc-title">計算してみる：スコア</div>
@@ -941,34 +924,44 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="dev">
       <div class="sec-head">
         <h2>作り方の工夫</h2>
-        <p class="lead">来場者に「どうやって開発したの？」と聞かれたときに使う内容です。</p>
       </div>
 
-      <div class="two">
-        <div>
-          <h3>場面をプログラムで組み立てる</h3>
+      <details class="deep">
+        <summary><span class="tag">工夫</span>場面をプログラムで組み立てる</summary>
+        <div class="body">
           <p>Unity では、ふつうはエディタ上でシーンにオブジェクトを手で配置します。このゲームでは手で配置せず、エディタ拡張のスクリプト <code>NightSceneBuilder</code> が毎回ゼロからシーンを生成します。こうすると、誰がビルドしても同じシーンになり、班員が同時に作業しても Git でシーンファイルのコンフリクト(変更の衝突)が起きにくくなります。</p>
         </div>
-        <div>
-          <h3>ダブルクリックで最新版を起動</h3>
+      </details>
+      <details class="deep">
+        <summary><span class="tag">工夫</span>ダブルクリックで最新版を起動</summary>
+        <div class="body">
           <p>バッチファイル <code>play_night.bat</code> をダブルクリックすると、Unity をバッチモード(GUIなし)で実行して最新のプログラムをビルドし(約1分)、そのまま起動します。</p>
         </div>
-        <div>
-          <h3>ゲームに自動で遊ばせて撮影する</h3>
+      </details>
+      <details class="deep">
+        <summary><span class="tag">工夫</span>ゲームに自動で遊ばせて撮影する</summary>
+        <div class="body">
           <p>コマンドライン引数 <code>-nightAutoShot</code> を付けてゲームを起動すると、ゲームが自動操作しながら、タイトル・敵を照らす場面・擬態・結果画面などのスクリーンショットを順番に保存します。これにより、人が操作しなくても見た目の確認(ビジュアルテスト)ができます。</p>
         </div>
-        <div>
-          <h3>効果音はプログラムで作る</h3>
+      </details>
+      <details class="deep">
+        <summary><span class="tag">工夫</span>効果音はプログラムで作る</summary>
+        <div class="body">
           <p>ゲーム内の効果音(照らしたときのブザー、敵を倒したときのチャイム、雷など)は、音声ファイルを使わず、波形をプログラムで合成して作っています(プロシージャルオーディオ)。音声ファイルを使っているのは、BGMとスマホの一部の音だけです。</p>
         </div>
-        <div>
-          <h3>先にモックアップを作ってから決める</h3>
+      </details>
+      <details class="deep">
+        <summary><span class="tag">工夫</span>先にモックアップを作ってから決める</summary>
+        <div class="body">
           <p>画面の配置やランキングの表示は、先にHTMLでモックアップ(試作の画面)を作り、班で見比べて決めました。決まってから Unity で作ったのは、作り直しを減らすためです。</p>
         </div>
-        <div>
-          <h3>班での変更の記録</h3>
+      </details>
+      <details class="deep">
+        <summary><span class="tag">工夫</span>班での変更の記録</summary>
+        <div class="body">
           <p>班は Git(バージョン管理システム)と GitHub で変更を記録し、ブランチを分けて作業して、プルリクエストでレビューしてからマージしています。8月31日に開発を始め、10月31日の最新コミット(<code>51d4542</code>)までに60回コミットしました。</p>
         </div>
+      </details>
       </div>
       <details class="deep">
         <summary><span class="tag">深掘り</span>この章の専門用語</summary>
@@ -994,56 +987,56 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="stories">
       <div class="sec-head">
         <h2>苦労した話</h2>
-        <p class="lead">来場者からは「難しかったことは？」とほぼ必ず聞かれます。少なくとも1つは、自分の言葉で話せるようにしておいてください。</p>
+        <p class="lead">「難しかったことは？」はほぼ必ず聞かれます。1つは自分の言葉で話せるように。</p>
       </div>
 
       <div class="stories">
-        <article class="story">
-          <h3>光が当たった物を光らせようとしたのに、画面が変わらなかった</h3>
-          <dl>
+        <details class="deep story">
+          <summary><span class="tag">苦労</span>光が当たった物を光らせようとしたのに、画面が変わらなかった</summary>
+          <div class="body"><dl>
             <dt>症状</dt><dd>班は、Unity の「発光(Emission)」という機能で、光が当たった物を黄色く光らせようとしました。ところが、ビルドしたゲームでは、何をしても見た目が変わりませんでした。</dd>
             <dt>調べ方</dt><dd>ログで確かめると、色の値は正しく設定されていました。そこで、発光の色にありえない色(マゼンタ)を入れて試しました。それでも画面は白いままだったので、発光そのものが描かれていないことが確定しました。それまで敵が光って見えていたのは、敵の元の色がたまたまオレンジだったからでした。</dd>
             <dt>対策</dt><dd>発光を使うのをやめ、必ず描かれるふつうの色を、直接黄色に近づける方法に変えました。</dd>
             <dt>学び</dt><dd class="learn">数字が正しくても、それが画面に出ているとは限りません。結果がはっきり分かる実験をして、原因を切り分けることが大切です。</dd>
-          </dl>
-        </article>
-        <article class="story">
-          <h3>スマホを動かしてから、光が遅れて動いた</h3>
-          <dl>
+          </dl></div>
+        </details>
+        <details class="deep story">
+          <summary><span class="tag">苦労</span>スマホを動かしてから、光が遅れて動いた</summary>
+          <div class="body"><dl>
             <dt>原因</dt><dd>スマホがデータを1回送るたびに、TCP の接続を確立し直していました。1秒に20回、TCP の接続確立(3ウェイハンドシェイク)と、HTTPS の場合は TLS ハンドシェイクまでくり返していたことが原因でした。</dd>
             <dt>対策</dt><dd>まず、接続を再利用する HTTP Keep-Alive と、小さなパケットをまとめて送る Nagle アルゴリズムを無効にする設定(<code>NoDelay</code>)を入れました。さらに WebSocket に変えて、接続を常時維持するようにしました。Android の省電力で送信が遅れる問題には、Screen Wake Lock API で画面の消灯を止めて対応しました。</dd>
             <dt>学び</dt><dd class="learn">遅延の原因は、計算の速さではなく、接続の確立のしかたにありました。</dd>
-          </dl>
-        </article>
-        <article class="story">
-          <h3>iPhone だけ傾きセンサーが使えなかった</h3>
-          <dl>
+          </dl></div>
+        </details>
+        <details class="deep story">
+          <summary><span class="tag">苦労</span>iPhone だけ傾きセンサーが使えなかった</summary>
+          <div class="body"><dl>
             <dt>原因</dt><dd>iPhone は、HTTPS(暗号化された通信)で開いたページにしか、傾きセンサーの使用許可を出しません。</dd>
             <dt>対策</dt><dd>班は、Windows の PowerShell で自己署名証明書を作り、HTTPS のサーバーも用意しました。今は Cloudflare のURLが最初から HTTPS なので、ブラウザに警告も出ません。</dd>
-          </dl>
-        </article>
-        <article class="story">
-          <h3>敵が曲がり角で止まってしまった</h3>
-          <dl>
+          </dl></div>
+        </details>
+        <details class="deep story">
+          <summary><span class="tag">苦労</span>敵が曲がり角で止まってしまった</summary>
+          <div class="body"><dl>
             <dt>原因</dt><dd>敵は最短距離で直進しようとして、歩行可能な領域からはみ出していました。はみ出した敵を領域の内側へ戻す補正処理が、敵を元の位置に押し戻し続けていたため、敵が動けなくなっていました(スタック)。</dd>
             <dt>対策</dt><dd>敵が通路からはみ出す前に、通れる方向へ少しずつ向きを曲げ、壁沿いに滑らせるようにしました。それでも動けない場合は、しばらく計算した道に従って進ませます。</dd>
-          </dl>
-        </article>
-        <article class="story">
-          <h3>地面に線やちらつきが出た</h3>
-          <dl>
+          </dl></div>
+        </details>
+        <details class="deep story">
+          <summary><span class="tag">苦労</span>地面に線やちらつきが出た</summary>
+          <div class="body"><dl>
             <dt>原因</dt><dd>似た見た目の不具合が4回起き、4回とも原因が違いました。1回目は、メッシュを生成するときの三角形の頂点の巻き順(ワインディングオーダー)の間違いでした。2回目は、カメラのニアクリップ面が0.1と近すぎて、深度バッファの精度が手前に偏っていたことでした。3回目は、葉のメッシュが地面に埋まっていたことでした。4回目は、隣り合う通路がまったく同じ高さで重なり、Zファイティングが起きていたことでした。</dd>
             <dt>対策</dt><dd>1つずつ原因を切り分けて直しました。例えば、ニアクリップ面を3に広げ、通路ごとに高さを2mmずつずらしました。</dd>
             <dt>学び</dt><dd class="learn">見た目が似ている不具合でも、原因が同じとは限りません。</dd>
-          </dl>
-        </article>
-        <article class="story">
-          <h3>会場のWi-Fiだとスマホがつながらなかった</h3>
-          <dl>
+          </dl></div>
+        </details>
+        <details class="deep story">
+          <summary><span class="tag">苦労</span>会場のWi-Fiだとスマホがつながらなかった</summary>
+          <div class="body"><dl>
             <dt>原因</dt><dd>最初の版では、パソコンとスマホを同じWi-Fiにつなぐ必要がありました。しかし、学校やゲスト用のWi-Fiは、端末どうしの通信を禁止していることがあります。これを AP アイソレーション(クライアント分離)といいます。また、Wi-Fiが変わるとパソコンのIPアドレスが変わり、QRコードのURLも変わってしまいます。</dd>
             <dt>対策</dt><dd>Cloudflare Tunnel でインターネット上にURLを公開し、スマホが5G回線からも参加できるようにしました。インターネットがない会場のために、同じWi-Fi版も残しています。</dd>
-          </dl>
-        </article>
+          </dl></div>
+        </details>
       </div>
       <details class="deep">
         <summary><span class="tag">深掘り</span>この章の専門用語</summary>
@@ -1071,7 +1064,7 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="qa">
       <div class="sec-head">
         <h2>想定Q&amp;A</h2>
-        <p class="lead">質問を読んだら、まず自分で答えを考えてから開いてください。「さらに聞かれたら」は、来場者がもう一歩踏み込んで聞いてきたときの答えです。</p>
+        <p class="lead">自分で答えてから開いてください。「さらに聞かれたら」は2問目の答えです。</p>
       </div>
 
       <div class="qa-tools">
@@ -1091,7 +1084,7 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="trouble">
       <div class="sec-head">
         <h2>当日のトラブル</h2>
-        <p class="lead">説明中にトラブルが起きたら、まずこの表を確認してください。さらに詳しい対処は、README の「うまくいかないとき」に書いてあります。</p>
+        <p class="lead">まずこの表を確認。詳しくは README の「うまくいかないとき」。</p>
       </div>
       <div class="tbl"><table>
         <thead><tr><th>症状</th><th>まず確認すること</th></tr></thead>
@@ -1114,7 +1107,6 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="words">
       <div class="sec-head">
         <h2>用語ミニ辞典</h2>
-        <p class="lead">説明で使う言葉を、来場者に分かる言葉で言い換えられるようにしておいてください。</p>
       </div>
       <dl class="gloss">
         <div><dt>Unity(ユニティ)</dt><dd>ゲームを作るためのソフト(ゲームエンジン)です。3Dの表示、当たり判定、音などの機能がそろっています。</dd></div>
@@ -1147,7 +1139,6 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     <section id="refs">
       <div class="sec-head">
         <h2>参考にしたサイト</h2>
-        <p class="lead">このページの見た目は、次のサイトを参考にしました。</p>
       </div>
       <div class="refs">
         <a href="https://www.daido-life.co.jp/" target="_blank" rel="noopener"><b>大同生命 公式サイト</b><span>白地に青の配色と、丸い矢印アイコン付きの見出しを参考にしました(ロゴや社名は使っていません)。</span><span class="url">https://www.daido-life.co.jp/</span></a>
@@ -1329,31 +1320,49 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
 })();
 
 
-// ---- 目次: 今読んでいる章に印を付ける。スマホの目次は選んだら閉じる ----
+// ---- 目次: 三本線で開閉。今読んでいる章をヘッダーと目次に出す ----
 (function () {
-  var links = document.querySelectorAll('.toc-list a');
+  var drawer = document.getElementById('tocDrawer'), bg = document.getElementById('tocBg');
+  var openBtn = document.getElementById('tocOpen'), closeBtn = document.getElementById('tocClose');
   var cur = document.getElementById('tocCurrent');
-  var mobile = document.getElementById('tocMobile');
-  var sections = Array.prototype.map.call(document.querySelectorAll('.toc .toc-list a'), function (a) {
-    return document.getElementById(a.getAttribute('href').slice(1));
+  var links = drawer.querySelectorAll('a');
+  var sections = Array.prototype.map.call(links, function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+  function setOpen(open) {
+    drawer.hidden = !open; bg.hidden = !open;
+    openBtn.setAttribute('aria-expanded', String(open));
+    if (open) { var a = drawer.querySelector('a[aria-current]') || links[0]; a.focus(); }
+    else openBtn.focus();
+  }
+  openBtn.addEventListener('click', function () { setOpen(drawer.hidden); });
+  closeBtn.addEventListener('click', function () { setOpen(false); });
+  bg.addEventListener('click', function () { setOpen(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !drawer.hidden) setOpen(false); });
+  Array.prototype.forEach.call(links, function (a) {
+    a.addEventListener('click', function () { drawer.hidden = true; bg.hidden = true; openBtn.setAttribute('aria-expanded', 'false'); });
   });
   function update() {
     var y = window.innerHeight * 0.3, active = sections[0];
     sections.forEach(function (sec) { if (sec && sec.getBoundingClientRect().top <= y) active = sec; });
-    var id = active ? active.id : '';
     Array.prototype.forEach.call(links, function (a) {
-      var on = a.getAttribute('href') === '#' + id;
-      if (on) { a.setAttribute('aria-current', 'true'); if (cur) cur.textContent = a.textContent; }
+      if (active && a.getAttribute('href') === '#' + active.id) { a.setAttribute('aria-current', 'true'); cur.textContent = a.textContent; }
       else a.removeAttribute('aria-current');
     });
   }
   // 章は16個だけなので、スクロールのたびにそのまま調べても軽い
   window.addEventListener('scroll', update, { passive: true });
   window.addEventListener('resize', update);
-  Array.prototype.forEach.call(document.querySelectorAll('#tocMobile a'), function (a) {
-    a.addEventListener('click', function () { mobile.open = false; });
-  });
   update();
+})();
+
+// ---- すべて開く / 閉じる(本文の折りたたみ。Q&Aは Q&A の欄のボタンで) ----
+(function () {
+  var btn = document.getElementById('expandAll');
+  btn.addEventListener('click', function () {
+    var open = btn.getAttribute('aria-pressed') !== 'true';
+    Array.prototype.forEach.call(document.querySelectorAll('main details.deep'), function (d) { d.open = open; });
+    btn.setAttribute('aria-pressed', String(open));
+    btn.textContent = open ? 'すべて閉じる' : 'すべて開く';
+  });
 })();
 </script>
 </body>
