@@ -4,9 +4,9 @@ using System.IO;
 using System.Text;
 using UnityEngine;
 
-// マップごとのランキング。スコア = クリアタイムと撃破数を合わせた値。
+// マップごとのランキング。スコア = 早さと撃破数を合わせた値。早くクリアするほど、たくさん倒すほど高い。
 //   クリア時 : 5000 + 撃破数×100 + max(0, 600−クリア秒数)×10
-//   力尽きた時: 撃破数×100 + 生き延びた秒数×5(クリアより必ず低くなる)
+//   力尽きた時: 撃破数×100 だけ(長く粘っても点は増えない。クリアより必ず低くなる)
 //
 // 記録は exe と同じフォルダの ranking.csv に保存する(Excel でそのまま開いて、名前の修正・行の削除・
 // 並べ替えができる。Excel で保存し直した内容も、次にタイトル画面へ戻った時に反映される)。
@@ -15,7 +15,7 @@ public static class NightRanking
 {
     public const int MaxEntries = 10;       // 画面に出す順位の数(ファイルにはすべての記録を残す)
     public const int MaxNameLength = 8;
-    public const int ClearBonus = 5000, KillPoints = 100, TimeBase = 600, TimePoints = 10, SurvivePoints = 5;
+    public const int ClearBonus = 5000, KillPoints = 100, TimeBase = 600, TimePoints = 10;
     public const string DefaultName = "ゲスト";
     const string Header = "マップ,名前,スコア,秒数,撃破数,結果,日時";
     const string ClearedText = "クリア", FailedText = "途中終了";
@@ -45,7 +45,7 @@ public static class NightRanking
     public static int ScoreOf(bool cleared, int seconds, int kills)
     {
         if (cleared) return ClearBonus + kills * KillPoints + Mathf.Max(0, TimeBase - seconds) * TimePoints;
-        return kills * KillPoints + seconds * SurvivePoints;
+        return kills * KillPoints;
     }
 
     // ファイルが変わっていたら(Excel で編集された等)読み直す

@@ -155,7 +155,7 @@ public class NightWorld : MonoBehaviour
 
     void BuildWater()
     {
-        if (Map.Id == "A") return;
+        if (Map.Id == "A" || Map.Id == NightMap.PracticeId) return;
         var mat = NightMeshes.Emissive(NightMeshes.Hex(0x09576f), NightMeshes.Hex(0x032732) * 0.45f, 0.76f, 0.55f);
         waterMats.Add(mat);
         GameObject water;
@@ -351,9 +351,10 @@ public class NightWorld : MonoBehaviour
             Vector2 p = Map.Orbs[i];
             float y = Map.SurfaceAt(p.x, p.y);
             Cylinder(p.x, y + 0.05f, p.y, 1.35f, 0.22f, StoneMat);
-            var ringMat = NightMeshes.Unlit(NightMeshes.Hex(i > 0 ? 0xffc65d : 0x69c8ff, 0.7f));
+            // ホタルの石はどれも黄色(光の柱・輪も黄色になる)。前は1つ目が水色だった
+            var ringMat = NightMeshes.Unlit(NightMeshes.Hex(0xffc65d, 0.7f));
             RingObject(1.9f, 2.12f, ringMat, Root, new Vector3(p.x, y + 0.03f, p.y));
-            Orbs.Add(new NightOrb(this, p.x, p.y, y + 0.18f, NightMeshes.Hex(i > 0 ? 0xffdc72 : 0x78c8ff), i));
+            Orbs.Add(new NightOrb(this, p.x, p.y, y + 0.18f, NightMeshes.Hex(0xffdc72), i));
         }
     }
 
@@ -396,7 +397,7 @@ public class NightWorld : MonoBehaviour
         {
             float x = Rand(-hw, hw), z = Rand(zLo, zHi);
             float lake = Mathf.Sqrt(x * x + (z + 39f) * (z + 39f));
-            if (Map.RouteSurface(x, z).distance > 6f && (Map.Id == "A" || Map.Id == "C" && lake > 29f || Map.Id == "B" && Mathf.Abs(x) > 10f))
+            if (Map.RouteSurface(x, z).distance > 6f && (Map.Id == "A" || Map.Id == NightMap.PracticeId || Map.Id == "C" && lake > 29f || Map.Id == "B" && Mathf.Abs(x) > 10f))
             {
                 float radius = Rand(1f, 2f);
                 var patchGo = Circle(x, 0.02f + rng.Next() * 0.01f, z, radius, patchMat, false);

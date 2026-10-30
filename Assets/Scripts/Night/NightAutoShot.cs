@@ -31,7 +31,94 @@ public class NightAutoShot : MonoBehaviour
         if (System.Array.IndexOf(args, "-nightSpriteTest") >= 0) { StartCoroutine(SpriteTest()); return; }
         if (System.Array.IndexOf(args, "-nightBench") >= 0) { StartCoroutine(Bench()); return; }
         if (System.Array.IndexOf(args, "-nightEndNameTest") >= 0) { StartCoroutine(EndNameTest()); return; }
+        if (System.Array.IndexOf(args, "-nightPracticeTest") >= 0) { StartCoroutine(practiceToGame ? AfterTutorial() : PracticeTest()); return; }
         StartCoroutine(m >= 0 && m + 1 < args.Length ? Tour(args[m + 1]) : Run());
+    }
+
+    // チュートリアルの確認: 移動 → 敵を10体倒す → ホタルを集める → 門から脱出、を自動で進めて各ステップを撮る
+    IEnumerator PracticeTest()
+    {
+        yield return new WaitForSeconds(1.5f);
+        yield return Shot("p0_title");
+        NightHud.ToggleRanking("B"); // マップのアイコンを押したときのランキングの小窓
+        yield return new WaitForSeconds(0.3f);
+        yield return Shot("p0b_ranking_popup");
+        NightHud.ToggleRanking(null);
+        g.StartPractice();
+        yield return new WaitForSeconds(4.2f); // 3・2・1 のカウントダウン
+        yield return Shot("p1_move");
+        // STEP1: 前方のスポットまで歩く
+        float t = 0f;
+        NightPlayer.DebugInput = new Vector3(0, 0, -1);
+        while (g.Step == NightGame.TutorialStep.Move && t < 10f) { t += Time.deltaTime; yield return null; }
+        NightPlayer.DebugInput = new Vector3(0, 0, 0.0001f);
+        yield return new WaitForSeconds(0.3f);
+        NightPlayer.DebugInput = null;
+        Debug.Log("NightAutoShot: tutorial step=" + g.Step + " after walking " + t.ToString("0.0") + "s");
+        yield return new WaitForSeconds(1.2f);
+        yield return Shot("p2_defeat");
+        // STEP2: 一番近い敵を照らし続けて10体倒す
+        t = 0f;
+        while (g.Step == NightGame.TutorialStep.Defeat && t < 120f)
+        {
+            NightEnemy target = null; float best = float.MaxValue;
+            foreach (var en in g.Enemies) { if (en.dying) continue; float d = NightMap.Flat(en.Position, g.PlayerPos); if (d < best) { best = d; target = en; } }
+            if (target != null) { Vector3 v = g.Cam.WorldToViewportPoint(target.Position); g.Flashlight.DebugAim = new Vector2(v.x, 1f - v.y); }
+            if (g.TutorialKills == 5 && t > 0f) { yield return Shot("p2b_kills5"); t += 0.1f; }
+            t += Time.deltaTime;
+            yield return null;
+        }
+        g.Flashlight.DebugAim = null;
+        Debug.Log("NightAutoShot: tutorial step=" + g.Step + " kills=" + g.TutorialKills + " in " + t.ToString("0.0") + "s");
+        yield return new WaitForSeconds(1f);
+        yield return Shot("p3_fireflies");
+        // STEP3: 石を照らしてホタルを呼び、触れて捕まえる
+        var orb = g.World.Orbs[0];
+        yield return AimAt(() => orb.root.position, 10.6f);
+        g.Flashlight.DebugAim = null;
+        yield return Shot("p3b_materialized");
+        t = 0f;
+        while (!orb.collected && t < 12f)
+        {
+            Vector3 to = orb.Position - g.PlayerPos; to.y = 0f;
+            NightPlayer.DebugInput = to.normalized;
+            t += Time.deltaTime;
+            yield return null;
+        }
+        NightPlayer.DebugInput = null;
+        yield return new WaitForSeconds(1.2f);
+        yield return Shot("p4_escape");
+        Debug.Log("NightAutoShot: tutorial step=" + g.Step + " collected=" + orb.collected + " gate=" + g.GateOpened);
+        // STEP4: 入口の門へ戻ってくぐる
+        t = 0f;
+        while (g.State == NightGame.GameState.Playing && t < 25f)
+        {
+            Vector3 to = new Vector3(NightMap.Exit.x, 0, NightMap.Exit.y + 2f) - g.PlayerPos; to.y = 0f;
+            NightPlayer.DebugInput = to.normalized;
+            t += Time.deltaTime;
+            yield return null;
+        }
+        NightPlayer.DebugInput = null;
+        yield return new WaitForSeconds(3f);
+        yield return Shot("p5_end");
+        Debug.Log("NightAutoShot: tutorial end state=" + g.State + " cleared=" + g.Cleared);
+        // 結果画面で難易度(マップC)を選び、そのまま本番を始める。読み直したあとは AfterTutorial が続きを撮る
+        g.SelectMap("C");
+        yield return new WaitForSeconds(0.5f);
+        yield return Shot("p6_pick_map");
+        practiceToGame = true;
+        g.StartFromTutorial();
+    }
+
+    static bool practiceToGame;
+    IEnumerator AfterTutorial()
+    {
+        yield return new WaitForSeconds(1.5f);
+        yield return Shot("p7_game_countdown");
+        yield return new WaitForSeconds(3f);
+        yield return Shot("p8_game_playing");
+        Debug.Log("NightAutoShot: after tutorial state=" + g.State + " map=" + g.MapId + " practice=" + g.Practice);
+        Application.Quit();
     }
 
     // 結果画面での名前入力の確認: 名前なしで始めて終わらせ、名前入力の画面 → 登録後の画面を撮る(テスト用のランキングに入る)
@@ -497,16 +584,16 @@ public class NightAutoShot : MonoBehaviour
         var orb = g.World.Orbs[0];
         Teleport(orb.Position + new Vector3(0, 0, 4f));
         yield return new WaitForSeconds(1.2f);
-        yield return AimAt(() => orb.Position, 1.1f);
+        yield return AimAt(() => orb.Position, 5.5f);
         yield return Shot("07a_stone_half");
-        yield return AimAt(() => orb.Position, 1.4f);
+        yield return AimAt(() => orb.Position, 5.3f);
         yield return new WaitForSeconds(0.8f);
         yield return Shot("07_orb_materialized");
         // 触れて蛍を捕まえる
         Teleport(orb.Position + new Vector3(0, 0, 0.6f));
         yield return new WaitForSeconds(0.25f);
         yield return Shot("07b_firefly_caught");
-        Debug.Log("[AutoShot] 蛍の回収: collected=" + orb.collected + " OrbCount=" + g.OrbCount);
+        Debug.Log("[AutoShot] ホタルの回収: collected=" + orb.collected + " OrbCount=" + g.OrbCount);
 
         // 近くのランタンを点灯
         NightLamp lamp = g.World.Lamps[0];

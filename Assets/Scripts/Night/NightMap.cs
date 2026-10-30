@@ -33,6 +33,8 @@ public class NightMap
     public const float ExitHalfWidth = 1.9f;
 
     public static readonly string[] Ids = { "A", "B", "C" };
+    // 練習モードのマップ。タイトルのマップ選択(Ids)には入れず、「練習モード」ボタンからだけ遊ぶ(ランキングもなし)
+    public const string PracticeId = "P";
 
     public readonly string Id, Name, Description, Info;
     public readonly NightRegion[] Regions;
@@ -41,7 +43,7 @@ public class NightMap
     public readonly List<Vector3> NavNodes = new List<Vector3>();
     readonly List<List<KeyValuePair<int, float>>> navEdges = new List<List<KeyValuePair<int, float>>>();
 
-    public static string NameOf(string id) => id == "B" ? "遺跡攻略" : id == "C" ? "中央湖の周回" : "森の迷路";
+    public static string NameOf(string id) => id == "B" ? "遺跡攻略" : id == "C" ? "中央湖の周回" : id == PracticeId ? "チュートリアルの森" : "森の迷路";
 
     NightMap(string id, string name, string desc, string info, float width, float[][] routes, int bridgeRoute,
         float[] orbs, float[] regions)
@@ -116,6 +118,18 @@ public class NightMap
                     }, -1,
                     new float[] { 24, -38, -22, -64 }, // 蛍1 = 右上の石、蛍2 = 左奥の石(矢印はこの順に向く)
                     new float[] { 0,0,0,5.5f, -20,-26,3,4, 0,-26,0,3, -34,-54,3,3, 12,-36,3,5, 12,-53,6,3.5f, 26,-53,6,3, 12,-72,6,3, -22,-64,6,5, 24,-38,3,4.5f });
+            case PracticeId:
+                // 練習の森: 入口の広場から奥へ続く、四角い広場(幅の広い通路を格子に重ねて、ほぼ四角に歩ける所を作る)。
+                // 奥のまん中に蛍の石が1つ。敵は NightGame の練習用の場所に4体置く
+                return new NightMap(PracticeId, "チュートリアルの森", "四角い森の広場。移動・ライト・ホタル集めを練習しよう。", "練習", 8f,
+                    new[]
+                    {
+                        R(0,0, 0,-26),
+                        R(-11,-6, 11,-6), R(-11,-12, 11,-12), R(-11,-18, 11,-18), R(-11,-24, 11,-24),
+                        R(-11,-6, -11,-24), R(11,-6, 11,-24),
+                    }, -1,
+                    new float[] { 0, -27 },
+                    new float[] { 0,0,0,5 });
             case "C":
                 return new NightMap("C", "中央湖の周回", "二重の湖畔道と小島の桟橋。岸辺を巡るか、橋を渡るか。", "周回 / 湖畔 / 小島", 5.2f,
                     new[]

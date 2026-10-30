@@ -46,7 +46,13 @@ public class NightHud : MonoBehaviour
         Color target;
         float width;
         if (game.HurtNow) { target = new Color(1f, 0.16f, 0.08f, 0.5f); width = 1.3f; }
-        else if (game.Camouflaged) { target = new Color(0.31f, 0.78f, 1f, 0.28f); width = 1f; }
+        else if (game.Camouflaged)
+        {
+            // 擬態中は画面の縁を水色に光らせる(文字の代わりに「隠れている」ことを伝える)。ゆっくり脈打たせて目立たせる
+            float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 3f);
+            target = new Color(0.35f, 0.85f, 1f, 0.5f + 0.15f * pulse);
+            width = 1.6f + 0.25f * pulse;
+        }
         else
         {
             float lost = 1f - game.Hp / NightGame.HpMax;
@@ -101,11 +107,13 @@ public class NightHud : MonoBehaviour
         if (game.State == NightGame.GameState.Title)
         {
             bool zoom = QrZoomOpen;
-            GUI.enabled = !zoom; // 拡大表示中は下のボタンを押せないようにする
+            if (game.ChoosingMap) RankingPopup = null;
+            GUI.enabled = !zoom && RankingPopup == null; // 拡大表示・ランキングの小窓を開いている間は下のボタンを押せないようにする
             DrawStartOverlay();
             DrawRankingPanel();
             DrawConnectPanel(true);
             GUI.enabled = true;
+            DrawRankingPopup();
             DrawQrZoom();
             return;
         }
@@ -113,6 +121,8 @@ public class NightHud : MonoBehaviour
         if (game.State == NightGame.GameState.NameEntry)
         {
             DrawNameEntry();
+            sidePanelTop = 16f;
+            titleHomeLayout = false;
             DrawRankingPanel();
             DrawConnectPanel(true);
             return;
@@ -127,6 +137,7 @@ public class NightHud : MonoBehaviour
         if (playing)
         {
             DrawEnemyMarks();
+            DrawTutorialEnemyNames();
             DrawObjectGauges();
             DrawObjectiveArrow();
             DrawPlayerBars();
@@ -176,7 +187,15 @@ public class NightHud : MonoBehaviour
         var subStyle = S("subtitle", compact ? 20 : 26, C(0xe6f5e9), TextAnchor.MiddleCenter, bold: true);
         float subH = subStyle.fontSize * 1.6f;
 
-        float total = logoH + 6 + subH + gap + cardH + gap + 46;
+        // タイトルは基本「チュートリアルから始める」だけ。下に小さく「スキップしてゲーム」(難易度=マップ選択へ)。
+        // 難易度選択はチュートリアルを終えたあと(結果画面)か、スキップしたときに出す
+        bool choosing = game.ChoosingMap;
+        sidePanelTop = 16f;
+        titleHomeLayout = false;
+        connectAtBottom = false;
+        if (!choosing && sidePanels && logoTex != null) { DrawTitleHome(Subtitle, subStyle, subH); return; }
+        float bodyH = choosing ? 26 + 12 + cardH + gap + 46 : 60 + 22 + 34;
+        float total = logoH + 6 + subH + gap + bodyH;
         float y = Mathf.Max(16f, (H - total) / 2f);
         float cx = W / 2f;
 
@@ -197,7 +216,52 @@ public class NightHud : MonoBehaviour
         Shadowed(new Rect(0, y, W, subH), Subtitle, subStyle, 2f);
         y += subH + gap;
 
-        // マップ選択カード
+        if (!choosing)
+        {
+            // 大きく「チュートリアルから始める」
+            Rect tbtn = new Rect(cx - 200, y, 400, 60);
+            bool th = tbtn.Contains(Event.current.mousePosition);
+            GUI.DrawTexture(tbtn, Tex("tutorialBtn" + th, () => Gradient(400, 60, C(0x2e7974), C(0x246257), 10, C(0x8ddccb, th ? 0.95f : 0.6f), 1, 120f)));
+            Label(tbtn, "チュートリアルから始める (B) →", S("tutorialBtnText", 20, Color.white, TextAnchor.MiddleCenter, bold: true));
+            if (GUI.Button(tbtn, GUIContent.none, GUIStyle.none)) game.StartPractice();
+            y += 60 + 22;
+            // 小さく「スキップしてゲーム」
+            Rect sbtn = new Rect(cx - 170, y, 340, 34);
+            bool sh = sbtn.Contains(Event.current.mousePosition);
+            Panel(sbtn, Tex("skipBtn" + sh, () => RoundedBox(32, 8, C(0x06131b, sh ? 0.75f : 0.45f), C(0x9fd0e0, sh ? 0.8f : 0.35f), 1)), 8);
+            Label(sbtn, "チュートリアルをスキップしてゲーム (V)", S("skipBtnText", 13, C(sh ? 0xffffff : 0xb9d6d0), TextAnchor.MiddleCenter));
+            if (GUI.Button(sbtn, GUIContent.none, GUIStyle.none)) game.OpenMapSelect(true);
+        }
+        else
+        {
+            Shadowed(new Rect(0, y, W, 26), "難易度(マップ)を選んでね", S("chooseHead", 20, C(0xffe9a0), TextAnchor.MiddleCenter, bold: true), 2f);
+            y += 26 + 12;
+            DrawMapCards(cx, y, cardW, cardH, preview, game.PickedMap);
+            y += cardH + gap;
+
+            // 左に小さく「戻る」、右に本番の開始ボタン
+            const float BackBtnW = 160f, MainBtnW = 300f, BtnGap = 16f;
+            float bx = cx - (BackBtnW + BtnGap + MainBtnW) / 2f;
+            Rect bbtn = new Rect(bx, y + 6, BackBtnW, 34);
+            bool bh = bbtn.Contains(Event.current.mousePosition);
+            Panel(bbtn, Tex("backBtn" + bh, () => RoundedBox(32, 8, C(0x06131b, bh ? 0.75f : 0.45f), C(0x9fd0e0, bh ? 0.8f : 0.35f), 1)), 8);
+            Label(bbtn, "← 戻る (V)", S("skipBtnText", 13, C(bh ? 0xffffff : 0xb9d6d0), TextAnchor.MiddleCenter));
+            if (GUI.Button(bbtn, GUIContent.none, GUIStyle.none)) game.OpenMapSelect(false);
+
+            Rect btn = new Rect(bx + BackBtnW + BtnGap, y, MainBtnW, 46);
+            bool btnHover = btn.Contains(Event.current.mousePosition);
+            GUI.DrawTexture(btn, Tex("startBtn" + btnHover, () => Gradient(300, 46, C(0x2e7974), C(0x246257), 8, C(0x8ddccb, btnHover ? 0.9f : 0.53f), 1, 120f)));
+            Label(btn, "このマップでプレイ (B) →", S("startBtnText", 16, Color.white, TextAnchor.MiddleCenter));
+            if (GUI.Button(btn, GUIContent.none, GUIStyle.none)) game.StartGame();
+        }
+
+        // 始める前にマットが反応するか確かめられるよう、タイトルでも左下に大きめに接続状態と踏んでいるパッドを出す
+        DrawMatStatus(20, H - 20 - MatStatusHeight(TitleMatScale, 14), TitleMatScale, 14);
+    }
+
+    // 難易度(マップ)選択のカード3枚。タイトルの難易度選択と、チュートリアルの結果画面で使う
+    void DrawMapCards(float cx, float y, float cardW, float cardH, float preview, string selectedId)
+    {
         float rowW = cardW * 3 + 32f;
         float x0 = cx - rowW / 2f;
         for (int i = 0; i < NightMap.Ids.Length; i++)
@@ -205,22 +269,92 @@ public class NightHud : MonoBehaviour
             string id = NightMap.Ids[i];
             Rect r = new Rect(x0 + i * (cardW + 16f), y, cardW, cardH);
             bool hover = r.Contains(Event.current.mousePosition);
-            bool selected = id == game.MapId;
+            bool selected = id == selectedId;
             if (hover) r.y -= 4f;
             DrawMapCard(r, id, selected, hover, preview);
             if (GUI.Button(r, GUIContent.none, GUIStyle.none)) game.SelectMap(id);
         }
-        y += cardH + gap;
+    }
 
-        Rect btn = new Rect(cx - 140, y, 280, 46);
-        bool btnHover = btn.Contains(Event.current.mousePosition);
-        GUI.DrawTexture(btn, Tex("startBtn" + btnHover, () => Gradient(280, 46, C(0x2e7974), C(0x246257), 8, C(0x8ddccb, btnHover ? 0.9f : 0.53f), 1, 120f)));
-        Label(btn, "このマップでプレイ →", S("startBtnText", 16, Color.white, TextAnchor.MiddleCenter));
-        if (GUI.Button(btn, GUIContent.none, GUIStyle.none)) game.StartGame();
+    // 左右のパネル(ランキング・QR)の上端。タイトルの最初の画面では、大きなロゴの下に並べる
+    float sidePanelTop = 16f;
 
-        // 始める前にマットが反応するか確かめられるよう、タイトルでも左下に大きめに接続状態と踏んでいるパッドを出す
+    // タイトルの最初の画面: ロゴを画面の幅いっぱいに大きく真ん中へ。その下にサブタイトル、
+    // さらに下に左右のパネル(ランキング・QR)と、まん中に「チュートリアルから始める」「スキップ」のボタン
+    void DrawTitleHome(string subtitle, GUIStyle subStyle, float subH)
+    {
+        float cx = W / 2f;
+        float logoW = W - 48f;
+        float logoH = logoW * logoTex.height / logoTex.width;
+        const float MaxLogoH = 220f; // これより大きいと、下のパネルが画面からはみ出す
+        if (logoH > MaxLogoH) { logoH = MaxLogoH; logoW = logoH * logoTex.width / logoTex.height; }
+        float y = 18f;
+        GUI.DrawTexture(new Rect(cx - logoW / 2f, y, logoW, logoH), logoTex, ScaleMode.ScaleToFit, true);
+        y += logoH + 4;
+        Shadowed(new Rect(0, y, W, subH), subtitle, subStyle, 2f);
+        y += subH + 12;
+        sidePanelTop = y;
+
+        // ボタンはまん中。その下にマップのアイコンだけを並べ、押すとそのマップのランキングを小窓で見られる。
+        // QRコードは右下、マットのセンサーの表示は左下
+        titleHomeLayout = true;
+        connectAtBottom = true;
+        y += 6f;
+        Rect tbtn = new Rect(cx - 200, y, 400, 58);
+        bool th = tbtn.Contains(Event.current.mousePosition);
+        GUI.DrawTexture(tbtn, Tex("tutorialBtn" + th, () => Gradient(400, 58, C(0x2e7974), C(0x246257), 10, C(0x8ddccb, th ? 0.95f : 0.6f), 1, 120f)));
+        Label(tbtn, "チュートリアルから始める (B) →", S("tutorialBtnText", 20, Color.white, TextAnchor.MiddleCenter, bold: true));
+        if (GUI.Button(tbtn, GUIContent.none, GUIStyle.none)) game.StartPractice();
+        y += 58 + 12;
+        Rect sbtn = new Rect(cx - 170, y, 340, 32);
+        bool sh = sbtn.Contains(Event.current.mousePosition);
+        Panel(sbtn, Tex("skipBtn" + sh, () => RoundedBox(32, 8, C(0x06131b, sh ? 0.75f : 0.45f), C(0x9fd0e0, sh ? 0.8f : 0.35f), 1)), 8);
+        Label(sbtn, "チュートリアルをスキップしてゲーム (V)", S("skipBtnText", 13, C(sh ? 0xffffff : 0xb9d6d0), TextAnchor.MiddleCenter));
+        if (GUI.Button(sbtn, GUIContent.none, GUIStyle.none)) game.OpenMapSelect(true);
+        y += 32 + 26;
+
+        // マップのアイコン(押すとランキング)
+        const float Icon = 96f, IconGap = 28f;
+        Shadowed(new Rect(0, y, W, 18), "ランキング", S("homeRankHead", 13, C(0xdfc985), TextAnchor.MiddleCenter, bold: true));
+        y += 22;
+        float ix = cx - (Icon * 3 + IconGap * 2) / 2f;
+        for (int k = 0; k < NightMap.Ids.Length; k++)
+        {
+            string id = NightMap.Ids[k];
+            Rect ir = new Rect(ix + k * (Icon + IconGap), y, Icon, Icon);
+            bool hov = GUI.enabled && ir.Contains(Event.current.mousePosition);
+            Panel(new Rect(ir.x - 4, ir.y - 4, ir.width + 8, ir.height + 8), Tex("mapIconBg" + hov, () => RoundedBox(32, 10, C(0x0b1f22, 0.9f), C(hov ? 0xdfc985 : 0x739e90, hov ? 0.95f : 0.4f), 1)), 10);
+            GUI.DrawTexture(ir, previews[id], ScaleMode.ScaleToFit);
+            Label(new Rect(ir.x - 20, ir.yMax + 8, ir.width + 40, 18), id + ". " + NightMap.NameOf(id), S("mapIconName", 13, C(0xdfffe0), TextAnchor.MiddleCenter, bold: true));
+            Label(new Rect(ir.x - 20, ir.yMax + 26, ir.width + 40, 16), "[" + NightGame.MapKeyNames[k] + "]", S("mapIconKey", 11, C(0xdfc985), TextAnchor.MiddleCenter));
+            if (GUI.Button(ir, GUIContent.none, GUIStyle.none)) ToggleRanking(id);
+        }
+
+        // マットのセンサーの表示は左下
         DrawMatStatus(20, H - 20 - MatStatusHeight(TitleMatScale, 14), TitleMatScale, 14);
     }
+
+    // タイトルの最初の画面で、マップのアイコンを押したときに出すランキングの小窓(もう一度押す・どこかを押す・ESCで閉じる)
+    public static string RankingPopup { get; private set; }
+    public static void ToggleRanking(string id) => RankingPopup = id == null || RankingPopup == id ? null : id;
+    bool connectAtBottom; // QRのパネルを右下に出す(タイトルの最初の画面)
+
+    void DrawRankingPopup()
+    {
+        if (RankingPopup == null || game.State != NightGame.GameState.Title) return;
+        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape) { RankingPopup = null; Event.current.Use(); return; }
+        Fill(new Rect(0, 0, W, H), new Color(0f, 0.02f, 0.04f, 0.7f));
+        const float rowH = 28f, w = 340f;
+        float h = RankingCardHeight(NightRanking.Top(RankingPopup), NightRanking.MaxEntries, rowH, true);
+        Rect r = new Rect((W - w) / 2f, (H - h - 30f) / 2f, w, h);
+        Panel(r, Tex("popupBg", () => RoundedBox(48, 12, C(0x06131b, 1f), C(0xdfc985, 0.6f), 1)), 12); // 下の文字が透けないよう、不透明な台を敷く
+        DrawRankingCard(r, RankingPopup, NightRanking.MaxEntries, rowH, true);
+        Label(new Rect(0, r.yMax + 10, W, 18), "どこかを押す / ESC で閉じる", S("popupClose", 12, C(0xa9c4b8), TextAnchor.MiddleCenter));
+        if (GUI.Button(new Rect(0, 0, W, H), GUIContent.none, GUIStyle.none)) RankingPopup = null;
+    }
+
+    // タイトルの最初の画面のときは、左のランキングのパネルを出さない(まん中に3マップ分を出すため)
+    bool titleHomeLayout;
 
     void DrawMapCard(Rect r, string id, bool selected, bool hover, float preview)
     {
@@ -232,6 +366,9 @@ public class NightHud : MonoBehaviour
         Rect pv = new Rect(r.x + (r.width - preview) / 2f, r.y + 14, preview, preview);
         GUI.DrawTexture(pv, previews[id], ScaleMode.ScaleToFit);
         Label(new Rect(r.x + 12, pv.yMax + 12, r.width - 24, 22), id + ". " + NightMap.NameOf(id), S("cardTitle", 16, C(0xdfffe0), TextAnchor.MiddleLeft, bold: true));
+        // このマップを選ぶキー(Z / X / C)を右下に小さく出す
+        int ki = System.Array.IndexOf(NightMap.Ids, id);
+        if (ki >= 0) Label(new Rect(r.x + 12, pv.yMax + 12, r.width - 24, 22), "[" + NightGame.MapKeyNames[ki] + "]", S("cardKey", 13, C(0xdfc985), TextAnchor.MiddleRight, bold: true));
 
         var diff = NightDifficulty.For(id);
         var dStyle = S("cardDiff" + id, 11, diff.color, TextAnchor.MiddleCenter, bold: true);
@@ -254,17 +391,14 @@ public class NightHud : MonoBehaviour
     // ================= HUD =================
     void DrawHud()
     {
-        // HPバー・擬態ゲージは主人公の頭上に出す(DrawPlayerBars)。ここはマップ名・操作・接続状態だけ
-        var row = S("hudRow", 10, C(0xdfffe0, 0.82f), TextAnchor.UpperLeft, wrap: true);
-        string rowText = "移動: WASD/矢印　灯り: " + (game.Flashlight.HasPhoneInput ? "スマホ" : "スマホ未接続") + "　止まる=擬態　石を照らして蛍を集めよう";
-        float rowH = row.CalcHeight(new GUIContent(rowText), 220);
-        Rect r = new Rect(12, 12, 248, 10 + 21 + rowH + 10);
+        // HPバー・擬態ゲージは主人公の頭上に出す(DrawPlayerBars)。左上はモード名(チュートリアル / マップ名)だけ。細かい操作説明は出さない
+        string head = game.Practice ? "チュートリアル" : game.MapId + ". " + game.Map.Name;
+        var headStyle = S("hudH1", 14, C(0xdfffe0, 0.9f), TextAnchor.MiddleLeft, bold: true);
+        Rect r = new Rect(12, 12, headStyle.CalcSize(new GUIContent(head)).x + 14 + 21 + 16, 38);
         Panel(r, PanelTex(), 9);
         float x = r.x + 14, y = r.y + 10;
         GUI.DrawTexture(new Rect(x, y + 1, 16, 16), markTex);
-        Shadowed(new Rect(x + 21, y, r.width - 49, 18), game.MapId + ". " + game.Map.Name, S("hudH1", 14, C(0xdfffe0, 0.9f), TextAnchor.MiddleLeft, bold: true));
-        y += 21;
-        Shadowed(new Rect(x, y, 220, rowH), rowText, row);
+        Shadowed(new Rect(x + 21, y, r.width - 35, 18), head, headStyle);
 
         // マットの反応はプレイ中は小さめにして左下(下のヒントの上)に出す
         DrawMatStatus(16, H - 18 - 16 - 10 - MatStatusHeight(PlayMatScale, 10), PlayMatScale, 10);
@@ -314,47 +448,51 @@ public class NightHud : MonoBehaviour
 
     void DrawGoalHud()
     {
-        string text = game.GateOpened ? "門が開いた！入口へ戻ろう" : "蛍 " + game.OrbCount + " / " + NightGame.OrbTotal;
+        // 練習では、蛍の石のゲージ(たまったら終わり)をバーで出す
+        float orbGauge = game.World.Orbs.Count > 0 ? game.World.Orbs[0].reveal / game.World.Orbs[0].RevealTime : 0f;
+        string text = game.Practice ? "チュートリアル  STEP " + game.TutorialStepNumber + " / " + NightGame.TutorialSteps + "  " + game.TutorialTitle
+                    : game.GateOpened ? "門が開いた！入口へ戻ろう" : "ホタル " + game.OrbCount + " / " + NightGame.OrbTotal;
         var style = S("goal", 14, C(0xdfffe0), TextAnchor.MiddleCenter, bold: true);
         // いまやることを、パネルの下の段に常に出す
         string todo = "いまやること: " + game.Objective;
         var todoStyle = S("goalTodo", 14, C(0xffe9a0), TextAnchor.MiddleCenter, bold: true);
-        float w = Mathf.Max(250f, style.CalcSize(new GUIContent(text)).x + 30f, todoStyle.CalcSize(new GUIContent(todo)).x + 34f);
+        float w = Mathf.Max(330f, style.CalcSize(new GUIContent(text)).x + 30f, todoStyle.CalcSize(new GUIContent(todo)).x + 34f);
         Rect r = new Rect(W / 2f - w / 2f, 12, w, 68);
         Panel(r, PanelTex(), 9);
-        Shadowed(new Rect(r.x, r.y + 8, r.width, 18), text, style);
-        Bar(new Rect(W / 2f - 110f, r.y + 30, 220, 8), game.OrbCount / (float)NightGame.OrbTotal, "prog", C(0xffdd55), C(0x9dffb0), null, 0.18f);
+        // ホタルの石の近くにいる間は、上の段とバーを「石に光を当てた進み具合(チャージ)」に切り替える
+        var near = game.NearbyOrb;
+        if (near != null)
+        {
+            float charge = Mathf.Clamp01(near.reveal / near.RevealTime);
+            string nearText = near.materialized ? "ホタルの石  チャージ完了！ 触れて捕まえよう" : "ホタルの石  チャージ " + Mathf.RoundToInt(charge * 100f) + "%";
+            var nearStyle = S("goalOrb" + near.index, 14, Color.Lerp(near.color, Color.white, 0.35f), TextAnchor.MiddleCenter, bold: true);
+            Shadowed(new Rect(r.x, r.y + 8, r.width, 18), nearText, nearStyle);
+            Bar(new Rect(W / 2f - 110f, r.y + 30, 220, 8), charge, "orbCharge" + near.index, near.color, Color.Lerp(near.color, Color.white, 0.5f), null, 0.18f);
+        }
+        else
+        {
+            Shadowed(new Rect(r.x, r.y + 8, r.width, 18), text, style);
+            Bar(new Rect(W / 2f - 110f, r.y + 30, 220, 8), game.Practice ? game.TutorialProgress : game.OrbCount / (float)NightGame.OrbTotal, "prog", C(0xffdd55), C(0x9dffb0), null, 0.18f);
+        }
         Shadowed(new Rect(r.x, r.y + 44, r.width, 18), todo, todoStyle);
     }
 
     void DrawTopRight()
     {
-        string badge; Color badgeColor;
-        if (game.Camouflaged) { badge = "擬態中(無敵)"; badgeColor = new Color(60 / 255f, 160 / 255f, 200 / 255f, 0.9f); }
-        else if (game.CampLocked) { badge = "ゲージ切れ"; badgeColor = new Color(120 / 255f, 120 / 255f, 120 / 255f, 0.85f); }
-        else { badge = "移動中"; badgeColor = new Color(190 / 255f, 110 / 255f, 50 / 255f, 0.9f); }
-
-
-        var badgeStyle = S("badge", 12, Color.white, TextAnchor.MiddleCenter, bold: true);
+        // 擬態中・移動中などの状態のバッジは出さない(擬態ゲージは主人公の頭上のバーで分かる)
         var killStyle = S("kill", 14, C(0xffb0b0), TextAnchor.MiddleRight);
         var timerStyle = S("timer", 16, C(0xbbccdd), TextAnchor.MiddleRight);
 
         string kill = "撃破: " + game.KillCount;
-        string threat = "脅威 Lv." + game.Threat + (game.Threat >= NightGame.ThreatMax ? " (最大)" : "");
+        string threat = game.Practice ? "チュートリアル(ダメージなし)" : "脅威 Lv." + game.Threat + (game.Threat >= NightGame.ThreatMax ? " (最大)" : "");
         var threatStyle = S("threat" + Mathf.Min(game.Threat, 5), 13, Color.Lerp(C(0xffd9a0), C(0xff5a4a), (game.Threat - 1) / 4f), TextAnchor.MiddleRight, bold: true);
         string timer = FormatTime(game.Elapsed);
-        float bw = badgeStyle.CalcSize(new GUIContent(badge)).x + 20f;
-        float contentW = Mathf.Max(bw, killStyle.CalcSize(new GUIContent(kill)).x, threatStyle.CalcSize(new GUIContent(threat)).x, timerStyle.CalcSize(new GUIContent(timer)).x);
+        float contentW = Mathf.Max(killStyle.CalcSize(new GUIContent(kill)).x, threatStyle.CalcSize(new GUIContent(threat)).x, timerStyle.CalcSize(new GUIContent(timer)).x);
         // 雷(閃光)までの秒数は出さない(ゴロゴロという予兆の音と画面のちらつきで分かる)
-        Rect r = new Rect(W - 12 - (contentW + 24), 12, contentW + 24, 8 + 22 + 2 + 20 + 2 + 18 + 6 + 2 + 22 + 8);
+        Rect r = new Rect(W - 12 - (contentW + 24), 12, contentW + 24, 8 + 20 + 2 + 18 + 6 + 2 + 22 + 8);
         Panel(r, PanelTex(), 9);
         float x = r.x + 12, y = r.y + 8, w = contentW;
 
-        GUI.color = badgeColor;
-        Panel(new Rect(x + w - bw, y, bw, 22), Tex("pill", () => RoundedBox(32, 11, Color.white, Color.white, 0)), 11);
-        GUI.color = Color.white;
-        Label(new Rect(x + w - bw, y, bw, 22), badge, badgeStyle);
-        y += 22 + 2;
         Shadowed(new Rect(x, y, w, 20), kill, killStyle);
         y += 20 + 2;
         // 脅威レベル。下の細いバーは「あとどれだけ回復すると次のレベルか」
@@ -362,8 +500,11 @@ public class NightHud : MonoBehaviour
             threatStyle.normal.textColor = Color.Lerp(threatStyle.normal.textColor, Color.white, Mathf.Abs(Mathf.Sin(Time.unscaledTime * 10f)));
         Shadowed(new Rect(x, y, w, 18), threat, threatStyle);
         y += 18 + 1;
-        Fill(new Rect(x + w - 90, y, 90, 4), new Color(1f, 1f, 1f, 0.12f));
-        Fill(new Rect(x + w - 90, y, 90 * Mathf.Clamp01(game.ThreatProgress), 4), new Color(1f, 0.45f, 0.3f, 0.85f));
+        if (!game.Practice)
+        {
+            Fill(new Rect(x + w - 90, y, 90, 4), new Color(1f, 1f, 1f, 0.12f));
+            Fill(new Rect(x + w - 90, y, 90 * Mathf.Clamp01(game.ThreatProgress), 4), new Color(1f, 0.45f, 0.3f, 0.85f));
+        }
         y += 5 + 2;
         Shadowed(new Rect(x, y, w, 22), timer, timerStyle);
     }
@@ -387,6 +528,32 @@ public class NightHud : MonoBehaviour
         Vector3 s = game.Cam.WorldToScreenPoint(world);
         p = new Vector2(s.x / scale, (Screen.height - s.y) / scale);
         return s.z > 0f;
+    }
+
+    // チュートリアルでは、敵の紹介として頭の上に名前と特徴を出す
+    void DrawTutorialEnemyNames()
+    {
+        if (!game.Practice) return;
+        var nameSt = S("tutEnemyName", 15, Color.white, TextAnchor.MiddleCenter, bold: true);
+        var traitSt = S("tutEnemyTrait", 12, C(0xffe9a0), TextAnchor.MiddleCenter, bold: true);
+        foreach (var en in game.Enemies)
+        {
+            if (en.dying) continue;
+            if (!ToHud(en.Position + Vector3.up * (en.hitHeight * 1.9f + 0.6f), out var p)) continue;
+            if (p.x < -80 || p.x > W + 80 || p.y < -40 || p.y > H + 40) continue;
+            string name, trait;
+            switch (en.kind)
+            {
+                case NightEnemy.Kind.Moth: name = "オオカミ"; trait = "速い・群れで来る"; break;
+                case NightEnemy.Kind.Shooter: name = "キツネ"; trait = "火の玉を撃つ"; break;
+                case NightEnemy.Kind.Brute: name = "クマ"; trait = "大きくて硬い"; break;
+                default: name = "ようせい"; trait = "壁をすり抜ける"; break;
+            }
+            Rect r = new Rect(p.x - 70, p.y - 34, 140, 40);
+            Panel(r, PanelTex(), 8);
+            Shadowed(new Rect(r.x, r.y + 3, r.width, 18), name, nameSt);
+            Shadowed(new Rect(r.x, r.y + 20, r.width, 16), trait, traitSt);
+        }
     }
 
     // 擬態中、敵の頭の上に「？」(見失っている)。擬態が解けた直後は「！」(見つけた)。
@@ -506,7 +673,7 @@ public class NightHud : MonoBehaviour
             if (!active) ObjectGauge(new Vector3(plant.x, plant.height + 1.35f, plant.z), plant.charge / NightGuidePlant.ChargeTime, C(0x98efbd), "導きの花");
         }
         foreach (var orb in world.Orbs)
-            if (!orb.collected && !orb.materialized) ObjectGauge(orb.Position + Vector3.up * 2.6f, orb.reveal / NightOrb.RevealTime, orb.color, "蛍の石");
+            if (!orb.collected && !orb.materialized && game.OrbsActive) ObjectGauge(orb.Position + Vector3.up * 2.6f, orb.reveal / orb.RevealTime, orb.color, "ホタルの石");
     }
 
     void ObjectGauge(Vector3 world, float ratio, Color color, string name)
@@ -594,6 +761,7 @@ public class NightHud : MonoBehaviour
 
     void DrawHint()
     {
+        if (string.IsNullOrEmpty(game.Hint)) return;
         Color old = GUI.color;
         GUI.color = new Color(1, 1, 1, 0.75f);
         Shadowed(new Rect(16, H - 18 - 16, W - 32 - 190, 16), game.Hint, S("hint", 11, C(0xcdeccd), TextAnchor.MiddleLeft));
@@ -648,6 +816,7 @@ public class NightHud : MonoBehaviour
         float t = endSkip ? 99f : Time.unscaledTime - endStart;
 
         Fill(new Rect(0, 0, W, H), new Color(0, 0, 0, 0.82f * Seg(t, 0f, 0.4f)));
+        if (game.Practice) { DrawPracticeEnd(t); return; }
         bool win = game.Cleared;
         float cx = W / 2f, y = Mathf.Max(24f, H / 2f - 250f);
 
@@ -655,7 +824,7 @@ public class NightHud : MonoBehaviour
         LabelFx(new Rect(0, y, W, 50), win ? "門を抜けて脱出した！" : "力尽きた…",
             S(win ? "endWin" : "endLose", 38, win ? C(0x9dffb0) : C(0xff8f7a), TextAnchor.MiddleCenter, bold: true), Mathf.Lerp(1.6f, 1f, EaseOutBack(tp)), tp);
         y += 56;
-        LabelFx(new Rect(0, y, W, 20), (game.Registered ? game.PlayerName + "  /  " : "") + game.MapId + ". " + game.Map.Name + "  /  " + (win ? "クリアタイム " : "生存 ") + FormatTime(game.Elapsed) + "  /  蛍 " + game.OrbCount + " / " + NightGame.OrbTotal,
+        LabelFx(new Rect(0, y, W, 20), (game.Registered ? game.PlayerName + "  /  " : "") + game.MapId + ". " + game.Map.Name + "  /  " + (win ? "クリアタイム " : "生存 ") + FormatTime(game.Elapsed) + "  /  ホタル " + game.OrbCount + " / " + NightGame.OrbTotal,
             S("endMap", 13, new Color(1, 1, 1, 0.75f), TextAnchor.MiddleCenter), 1f, Seg(t, 0.6f, 0.3f));
         y += 30;
 
@@ -674,7 +843,6 @@ public class NightHud : MonoBehaviour
         else
         {
             rows.Add(new KeyValuePair<string, int>("撃破 " + kills + "体 × " + NightRanking.KillPoints, kills * NightRanking.KillPoints));
-            rows.Add(new KeyValuePair<string, int>("生存 " + s0 + "秒 × " + NightRanking.SurvivePoints, s0 * NightRanking.SurvivePoints));
         }
         for (int i = 0; i < rows.Count; i++)
         {
@@ -738,14 +906,55 @@ public class NightHud : MonoBehaviour
         Rect btn = new Rect(cx - 110, y, 220, 42);
         bool hover = btn.Contains(Event.current.mousePosition);
         Panel(btn, Tex("endBtn" + hover, () => RoundedBox(32, 8, hover ? C(0x46a058) : C(0x3a8a4a), hover ? C(0x46a058) : C(0x3a8a4a), 0)), 8);
-        Label(btn, "もう一度やり直す (R)", S("endBtnText", 15, Color.white, TextAnchor.MiddleCenter));
+        Label(btn, "もう一度やり直す (Z)", S("endBtnText", 15, Color.white, TextAnchor.MiddleCenter));
         Rect btn2 = new Rect(cx - 110, y + 52, 220, 42);
         bool hover2 = btn2.Contains(Event.current.mousePosition);
         Panel(btn2, Tex("endBtn2" + hover2, () => RoundedBox(32, 8, hover2 ? C(0x3a6f8a) : C(0x2f5d75), hover2 ? C(0x3a6f8a) : C(0x2f5d75), 0)), 8);
-        Label(btn2, "ステージ選択へ (T)", S("endBtnText", 15, Color.white, TextAnchor.MiddleCenter));
+        Label(btn2, "ステージ選択へ (X)", S("endBtnText", 15, Color.white, TextAnchor.MiddleCenter));
         GUI.color = prev;
         if (GUI.Button(btn, GUIContent.none, GUIStyle.none)) game.Restart();
         if (GUI.Button(btn2, GUIContent.none, GUIStyle.none)) game.BackToTitle();
+    }
+
+    // 練習モードの結果: スコア・ランキングは出さず、できたことを確認して本番へ誘う
+    void DrawPracticeEnd(float t)
+    {
+        // チュートリアルの結果: スコア・ランキングは出さず、そのまま難易度(マップ)を選んで本番を始められるようにする
+        float cx = W / 2f;
+        float cardW = Mathf.Floor((Mathf.Min(660f, W - 48f) - 32f) / 3f);
+        bool compact = H < 760f;
+        float preview = Mathf.Min(cardW - 24f, compact ? 110f : 140f);
+        float cardH = 14f + preview + 12f + 22f + 14f;
+        float y = Mathf.Max(16f, (H - (52 + 30 + 24 + 34 + 12 + cardH + 22 + 46 + 50)) / 2f);
+        float tp = Seg(t, 0.15f, 0.5f);
+        LabelFx(new Rect(0, y, W, 52), "チュートリアルクリア！", S("practiceEndTitle", 40, C(0x9dffb0), TextAnchor.MiddleCenter, bold: true), Mathf.Lerp(1.6f, 1f, EaseOutBack(tp)), tp);
+        y += 58;
+        LabelFx(new Rect(0, y, W, 24), "ルールはばっちり！ このまま本番へ。難易度(マップ)を選んでね", S("practiceEndSub", 18, C(0xe6f5e9), TextAnchor.MiddleCenter, bold: true), 1f, Seg(t, 0.6f, 0.3f));
+        y += 28;
+        LabelFx(new Rect(0, y, W, 22), "倒した敵 " + game.KillCount + "体  /  " + FormatTime(game.Elapsed), S("practiceEndInfo", 14, new Color(1, 1, 1, 0.75f), TextAnchor.MiddleCenter), 1f, Seg(t, 0.9f, 0.3f));
+        y += 34;
+        DrawConfetti(t);
+
+        float ba = Seg(t, 1.2f, 0.4f);
+        Color prev = GUI.color;
+        GUI.color = new Color(1, 1, 1, ba);
+        DrawMapCards(cx, y, cardW, cardH, preview, game.PickedMap);
+        y += cardH + 22;
+        Rect btn = new Rect(cx - 160, y, 320, 46);
+        bool hover = btn.Contains(Event.current.mousePosition);
+        GUI.DrawTexture(btn, Tex("startBtn2" + hover, () => Gradient(320, 46, C(0x2e7974), C(0x246257), 8, C(0x8ddccb, hover ? 0.9f : 0.53f), 1, 120f)));
+        Label(btn, "このマップでゲーム開始 (B) →", S("startBtnText", 16, Color.white, TextAnchor.MiddleCenter));
+        y += 46 + 14;
+        Rect again = new Rect(cx - 170, y, 160, 30);
+        Rect home = new Rect(cx + 10, y, 160, 30);
+        bool ha = again.Contains(Event.current.mousePosition), hh = home.Contains(Event.current.mousePosition);
+        Label(again, "もう一度チュートリアル (R)", S(ha ? "endSmallH" : "endSmall", 12, ha ? Color.white : C(0xa9c4b8), TextAnchor.MiddleCenter));
+        Label(home, "タイトルへ (T)", S(hh ? "endSmallH" : "endSmall", 12, hh ? Color.white : C(0xa9c4b8), TextAnchor.MiddleCenter));
+        GUI.color = prev;
+        if (ba < 0.5f) return; // ボタンが出きるまでは押せない(結果が出た瞬間のクリックで進まないように)
+        if (GUI.Button(btn, GUIContent.none, GUIStyle.none)) game.StartFromTutorial();
+        if (GUI.Button(again, GUIContent.none, GUIStyle.none)) game.RestartPractice();
+        if (GUI.Button(home, GUIContent.none, GUIStyle.none)) game.BackToTitle();
     }
 
     float endCelebrateStart;
@@ -783,7 +992,7 @@ public class NightHud : MonoBehaviour
         if (GUI.Button(ok, GUIContent.none, GUIStyle.none)) game.SubmitRanking(endName);
         Rect skip = new Rect(cx - 110, y + 50, 220, 28);
         bool hs = skip.Contains(Event.current.mousePosition);
-        Label(skip, "登録しない", S(hs ? "neGuestH" : "neGuest", 14, hs ? Color.white : C(0xa9c4b8), TextAnchor.MiddleCenter));
+        Label(skip, "登録しない (Esc)", S(hs ? "neGuestH" : "neGuest", 14, hs ? Color.white : C(0xa9c4b8), TextAnchor.MiddleCenter));
         if (GUI.Button(skip, GUIContent.none, GUIStyle.none)) game.SubmitRanking("");
         GUI.color = prev;
     }
@@ -876,46 +1085,74 @@ public class NightHud : MonoBehaviour
     // 1〜3位はメダル色の丸、行は交互に色を変え、文字は大きめ。スコアは右揃えで桁が見比べやすい。
     void DrawRankingPanel()
     {
-        if (W < 1000f) return; // 狭い画面では中央のカードと重なるので出さない
+        if (W < 1000f || titleHomeLayout) return; // 狭い画面では中央のカードと重なるので出さない。最初の画面はまん中に3マップ分を出す
+        const float rowH = 28f;
         var top = NightRanking.Top(game.MapId);
-        const float w = 252f, rowH = 28f;
-        bool anyFail = top.Exists(e => !e.cleared);
-        const float listTop = 94f;
-        float h = listTop + Mathf.Max(top.Count, 3) * rowH + 12f + (anyFail ? 18f : 0f);
-        Rect r = new Rect(10, 16, w, h);
+        DrawRankingCard(new Rect(10, sidePanelTop, 252f, RankingCardHeight(top, NightRanking.MaxEntries, rowH, true)), game.MapId, NightRanking.MaxEntries, rowH, true);
+    }
+
+    float RankingCardHeight(List<NightRanking.Entry> top, int maxRows, float rowH, bool full)
+    {
+        int n = Mathf.Min(top.Count, maxRows);
+        bool anyFail = false;
+        for (int i = 0; i < n; i++) if (!top[i].cleared) anyFail = true;
+        return (full ? 94f : 58f) + Mathf.Max(n, full ? 3 : maxRows) * rowH + 10f + (anyFail ? 18f : 0f);
+    }
+
+    // 1つのマップのランキング。full = 見出しを詳しく(タイトルの左のパネル)。そうでなければ見出しは1行で、上位 maxRows 位まで
+    void DrawRankingCard(Rect r, string id, int maxRows, float rowH, bool full)
+    {
+        var top = NightRanking.Top(id);
+        int n = Mathf.Min(top.Count, maxRows);
+        bool anyFail = false;
+        for (int i = 0; i < n; i++) if (!top[i].cleared) anyFail = true;
+        float w = r.width;
         Panel(r, PanelTex(), 9);
-        Label(new Rect(r.x + 14, r.y + 10, w - 28, 24), game.MapId + ". " + game.Map.Name, S("rkHead", 17, C(0xdfffe0), TextAnchor.MiddleLeft, bold: true));
-        var rd = game.Difficulty;
-        Label(new Rect(r.x + 14, r.y + 34, w - 28, 18), rd.Stars + " " + rd.label, S("rkDiff" + game.MapId, 12, rd.color, TextAnchor.MiddleLeft, bold: true));
-        Label(new Rect(r.x + 14, r.y + 54, w - 28, 18), "TOP " + NightRanking.MaxEntries + " ランキング", S("rkSub", 13, C(0xdfc985), TextAnchor.MiddleLeft, bold: true));
-        Label(new Rect(r.x + 14, r.y + 72, w - 28, 16), "スコア = クリアタイム + 撃破数", S("rkSub2", 11, C(0x9fbdb0), TextAnchor.MiddleLeft));
+        var rd = NightDifficulty.For(id);
+        Label(new Rect(r.x + 14, r.y + 10, w - 28, 24), id + ". " + NightMap.NameOf(id), S("rkHead", 17, C(0xdfffe0), TextAnchor.MiddleLeft, bold: true));
+        float listTop;
+        if (full)
+        {
+            Label(new Rect(r.x + 14, r.y + 34, w - 28, 18), rd.Stars + " " + rd.label, S("rkDiff" + id, 12, rd.color, TextAnchor.MiddleLeft, bold: true));
+            Label(new Rect(r.x + 14, r.y + 54, w - 28, 18), "TOP " + NightRanking.MaxEntries + " ランキング", S("rkSub", 13, C(0xdfc985), TextAnchor.MiddleLeft, bold: true));
+            Label(new Rect(r.x + 14, r.y + 72, w - 28, 16), "スコア = 早さ + 撃破数", S("rkSub2", 11, C(0x9fbdb0), TextAnchor.MiddleLeft));
+            listTop = 94f;
+        }
+        else
+        {
+            Label(new Rect(r.x + 14, r.y + 10, w - 28, 24), rd.Stars + " " + rd.label, S("rkDiffR" + id, 12, rd.color, TextAnchor.MiddleRight, bold: true));
+            Label(new Rect(r.x + 14, r.y + 34, w - 28, 18), "TOP " + maxRows, S("rkSub", 13, C(0xdfc985), TextAnchor.MiddleLeft, bold: true));
+            listTop = 58f;
+        }
         float y = r.y + listTop;
-        if (top.Count == 0)
+        if (n == 0)
         {
             Label(new Rect(r.x + 14, y, w - 28, 60), "まだ記録がありません。\n最初の1位を目指そう！", S("rkNone", 14, C(0xc4dacd), TextAnchor.UpperLeft));
             return;
         }
         var dotTex = Tex("playerDot", () => RoundedBox(32, 16, Color.white, Color.white, 0));
-        for (int i = 0; i < top.Count; i++)
+        float nameW = w - 42 - 104;
+        for (int i = 0; i < n; i++)
         {
             var e = top[i];
             if (i % 2 == 0) Fill(new Rect(r.x + 6, y, w - 12, rowH - 2), new Color(1, 1, 1, 0.06f));
             Color medal = i == 0 ? C(0xffd76a) : i == 1 ? C(0xd5dde0) : i == 2 ? C(0xe0a070) : Color.clear;
+            float cy = y + (rowH - 22f) / 2f - 1f;
             if (i < 3)
             {
                 Color old = GUI.color;
                 GUI.color = medal;
-                GUI.DrawTexture(new Rect(r.x + 12, y + 3, 22, 22), dotTex);
+                GUI.DrawTexture(new Rect(r.x + 12, cy, 22, 22), dotTex);
                 GUI.color = old;
-                Label(new Rect(r.x + 12, y + 3, 22, 22), (i + 1).ToString(), S("rkMedal", 13, C(0x1a1400), TextAnchor.MiddleCenter, bold: true));
+                Label(new Rect(r.x + 12, cy, 22, 22), (i + 1).ToString(), S("rkMedal", 13, C(0x1a1400), TextAnchor.MiddleCenter, bold: true));
             }
-            else Label(new Rect(r.x + 12, y + 2, 22, 24), (i + 1).ToString(), S("rkNum", 14, C(0xa9c4b8), TextAnchor.MiddleCenter));
+            else Label(new Rect(r.x + 12, y, 22, rowH - 2), (i + 1).ToString(), S("rkNum", 14, C(0xa9c4b8), TextAnchor.MiddleCenter));
             Color tc = i < 3 ? medal : C(0xe6f5e9);
             string nm = e.name + (e.cleared ? "" : " *");
             var nameStyle = S("rkName" + (i < 3 ? i : 3), 14, tc, TextAnchor.MiddleLeft, bold: i < 3);
             nameStyle.clipping = TextClipping.Clip;
-            Label(new Rect(r.x + 42, y + 1, 118, 26), nm, nameStyle);
-            Label(new Rect(r.x + 164, y + 1, w - 178, 26), e.score.ToString("N0"), S("rkScore" + (i < 3 ? i : 3), 15, tc, TextAnchor.MiddleRight, bold: true));
+            Label(new Rect(r.x + 42, y, nameW, rowH - 2), nm, nameStyle);
+            Label(new Rect(r.x + w - 14 - 100, y, 100, rowH - 2), e.score.ToString("N0"), S("rkScore" + (i < 3 ? i : 3), 15, tc, TextAnchor.MiddleRight, bold: true));
             y += rowH;
         }
         if (anyFail) Label(new Rect(r.x + 14, y + 2, w - 28, 16), "* 途中終了", S("rkNote", 11, C(0x8fada4), TextAnchor.MiddleLeft));
@@ -931,19 +1168,19 @@ public class NightHud : MonoBehaviour
         Label(new Rect(card.x + 24, card.y + 72, card.width - 48, 18), "開発者向け設定", S("pauseSection", 12, C(0xdfc985), TextAnchor.MiddleLeft, bold: true));
 
         var label = S("pauseLabel", 14, C(0xdfffe0), TextAnchor.MiddleLeft);
-        Label(new Rect(card.x + 24, card.y + 96, card.width - 48, 22), "画面の明るさ  ×" + game.Brightness.ToString("0.00"), label);
+        Label(new Rect(card.x + 24, card.y + 96, card.width - 48, 22), "画面の明るさ  ×" + game.Brightness.ToString("0.00") + "   (V / B)", label);
         float b = GUI.HorizontalSlider(new Rect(card.x + 24, card.y + 124, card.width - 48, 20), game.Brightness, NightGame.BrightnessMin, NightGame.BrightnessMax);
         if (!Mathf.Approximately(b, game.Brightness)) game.SetBrightness(b);
         if (GUI.Button(new Rect(card.x + 24, card.y + 148, 130, 26), "明るさをリセット")) game.SetBrightness(1f);
 
-        Label(new Rect(card.x + 24, card.y + 190, card.width - 48, 22), "音量  " + Mathf.RoundToInt(game.Volume * 100f) + "%", label);
+        Label(new Rect(card.x + 24, card.y + 190, card.width - 48, 22), "音量  " + Mathf.RoundToInt(game.Volume * 100f) + "%   (N / M)", label);
         float v = GUI.HorizontalSlider(new Rect(card.x + 24, card.y + 218, card.width - 48, 20), game.Volume, 0f, 1f);
         if (!Mathf.Approximately(v, game.Volume)) game.SetVolume(v);
 
-        if (MenuButton(new Rect(card.x + 24, card.y + 262, 168, 42), "再開")) game.Resume();
-        if (MenuButton(new Rect(card.xMax - 24 - 168, card.y + 262, 168, 42), "最初からやり直す")) game.Restart();
-        if (MenuButton(new Rect(card.x + 24, card.y + 316, card.width - 48, 42), "ステージ選択へ戻る (T)")) game.BackToTitle();
-        Label(new Rect(card.x, card.y + 372, card.width, 18), "ESCでも再開できます", S("pauseHint", 11, C(0x8fada4), TextAnchor.MiddleCenter));
+        if (MenuButton(new Rect(card.x + 24, card.y + 262, 168, 42), "再開 (Z)")) game.Resume();
+        if (MenuButton(new Rect(card.xMax - 24 - 168, card.y + 262, 168, 42), "最初からやり直す (X)")) game.Restart();
+        if (MenuButton(new Rect(card.x + 24, card.y + 316, card.width - 48, 42), "ステージ選択へ戻る (C)")) game.BackToTitle();
+        Label(new Rect(card.x, card.y + 372, card.width, 18), "ESC でも再開できます。明るさは V / B、音量は N / M で変えられます", S("pauseHint", 11, C(0x8fada4), TextAnchor.MiddleCenter));
     }
 
     bool MenuButton(Rect r, string text)
@@ -959,6 +1196,7 @@ public class NightHud : MonoBehaviour
     // プレイ中: 右下に小さなQRと、参加人数・参加中の色だけを出す。
     // QRは準備ができるまで「QRコードを作成中」と出し、読み取れないQRや途中で変わるQRは見せない。
     public static bool QrZoomOpen { get; private set; }
+    public static void ToggleQrZoom() => QrZoomOpen = !QrZoomOpen; // タイトル画面の N キー
     public static void DebugOpenQrZoom() => QrZoomOpen = true;   // 自動撮影(NightAutoShot)用
     public static void DebugCloseQrZoom() => QrZoomOpen = false;
     public static bool DebugQrWaiting; // 自動撮影用: QRの準備中の表示を出す
@@ -1037,7 +1275,7 @@ public class NightHud : MonoBehaviour
         const float qr = 196f, w = qr + 28f;
         int rows = Mathf.Max(1, (players.Count + 1) / 2);
         float h = 36f + qr + 22f + 34f + rows * 28f + 14f;
-        Rect r = new Rect(W - w - 16, 16, w, h);
+        Rect r = new Rect(W - w - 16, connectAtBottom ? H - h - 16 : sidePanelTop, w, h);
         Panel(r, PanelTex(), 9);
         Label(new Rect(r.x + 8, r.y + 8, r.width - 16, 24), "灯り役はスマホでQRを読み取り", S("qrHeadT", 13, C(0xdfffe0), TextAnchor.MiddleCenter, bold: true));
 
@@ -1048,7 +1286,7 @@ public class NightHud : MonoBehaviour
             if (hover) Fill(new Rect(qrRect.x - 3, qrRect.y - 3, qr + 6, qr + 6), C(0x9dffb0, 0.8f));
             GUI.DrawTexture(qrRect, qrTexture);
             if (canZoom && GUI.Button(qrRect, GUIContent.none, GUIStyle.none)) QrZoomOpen = true;
-            string sub = canZoom ? "クリックで拡大" : "";
+            string sub = canZoom ? "N / クリックで拡大" : "";
             // 5G用のURLが作れず(インターネットがない・cloudflared がない等)同じWi-Fi用のQRになった時は、そう伝える
             sub = (sub.Length > 0 ? sub + "・" : "") + (online ? "5G・どのWi-Fiからでも参加OK" : "同じWi-Fiにつないで参加");
             Label(new Rect(r.x + 4, qrRect.yMax + 3, r.width - 8, 16), sub, S("qrSubT", 10, C(0x98b6a8), TextAnchor.MiddleCenter));

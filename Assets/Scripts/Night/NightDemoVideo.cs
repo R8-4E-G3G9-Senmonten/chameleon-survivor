@@ -181,7 +181,7 @@ public class NightDemoVideo : MonoBehaviour
         yield return Wait(1.0f);
 
         // 2. 移動
-        Caption("移動する", "主人公は圧力マット(足踏み)で移動。トーチの灯りで足元だけが見える。目的は2つの石で蛍を集めて門から脱出");
+        Caption("移動する", "主人公は圧力マット(足踏み)で移動。トーチの灯りで足元だけが見える。目的は2つの石でホタルを集めて門から脱出");
         Vector3 start = g.PlayerPos;
         yield return WalkTo(start + new Vector3(0, 0, -7f), 3.5f);
         yield return WalkTo(start + new Vector3(0, 0, -2f), 2.5f);
@@ -247,7 +247,7 @@ public class NightDemoVideo : MonoBehaviour
         {
             Vector3 pp = new Vector3(plant.x, plant.height, plant.z);
             yield return Cut(() => Teleport(StandNear(pp, 3f)));
-            Caption("導きの花", "花に合計2秒光を当てると、まだ蛍のいる石までの道が光る。迷ったら花を探そう");
+            Caption("導きの花", "花に合計2秒光を当てると、まだホタルのいる石までの道が光る。迷ったら花を探そう");
             yield return Wait(0.6f);
             yield return AimAt(() => pp, 2.3f);
             AimAway();
@@ -260,12 +260,12 @@ public class NightDemoVideo : MonoBehaviour
         {
             var o = orbs[0];
             yield return Cut(() => Teleport(StandNear(o.Position, 3.2f)));
-            Caption("石を照らして蛍を集める", "石に光を合計2秒当てると、石の色が変わって蛍が集まってくる。触れると蛍を捕まえられる");
+            Caption("石を照らしてホタルを集める", "石に光を合計10秒当てると、石の色が変わってホタルが集まってくる。触れるとホタルを捕まえられる");
             yield return Wait(0.6f);
-            yield return AimAt(() => o.Position, 2.4f, () => o.materialized);
+            yield return AimAt(() => o.Position, 10.5f, () => o.materialized);
             AimAway();
             yield return Wait(0.4f);
-            Caption("蛍を捕まえると敵が増える", "蛍を捕まえたり回復したりすると「脅威レベル」が上がり、敵が増えて速く出てくる。後半ほど難しくなる");
+            Caption("ホタルを捕まえると敵が増える", "ホタルを捕まえたり回復したりすると「脅威レベル」が上がり、敵が増えて速く出てくる。後半ほど難しくなる");
             yield return WalkTo(o.Position, 3f, 0.4f);
             yield return Wait(3.0f);
         }
@@ -281,8 +281,8 @@ public class NightDemoVideo : MonoBehaviour
         {
             var o = orbs[1];
             yield return Cut(() => Teleport(StandNear(o.Position, 3.2f)));
-            Caption("2つ目の蛍で門が開く", "2つの石の蛍を捕まえると、スタート地点の門が開く");
-            yield return AimAt(() => o.Position, 2.4f, () => o.materialized);
+            Caption("2つ目のホタルで門が開く", "2つの石のホタルを捕まえると、スタート地点の門が開く");
+            yield return AimAt(() => o.Position, 10.5f, () => o.materialized);
             AimAway();
             yield return WalkTo(o.Position, 3f, 0.4f);
             yield return Wait(2.2f);

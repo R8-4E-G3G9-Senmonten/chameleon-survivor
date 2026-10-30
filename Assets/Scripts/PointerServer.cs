@@ -74,16 +74,17 @@ public class PointerServer : MonoBehaviour
     // 結果(viewState が "end" の間だけスマホに送る)
     bool resultWin;
     int resultTeamKills, resultSeconds;
+    bool viewTutorial; // 今のゲームがチュートリアルか(スマホは終わっても結果画面を出さず、そのまま本番を待つ)
     string resultMap = "";
 
     // Keyed by a per-page-load client id so multiple phones can each drive
     // their own light at once. Entries are pruned after a while of silence
     // so a long session with people joining/leaving doesn't leak memory.
     readonly Dictionary<string, PointerEntry> pointers = new Dictionary<string, PointerEntry>();
-    int nextColorIndex;
     const int MaxParticipants = 7; // これ以上は満員として新規参加を断る(誰か抜ければ空きが出る)
 
-    // 誰が見ても区別しやすい、はっきりした色の並び。参加した順に1人ずつ割り当てる(人数が多ければ循環する)。
+    // 誰が見ても区別しやすい、はっきりした色の並び。参加した人には、いま誰も使っていない色を前から順に割り当てる
+    // (参加者は最大7人・色は8色なので、同時に参加している人どうしで色がかぶることはない)。
     static readonly int[] Palette = { 0xff6b6b, 0x6bdfff, 0xffe066, 0xb388ff, 0x6bff95, 0xff9f6b, 0xff6bd6, 0x8c8cff };
     // スマホ画面の ColorNames と同じ並び(ゲーム画面にも色の名前を出す)
     static readonly string[] PaletteNames = { "赤", "水色", "黄色", "紫", "緑", "オレンジ", "ピンク", "青" };
@@ -106,12 +107,15 @@ public class PointerServer : MonoBehaviour
         }
     }
 
-    public void AddKill(string id)
+    // 数えられたら true(そのスマホがもう抜けていたら false。チームの撃破数もそのときは増やさない)
+    public bool AddKill(string id)
     {
-        if (string.IsNullOrEmpty(id)) return;
+        if (string.IsNullOrEmpty(id)) return false;
         lock (dataLock)
         {
-            if (pointers.TryGetValue(id, out PointerEntry entry)) entry.kills++;
+            if (!pointers.TryGetValue(id, out PointerEntry entry)) return false;
+            entry.kills++;
+            return true;
         }
     }
 
@@ -123,7 +127,7 @@ public class PointerServer : MonoBehaviour
         }
     }
 
-    public void SetGameView(Vector2 playerViewport, string state, bool win, int teamKills, int seconds, string map)
+    public void SetGameView(Vector2 playerViewport, string state, bool win, int teamKills, int seconds, string map, bool tutorial = false)
     {
         lock (dataLock)
         {
@@ -134,6 +138,7 @@ public class PointerServer : MonoBehaviour
             resultTeamKills = teamKills;
             resultSeconds = seconds;
             resultMap = map ?? "";
+            viewTutorial = tutorial;
         }
     }
 
@@ -147,7 +152,8 @@ public class PointerServer : MonoBehaviour
         string json = "{\"ok\":true,\"color\":\"" + HexOf(entry.colorIndex) + "\",\"kills\":" + entry.kills +
                ",\"st\":\"" + viewState + "\",\"play\":" + (viewState == "play" ? "true" : "false") +
                ",\"hit\":" + (entry.hasHit && Environment.TickCount - entry.lastHitMs < HitHoldMs ? "true" : "false") +
-               ",\"px\":" + viewPlayerX.ToString("0.00", ci) + ",\"py\":" + viewPlayerY.ToString("0.00", ci);
+               ",\"px\":" + viewPlayerX.ToString("0.00", ci) + ",\"py\":" + viewPlayerY.ToString("0.00", ci) +
+               (viewTutorial ? ",\"tut\":true" : "");
         if (viewState == "end")
         {
             // 灯り役の中での順位(撃破数の多い順。同じ数なら同じ順位)
@@ -230,6 +236,7 @@ public class PointerServer : MonoBehaviour
         public float x;
         public float y;
         public bool active;
+        public bool leave; // スマホの「終了する」: この人を参加者から外す
     }
 
     bool isDuplicate;
@@ -718,6 +725,28 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
     // 戻り値はスマホへ返すJSON(割り当てた色・倒した数・ゲームの様子)。満員で新規参加を断った場合は FullReply。
     string HandlePointerPost(string body) => HandlePointerPost(body, out _);
 
+    // 以前は参加するたびに色の番号を1つずつ進めていたため、抜けた人と入れ替わりで参加が続くと8色を一周し、
+    // まだ参加中の人と同じ色になることがあった。いま使われていない一番前の色を選ぶ。dataLock の中で呼ぶこと
+    int FreeColorIndex()
+    {
+        var used = new bool[Palette.Length];
+        foreach (var e in pointers.Values) used[((e.colorIndex % Palette.Length) + Palette.Length) % Palette.Length] = true;
+        for (int i = 0; i < used.Length; i++) if (!used[i]) return i;
+        return 0;
+    }
+
+    // 10秒以上何も届いていない人を外す(画面を閉じた・ページを読み直した人)。dataLock の中で呼ぶこと。
+    // GetActiveSamples でも同じように外すが、あちらはプレイ中にしか呼ばれないため、タイトル画面で参加し直したときにも外す
+    void PruneStale()
+    {
+        int now = Environment.TickCount;
+        List<string> stale = null;
+        foreach (var kv in pointers)
+            if (now - kv.Value.lastReceiveTimeMs > StaleMs) (stale ?? (stale = new List<string>())).Add(kv.Key);
+        if (stale != null) foreach (var key in stale) pointers.Remove(key);
+    }
+    const int StaleMs = 10000;
+
     string HandlePointerPost(string body, out string clientId)
     {
         clientId = null;
@@ -728,10 +757,13 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
             clientId = msg.id;
             lock (dataLock)
             {
+                // 「終了する」を押した人は、すぐ参加者から外す(色と参加枠を空ける)
+                if (msg.leave) { pointers.Remove(msg.id); return "{\"ok\":true,\"left\":true}"; }
                 if (!pointers.TryGetValue(msg.id, out PointerEntry entry))
                 {
+                    PruneStale(); // しばらく何も届いていない人(抜けた人)は先に外して、その色と枠を空ける
                     if (pointers.Count >= MaxParticipants) return FullReply; // 満員(最大7人)
-                    entry = new PointerEntry { colorIndex = nextColorIndex++ };
+                    entry = new PointerEntry { colorIndex = FreeColorIndex() };
                     pointers[msg.id] = entry;
                 }
                 entry.x = Mathf.Clamp01(msg.x);
@@ -958,7 +990,7 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
                 {
                     result.Add(new PointerSample { pos = new Vector2(kv.Value.x, kv.Value.y), color = ColorOf(kv.Value.colorIndex), id = kv.Key });
                 }
-                if (age > 10000)
+                if (age > StaleMs)
                 {
                     if (stale == null) stale = new List<string>();
                     stale.Add(kv.Key);
@@ -1180,6 +1212,8 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
   .resBtn:active { transform:scale(.97); }
   #btnSave { background:var(--c); color:#111; }
   #btnNext { background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-weight:700; }
+  #btnQuit { background:transparent; border:1px solid var(--line); color:var(--muted); font-weight:700; }
+  #leftOverlay { display:none; z-index:40; }
   #resNote { font-size:12px !important; }
   #debug { position:fixed; left:var(--s4); right:var(--s4); bottom:calc(var(--s2) + env(safe-area-inset-bottom)); z-index:21; text-align:center;
            font-size:12px; color:var(--warn); white-space:pre-wrap; pointer-events:none; }
@@ -1281,8 +1315,13 @@ Remove-Item -Path (""cert:\CurrentUser\My\"" + $cert.Thumbprint) -DeleteKey
     <svg class=""icon"" viewBox=""0 0 24 24"" aria-hidden=""true""><path d=""M12 3v12M7 10l5 5 5-5""/><path d=""M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2""/></svg>
     記念に画像を保存
   </button>
-  <button id=""btnNext"" class=""resBtn"" type=""button"">次のゲームも参加する</button>
+  <button id=""btnNext"" class=""resBtn"" type=""button"">続けてプレイする</button>
+  <button id=""btnQuit"" class=""resBtn"" type=""button"">終了する</button>
   <p id=""resNote"">次のゲームが始まると、この画面は自動で閉じます</p>
+</div>
+<div id=""leftOverlay"" class=""overlay"" role=""alert"">
+  <h1>おつかれさま！</h1>
+  <p>参加を終了しました。<br>このページは閉じて大丈夫です。</p>
 </div>
 <div id=""fullOverlay"" class=""overlay"" role=""alert"">
   <h1>満員です</h1>
@@ -1319,9 +1358,19 @@ function applyMyColor(hex) {
   colorNameEl.textContent = ColorNames[hex.toLowerCase()] || hex;
 }
 
-// One id per page load so the server can tell multiple simultaneous phones
+// One id per phone so the server can tell multiple simultaneous phones
 // apart and give each of them their own light.
-var clientId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+// ページを読み直しても同じ id を使い続ける(同じタブの間だけ)。読み直すたびに別人扱いになると、
+// 前の自分の分が10秒ほど残って色と参加枠を1つ使ってしまい、自分の色も変わってしまうため。
+var clientId = (function () {
+  var id = null;
+  try { id = sessionStorage.getItem('cameleonClientId'); } catch (e) {}
+  if (!id) {
+    id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    try { sessionStorage.setItem('cameleonClientId', id); } catch (e) {}
+  }
+  return id;
+})();
 
 // 画面が自動で消灯すると(特にAndroidで)Wi-Fiが省電力モードに入り、送信が数百ms単位で遅れることがある。
 // Screen Wake Lock で画面を点灯させ続けることで、この遅延スパイクをできるだけ避ける。
@@ -1497,7 +1546,7 @@ function onKills(n) {
 // ---- ゲームの様子(カメレオンの位置・プレイ中か) ----
 function onGameView(play, px, py) {
   gameStateEl.className = play ? 'play' : '';
-  gameStateEl.textContent = play ? 'ゲーム中' : 'ゲーム開始を待っています';
+  gameStateEl.textContent = play ? 'ゲーム中' : tutorialDone ? 'チュートリアルクリア！ 本番が始まるのを待っています' : 'ゲーム開始を待っています';
   mini.style.setProperty('--px', px);
   mini.style.setProperty('--py', py);
 }
@@ -1529,6 +1578,7 @@ function connectWs() {
   };
   ws.onclose = function () {
     wsReady = false; ws = null; updateNet();
+    if (leftGame) return; // 「終了する」を押した後はつなぎ直さない
     setTimeout(connectWs, 2000); // 切れたら2秒後につなぎ直す(その間はHTTPで送る)
   };
   ws.onerror = function () { /* onclose が続けて呼ばれるので、そこで再接続する */ };
@@ -1540,7 +1590,9 @@ setInterval(function () {
   offlineEl.classList.toggle('show', Date.now() - lastHeard > 5000);
 }, 1000);
 
+var leftGame = false; // 「終了する」を押した(もう送らない)
 function send(x, y, active, force) {
+  if (leftGame) return;
   var now = Date.now();
   // WebSocketなら約30回/秒、HTTPなら約20回/秒まで
   if (!force && now - last < (wsReady ? 33 : 50)) return;
@@ -1649,11 +1701,22 @@ function setHitting(on) {
 // 次のゲームが始まったら(「プレイ中」に戻ったら)自動で閉じる。ゲームの途中から参加した人にも出す。
 // 終わった後に開いた人(このゲームで遊んでいない人)には出さない。
 var lastSt = null, resultImage = null, resultData = null;
+var tutorialDone = false; // チュートリアルが終わって、本番を待っている
 var joinedNext = false; // 結果画面で「次のゲームも参加する」を押した(PCがまだ結果画面のあいだ、前の撃破数を出さない)
 function fmtTime(sec) { var m = Math.floor(sec / 60), s = sec % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
 function onGameState(d) {
   if (lastSt === 'end' && d.st !== 'end') { kills = 0; killNum.textContent = 0; joinedNext = false; } // 次のゲームは 0 から数える
-  if (d.st === 'end' && lastSt === 'play') showResult(d);
+  if (d.st === 'end' && lastSt === 'play') {
+    // チュートリアルが終わったときは結果画面を出さず、そのまま本番が始まるのを待つ(PCで難易度を選ぶと始まる)
+    if (d.tut) {
+      tutorialDone = true;
+      lightTouchId = null; setLight(false, 'チュートリアル終了');
+      gameStateEl.textContent = 'チュートリアルクリア！ 本番が始まるのを待っています';
+      toast('チュートリアルクリア！ このまま本番へ');
+    }
+    else showResult(d);
+  }
+  if (d.st === 'play') tutorialDone = false;
   if (d.st === 'play' && lastSt !== null && lastSt !== 'play') hideResult();
   lastSt = d.st;
 }
@@ -1727,6 +1790,26 @@ function saveResultImage() {
   toast('画像を保存しました');
 }
 $('btnSave').addEventListener('click', function (e) { e.preventDefault(); saveResultImage(); });
+// 「終了する」: 参加者から外してもらい、ページを閉じる。
+// ブラウザは、QRコードから開いたタブをページの側から閉じるのを許さないことが多い。閉じられなかったときは空白のページに切り替えて、
+// 画面からゲームを消す(戻るボタンで戻ると、また新しく参加できる)
+$('btnQuit').addEventListener('click', function (e) {
+  e.preventDefault();
+  if (leftGame) return;
+  leftGame = true;
+  if (typeof setHitting === 'function') setHitting(false);
+  var body = JSON.stringify({id:clientId, x:aimX, y:aimY, active:false, leave:true});
+  try { if (wsReady) ws.send(body); } catch (err) {}
+  try { fetch('/pointer', {method:'POST', headers:{'Content-Type':'application/json'}, body:body, keepalive:true}).catch(function () {}); } catch (err) {}
+  try { sessionStorage.removeItem('cameleonClientId'); } catch (err) {}
+  hideResult();
+  $('leftOverlay').style.display = 'flex';
+  setTimeout(function () {
+    try { if (ws) ws.close(); } catch (err) {}
+    window.close();
+    setTimeout(function () { location.replace('about:blank'); }, 400);
+  }, 1500);
+});
 $('btnNext').addEventListener('click', function (e) {
   e.preventDefault();
   hideResult();

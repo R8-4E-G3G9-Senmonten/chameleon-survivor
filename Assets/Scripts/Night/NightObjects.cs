@@ -156,11 +156,15 @@ public class NightGuidePlant
 }
 
 // 蛍の石。光を当てた時間がたまるほど石が灰色から石の色(青/金)に変わり、まわりから蛍が1匹ずつ飛んでくる。
-// 合計2秒照らすと蛍の群れがそろい(materialized)、主人公が触れると蛍が主人公に飛び込んで捕まえられる(collected)。
+// 1人で合計10秒照らすと(何人かで照らすとそのぶん早く)蛍の群れがそろい(materialized)、主人公が触れると蛍が主人公に飛び込んで捕まえられる(collected)。
 // 照らした時間はたまっていく(光を外しても減らない)。
 public class NightOrb
 {
-    public const float RevealTime = 2f, LightRadius = 3.2f;
+    public const float LightRadius = 3.2f;
+    // 蛍が集まるまでに照らす時間。本番もチュートリアルも1人で10秒で、照らす人が増えるほど早くたまる(2人なら5秒)
+    const float GameRevealTime = 10f, PracticeRevealTime = 10f;
+    public readonly float RevealTime;
+    readonly bool practice;
     const int FireflyCount = 14;
     const float StoneHeight = 1.15f, SwarmY = 1.9f, PickupRadius = 1.6f;
     static readonly Color StoneGray = NightMeshes.Hex(0x4a5352), FireflyGreen = NightMeshes.Hex(0xe4ff7a);
@@ -170,12 +174,15 @@ public class NightOrb
     public readonly float baseY;
     public bool collected, materialized;
     public float reveal;
-    float phase, fxTimer, flyAway;
+    float phase, fxTimer, chargeSfxTimer, flyAway;
 
     public readonly Transform root;
     readonly Transform swarm;
     readonly Material stoneMat, fireflyMat, glowMat, ringMat;
     readonly Transform ring;
+    readonly Transform beam;
+    readonly Material beamMat;
+    const float BeamHeight = 9f, BaseGlow = 0.6f; // 光の柱の高さ・照らす前から石が出しているほのかな光
     readonly Light light;
 
     // 蛍1匹ずつの動き
@@ -189,6 +196,8 @@ public class NightOrb
     public NightOrb(NightWorld w, float x, float z, float baseY, Color color, int index)
     {
         this.index = index; this.color = color; this.baseY = baseY;
+        practice = w.Map.Id == NightMap.PracticeId;
+        RevealTime = practice ? PracticeRevealTime : GameRevealTime;
         phase = Random.value * Mathf.PI * 2f;
         root = new GameObject("FireflyStone").transform;
         root.SetParent(w.Root, false);
@@ -223,9 +232,13 @@ public class NightOrb
             st.localScale = new Vector3(1.5f, StoneHeight, 1.3f);
         }
 
-        ringMat = NightMeshes.Unlit(new Color(color.r, color.g, color.b, 0.25f));
-        ring = w.RingObject(0.95f, 1.08f, ringMat, root, new Vector3(0, 0.08f, 0), 40).transform;
-        light = NightWorld.PointLight(root, new Vector3(0, SwarmY, 0), Color.Lerp(FireflyGreen, color, 0.3f), 0f, 5f);
+        // 足元の輪は太く明るめにして、ゆっくり脈打たせる(暗い森でも「ここが石」と分かるように)
+        ringMat = NightMeshes.Unlit(new Color(color.r, color.g, color.b, 0.55f));
+        ring = w.RingObject(0.95f, 1.25f, ringMat, root, new Vector3(0, 0.08f, 0), 40).transform;
+        light = NightWorld.PointLight(root, new Vector3(0, SwarmY, 0), Color.Lerp(FireflyGreen, color, 0.3f), BaseGlow, 5f);
+        // 石の色の光の柱。遠くからでも石の場所が分かる。ホタルを捕まえたら消える
+        beamMat = NightMeshes.Unlit(new Color(color.r, color.g, color.b, 0.12f));
+        beam = w.Cylinder(0, BeamHeight / 2f, 0, 0.55f, BeamHeight, beamMat, root).transform;
 
         // 蛍(光る小さな粒 + ぼんやりした光の輪)。最初は遠くにいて見えない
         swarm = new GameObject("Fireflies").transform;
@@ -270,24 +283,26 @@ public class NightOrb
                 flies[i].localScale = Vector3.one * (1f - t * 0.8f);
             }
             light.intensity = 1.2f * (1f - flyAway);
+            beam.gameObject.SetActive(false);
             if (flyAway >= 1f) swarm.gameObject.SetActive(false);
             return;
         }
 
         Vector3 lt = g.NearestLightTargetTo(p0);
         float distToLight = Mathf.Sqrt((p0.x - lt.x) * (p0.x - lt.x) + (p0.z - lt.z) * (p0.z - lt.z));
-        bool beingLit = distToLight < LightRadius && Mathf.Abs(lt.y - baseY) < 1.8f;
+        bool beingLit = g.OrbsActive && distToLight < LightRadius && Mathf.Abs(lt.y - baseY) < 1.8f;
 
         if (!materialized)
         {
-            if (beingLit) reveal = Mathf.Min(RevealTime, reveal + dt); // 外しても減らない(蓄積)
+            if (beingLit) reveal = Mathf.Min(RevealTime, reveal + dt * LightsOn(g, p0)); // 外しても減らない(蓄積)
             if (beingLit && NightGame.FxTick(ref fxTimer, dt, 0.16f)) SurvivorBurst.Spawn(p0 + Vector3.up * 0.9f, Color.Lerp(color, Color.white, 0.4f), 2);
-            if (beingLit && Random.value < dt * 3f) g.Audio.PlayHitBuzz();
+            // ホタルチャージ中: 照らしている間「ピッ、ピッ」と鳴り、たまるほど音が高くなる
+            if (beingLit && NightGame.FxTick(ref chargeSfxTimer, dt, 0.13f)) g.Audio.PlayOrbCharge(reveal / RevealTime);
             if (reveal >= RevealTime)
             {
                 materialized = true;
-                g.ShowToast("蛍が集まった！触れて捕まえよう");
-                g.Audio.PlayDownChime();
+                g.ShowToast("ホタルが集まった！触れて捕まえよう");
+                g.Audio.PlayOrbReady(); // ホタルチャージ完了
             }
         }
         float p = reveal / RevealTime;
@@ -324,7 +339,24 @@ public class NightOrb
                 g.OnOrbCollected(this);
             }
         }
-        else light.intensity = p * 0.9f;
+        else
+        {
+            light.intensity = BaseGlow + p * 0.9f;
+            ring.localScale = Vector3.one * (1f + Mathf.Sin(phase * 2f) * 0.08f);
+        }
+        // 光の柱はゆっくり明るくなったり暗くなったりする。たまるほど明るい
+        Color bc = beamMat.color;
+        bc.a = (0.09f + 0.05f * Mathf.Sin(phase * 1.8f)) * (1f + p);
+        beamMat.color = bc;
+    }
+
+    // 石を照らしている光の本数(照らす人数が多いほど早くゲージがたまる)
+    int LightsOn(NightGame g, Vector3 p0)
+    {
+        int n = 0;
+        foreach (var t in g.LightTargets)
+            if ((p0.x - t.x) * (p0.x - t.x) + (p0.z - t.z) * (p0.z - t.z) < LightRadius * LightRadius && Mathf.Abs(t.y - baseY) < 1.8f) n++;
+        return Mathf.Max(1, n);
     }
 
     // 石の色: 照らすほど灰色 → 石の色。光り方は glow 倍
@@ -343,7 +375,7 @@ public class NightGate
     readonly Transform[] hinges = new Transform[2];
     readonly int[] sides = { -1, 1 };
     readonly Material[] socketMats = new Material[2];
-    readonly Color[] socketColors = { NightMeshes.Hex(0x78c8ff), NightMeshes.Hex(0xffcf65) };
+    readonly Color[] socketColors = { NightMeshes.Hex(0xffcf65), NightMeshes.Hex(0xffcf65) };
     readonly GameObject beam;
     readonly Material goalLineMat;
     readonly Light goalLight;
