@@ -10,9 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
 <style>
-/* レイアウト: 大同生命のサイトを参考にした、白地にコーポレートブルーの1段組。
-   上に小さな青い丸ボタンと「文字サイズ 中/大」、お知らせは色付きの四角ラベル＋日付の行、
-   案内は「左に見出し・右に薄い青灰色のパネル」の2段。見出しは丸い矢印アイコン付きの左寄せ。明るい配色だけで作る */
+/* レイアウト: 白地にコーポレートブルー(大同生命のサイトを参考)。左に常に見える目次、右に本文の2段組。
+   スマホでは目次を上の固定バーに畳む。見出しは丸い矢印アイコン付きの左寄せ。明るい配色だけで作る */
 :root {
   --bg: #ffffff;
   --panel: #f2f6fa;
@@ -31,6 +30,7 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+@media (max-width: 900px) { html { scroll-padding-top: 64px; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 16px; line-height: 1.9; margin: 0; padding-block: 0; }
 a { color: var(--blue); }
@@ -41,72 +41,56 @@ p { margin: 0; }
 ul, ol { margin: 0; padding-left: 1.4em; }
 li + li { margin-top: 0.3em; }
 .wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-:root.lg .zoomable { zoom: 1.15; }
 
-/* 丸い矢印アイコン(青い丸に白の「>」) */
-.ico { display: inline-grid; place-items: center; width: 1.25em; height: 1.25em; border-radius: 50%; background: var(--blue); flex: none; }
-.ico::before { content: ""; width: 0.32em; height: 0.32em; border-top: 2px solid #fff; border-right: 2px solid #fff; transform: translateX(-0.06em) rotate(45deg); }
-
-/* ヘッダー */
-.site-head { border-bottom: 1px solid var(--line); }
-.site-head .wrap { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 32px; align-items: center; padding-block: 14px 10px; }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
-.brand .mark { width: 38px; height: 38px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; }
-.brand b { display: block; font-size: 19px; line-height: 1.25; }
+/* ヘッダー(ブランドだけ。スマホでは目次ボタンも入れて上に固定) */
+.site-head { border-bottom: 1px solid var(--line); padding: 12px max(16px, env(safe-area-inset-left, 0px)); display: flex; align-items: center; gap: 12px; background: var(--bg); }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); min-width: 0; }
+.brand .mark { width: 36px; height: 36px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; flex: none; }
+.brand b { display: block; font-size: 18px; line-height: 1.25; }
 .brand small { display: block; font-size: 11px; color: var(--sub); }
-.head-right { display: grid; gap: 8px; justify-items: end; min-width: 0; }
-.util { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; background: var(--blue); color: #fff; text-decoration: none; font-weight: 700; border: 2px solid var(--blue); line-height: 1.4; }
-.btn:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
-.btn.sm { font-size: 12px; padding: 5px 14px; min-height: 32px; }
-.btn.lg { font-size: 16px; padding: 14px 24px; min-height: 60px; width: 100%; }
-.btn.outline { background: #fff; color: var(--blue); }
-.btn.outline:hover { background: var(--blue-soft); }
-.fontsize { display: inline-flex; align-items: center; gap: 4px; background: var(--panel); border-radius: 999px; padding: 3px 4px 3px 12px; font-size: 12px; color: var(--sub); }
-.fontsize button { font: inherit; font-size: 13px; font-weight: 700; width: 28px; height: 28px; border-radius: 50%; border: 0; background: transparent; color: var(--text); cursor: pointer; }
-.fontsize button[aria-pressed="true"] { background: var(--blue); color: #fff; }
-.gnav { display: flex; flex-wrap: wrap; gap: 4px 22px; justify-content: flex-end; }
-.gnav a { color: var(--text); text-decoration: none; font-size: 14px; font-weight: 700; }
-.gnav a:hover { color: var(--blue); text-decoration: underline; }
-@media (max-width: 760px) {
-  .site-head .wrap { grid-template-columns: 1fr; }
-  .head-right, .util, .gnav { justify-items: start; justify-content: flex-start; }
+
+/* 目次 */
+.toc-list ol { list-style: none; margin: 0 0 14px; padding: 0; }
+.toc-list li { margin: 0; }
+.toc-list a { display: block; padding: 6px 12px; border-left: 3px solid transparent; color: var(--text); text-decoration: none; font-size: 14px; line-height: 1.5; }
+.toc-list a:hover { color: var(--blue); background: var(--blue-soft); }
+.toc-list a[aria-current="true"] { border-left-color: var(--blue); color: var(--blue); background: var(--blue-soft); font-weight: 700; }
+.toc-title { font-weight: 700; color: var(--blue); font-size: 15px; margin-bottom: 10px; padding-left: 12px; }
+.toc-group { font-size: 12px; color: var(--sub); font-weight: 700; padding: 0 12px 2px; }
+.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; max-height: 100dvh; overflow-y: auto; padding: 24px 8px 24px 0; border-right: 1px solid var(--line); }
+.toc-mobile { display: none; }
+
+/* 本文 */
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; max-width: 1200px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 860px; min-width: 0; display: grid; gap: 72px; padding-block: 32px 120px; }
+@media (max-width: 900px) {
+  .site-head { position: sticky; top: 0; z-index: 20; padding-block: 8px; }
+  .brand small { display: none; }
+  .brand b { font-size: 15px; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .toc { display: none; }
+  .toc-mobile { display: block; margin-left: auto; min-width: 0; }
+  .toc-mobile summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; min-height: 44px; }
+  .toc-mobile summary::-webkit-details-marker { display: none; }
+  .toc-btn { background: var(--blue); color: #fff; font-weight: 700; font-size: 14px; padding: 6px 16px; border-radius: 999px; flex: none; }
+  .toc-btn::after { content: " ▾"; }
+  .toc-mobile[open] .toc-btn::after { content: " ▴"; }
+  .toc-current { font-size: 13px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 9em; }
+  .toc-mobile .toc-list { position: absolute; left: 0; right: 0; top: 100%; background: var(--bg); border-bottom: 2px solid var(--blue); box-shadow: 0 8px 16px rgba(0,0,0,.12); max-height: calc(100dvh - 70px); overflow-y: auto; padding: 14px max(16px, env(safe-area-inset-left, 0px)) 6px; }
+  .toc-mobile .toc-list ol { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .toc-mobile .toc-list a { min-height: 44px; display: flex; align-items: center; }
 }
 
 /* 表紙 */
-.kv { background: linear-gradient(90deg, var(--bg) 0 55%, var(--panel) 55% 100%); }
-.kv .wrap { padding-block: 56px 48px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px 56px; align-items: center; }
+.kv { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px 36px; align-items: start; border-bottom: 2px solid var(--blue); padding-bottom: 32px; }
 .kv-text { display: grid; gap: 14px; min-width: 0; }
-.kv-side { background: #fff; border-top: 4px solid var(--blue); padding: 18px 22px; display: grid; gap: 8px; min-width: 0; font-size: 15px; }
+.kv-side { background: var(--panel); border-top: 4px solid var(--blue); padding: 18px 22px; display: grid; gap: 8px; min-width: 0; font-size: 15px; }
 .kv-side-ttl { font-weight: 700; color: var(--blue); }
-@media (max-width: 760px) { .kv .wrap { grid-template-columns: 1fr; } .kv-side { background: var(--panel); } }
-.kv h1 { font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.4; letter-spacing: 0.08em; font-weight: 400; }
+.kv h1 { font-size: clamp(1.8rem, 4.4vw, 2.6rem); line-height: 1.4; letter-spacing: 0.06em; font-weight: 400; }
 .kv h1 small { display: block; font-size: 0.42em; letter-spacing: 0.2em; color: var(--blue); font-weight: 700; margin-top: 8px; }
-.kv p { max-width: 36em; color: var(--sub); }
-@media (max-width: 760px) { .kv { background: var(--bg); } }
-
-/* お知らせの行(色付きの四角ラベル＋日付＋本文) */
-.news { border-top: 1px solid var(--line); }
-.news-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); border-bottom: 1px solid var(--line); }
-.news-row .label { background: var(--blue); color: #fff; font-weight: 700; font-size: 14px; padding: 8px 16px; display: flex; align-items: center; }
-.news-row.important .label { background: var(--red); }
-.news-row .body { padding: 8px 18px; font-size: 15px; display: flex; flex-wrap: wrap; gap: 0 16px; align-items: center; }
-.news-row time { color: var(--sub); white-space: nowrap; }
-@media (max-width: 600px) { .news-row { grid-template-columns: 1fr; } }
-
-/* 案内(左に見出し・右にパネル) */
-.guide { padding-block: 40px 16px; display: grid; gap: 28px; }
-.guide-row { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px; align-items: start; }
-.guide-row > h2 { display: flex; align-items: center; gap: 10px; font-size: 1.35rem; padding-top: 18px; }
-.guide-panel { background: var(--panel); padding: 22px 26px; display: grid; gap: 14px; }
-.guide-panel .ttl { text-align: center; font-weight: 700; }
-.btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-.btn-grid .btn { min-height: 52px; font-size: 15px; padding: 10px 18px; }
-@media (max-width: 760px) { .guide-row { grid-template-columns: 1fr; } .guide-row > h2 { padding-top: 0; } }
-
-/* 本文 */
-.content { padding-block: 24px 120px; }
-main { max-width: 900px; margin: 0 auto; min-width: 0; display: grid; gap: 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.kv p { color: var(--sub); }
+.kv-how { color: var(--text) !important; font-size: 15px; }
+@media (max-width: 1100px) { .kv { grid-template-columns: 1fr; } }
 section { display: grid; gap: 20px; }
 .sec-head { display: grid; gap: 6px; padding-top: 24px; border-bottom: 2px solid var(--blue); padding-bottom: 10px; }
 .sec-head h2 { font-size: 1.6rem; display: flex; align-items: center; gap: 12px; }
@@ -216,106 +200,102 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space:
 .refs span { font-size: 14px; color: var(--sub); }
 .refs .url { font-family: var(--mono); font-size: 12px; color: var(--blue); overflow-wrap: anywhere; }
 
+@media (max-width: 900px) { .qa-tools { top: 61px; } }
+
 footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
 
-.to-top { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; text-decoration: none; font-weight: 700; font-size: 12px; z-index: 10; }
-.to-top:hover { background: var(--blue-dark); }
 </style>
 </head>
 <body>
 
 <header class="site-head" id="top">
-  <div class="wrap">
-    <a class="brand" href="#top"><span class="mark" aria-hidden="true">カ</span><span><b>カメサバ説明ガイド</b><small>専門展 説明担当用</small></span></a>
-    <div class="head-right">
-      <div class="util">
-        <a class="btn sm" href="#qa">想定Q&amp;A</a>
-        <a class="btn sm" href="#trouble">当日のトラブル</a>
-        <span class="fontsize" role="group" aria-label="文字サイズ">文字サイズ
-          <button type="button" id="fsMid" aria-pressed="true">中</button>
-          <button type="button" id="fsLg" aria-pressed="false">大</button>
-        </span>
-      </div>
-      <nav class="gnav" aria-label="メニュー">
-        <a href="#start">最初に覚えること</a>
-        <a href="#system">全体の構成</a>
-        <a href="#mat">仕組み</a>
-        <a href="#dev">開発の話</a>
-        <a href="#words">用語</a>
-        <a href="#refs">参考サイト</a>
-      </nav>
-    </div>
-  </div>
+  <a class="brand" href="#top"><span class="mark" aria-hidden="true">カ</span><span><b>カメサバ説明ガイド</b><small>専門展 説明担当用</small></span></a>
+  <details class="toc-mobile" id="tocMobile">
+    <summary><span class="toc-btn">目次</span><span class="toc-current" id="tocCurrent">最初に覚えること</span></summary>
+    <nav class="toc-list" aria-label="目次(スマホ)">
+        <p class="toc-group">まずはここから</p>
+        <ol>
+          <li><a href="#start">最初に覚えること</a></li>
+          <li><a href="#aim">展示での意図</a></li>
+          <li><a href="#system">全体の構成</a></li>
+        </ol>
+        <p class="toc-group">仕組み</p>
+        <ol>
+          <li><a href="#mat">圧力マットとESP32</a></li>
+          <li><a href="#phone">スマホが懐中電灯になる仕組み</a></li>
+          <li><a href="#light">光の当たり判定</a></li>
+          <li><a href="#camo">擬態</a></li>
+          <li><a href="#enemy">敵のAI</a></li>
+          <li><a href="#model">3Dモデルと動き</a></li>
+          <li><a href="#balance">難しさとスコア</a></li>
+        </ol>
+        <p class="toc-group">本番の準備</p>
+        <ol>
+          <li><a href="#dev">作り方の工夫</a></li>
+          <li><a href="#stories">苦労した話</a></li>
+          <li><a href="#qa">想定Q&amp;A</a></li>
+          <li><a href="#trouble">当日のトラブル</a></li>
+          <li><a href="#words">用語ミニ辞典</a></li>
+        </ol>
+        <p class="toc-group">その他</p>
+        <ol>
+          <li><a href="#refs">参考にしたサイト</a></li>
+        </ol>
+    </nav>
+  </details>
 </header>
-<div class="zoomable">
-<div class="kv">
-  <div class="wrap">
-    <div class="kv-text">
-      <h1>カメレオンサバイバー<small>技術説明ガイド</small></h1>
-      <p>このページは、専門展で技術の説明を担当する班員のための資料です。読み終えた班員の誰もが、「このゲームがどうやって動いているのか」を自分の言葉で説明でき、来場者の質問にも答えられることを目標にしています。</p>
-    </div>
-    <div class="kv-side">
-      <div class="kv-side-ttl">一言で言うと</div>
-      <p>カメレオン役の1人が足元のマットを踏んで歩き、ほかの来場者がスマホを懐中電灯にして敵を照らし、全員で協力して夜の森から脱出するゲームです。</p>
-      <ul>
-        <li>ゲーム本体は Unity 6 で作り、C# で書いています。</li>
-        <li>マットの状態は、マイコンの ESP32 がUSBシリアル通信でパソコンに送ります。</li>
-        <li>スマホはQRコードを読むだけで参加でき、最大7人まで遊べます。</li>
-      </ul>
-    </div>
-  </div>
-</div>
-<div class="wrap">
-  <div class="news">
-    <div class="news-row important"><div class="label">大切なこと</div><div class="body">「最初に覚えること」の表と30秒の話す例は、班の全員が言えるようにしておいてください。<a href="#start">くわしく</a></div></div>
-    <div class="news-row"><div class="label">読み方</div><div class="body">まず「最初に覚えること」と「展示での意図」を読み(約5分)、次に自分が担当するテーマの章を読み、最後に「想定Q&amp;A」で答える練習をしてください。</div></div>
-    <div class="news-row"><div class="label">このページについて</div><div class="body">このページの内容は、<time>2026年10月31日</time>時点の最新版(最新コミット <code>51d4542</code>、10月31日)のプログラムをもとにしています。</div></div>
-  </div>
-  <div class="guide">
-    <div class="guide-row">
-      <h2><span class="ico" aria-hidden="true"></span>まずはここから</h2>
-      <div class="guide-panel">
-        <div class="ttl">説明の土台になる3つ</div>
-        <div class="btn-grid">
-          <a class="btn lg" href="#start">最初に覚えること</a>
-          <a class="btn lg" href="#aim">展示での意図</a>
-          <a class="btn lg" href="#system">全体の構成</a>
-        </div>
-      </div>
-    </div>
-    <div class="guide-row">
-      <h2><span class="ico" aria-hidden="true"></span>仕組みを知る</h2>
-      <div class="guide-panel">
-        <div class="ttl">担当のテーマを選ぶ</div>
-        <div class="btn-grid">
-          <a class="btn outline" href="#mat">圧力マットとESP32</a>
-          <a class="btn outline" href="#phone">スマホが懐中電灯に</a>
-          <a class="btn outline" href="#light">光の当たり判定</a>
-          <a class="btn outline" href="#camo">擬態</a>
-          <a class="btn outline" href="#enemy">敵のAI</a>
-          <a class="btn outline" href="#model">3Dモデルと動き</a>
-          <a class="btn outline" href="#balance">難しさとスコア</a>
-        </div>
-      </div>
-    </div>
-    <div class="guide-row">
-      <h2><span class="ico" aria-hidden="true"></span>本番の準備</h2>
-      <div class="guide-panel">
-        <div class="ttl">当日までに練習する</div>
-        <div class="btn-grid">
-          <a class="btn" href="#qa">想定Q&amp;Aで練習</a>
-          <a class="btn" href="#stories">苦労した話</a>
-          <a class="btn outline" href="#dev">作り方の工夫</a>
-          <a class="btn outline" href="#trouble">当日のトラブル</a>
-          <a class="btn outline" href="#words">用語ミニ辞典</a>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<div class="content">
-
+<div class="layout">
+  <aside class="toc" aria-label="目次">
+    <nav class="toc-list">
+      <p class="toc-title">目次</p>
+        <p class="toc-group">まずはここから</p>
+        <ol>
+          <li><a href="#start">最初に覚えること</a></li>
+          <li><a href="#aim">展示での意図</a></li>
+          <li><a href="#system">全体の構成</a></li>
+        </ol>
+        <p class="toc-group">仕組み</p>
+        <ol>
+          <li><a href="#mat">圧力マットとESP32</a></li>
+          <li><a href="#phone">スマホが懐中電灯になる仕組み</a></li>
+          <li><a href="#light">光の当たり判定</a></li>
+          <li><a href="#camo">擬態</a></li>
+          <li><a href="#enemy">敵のAI</a></li>
+          <li><a href="#model">3Dモデルと動き</a></li>
+          <li><a href="#balance">難しさとスコア</a></li>
+        </ol>
+        <p class="toc-group">本番の準備</p>
+        <ol>
+          <li><a href="#dev">作り方の工夫</a></li>
+          <li><a href="#stories">苦労した話</a></li>
+          <li><a href="#qa">想定Q&amp;A</a></li>
+          <li><a href="#trouble">当日のトラブル</a></li>
+          <li><a href="#words">用語ミニ辞典</a></li>
+        </ol>
+        <p class="toc-group">その他</p>
+        <ol>
+          <li><a href="#refs">参考にしたサイト</a></li>
+        </ol>
+    </nav>
+  </aside>
   <main>
+    <div class="kv">
+      <div class="kv-text">
+        <h1>カメレオンサバイバー<small>技術説明ガイド</small></h1>
+        <p>このページは、専門展で技術の説明を担当する班員のための資料です。読み終えた班員の誰もが、「このゲームがどうやって動いているのか」を自分の言葉で説明でき、来場者の質問にも答えられることを目標にしています。</p>
+        <p class="kv-how"><b>読み方</b>: まず「最初に覚えること」と「展示での意図」を読み(約5分)、次に自分が担当するテーマの章を読み、最後に「想定Q&amp;A」で答える練習をしてください。「最初に覚えること」の表と30秒の話す例は、班の全員が言えるようにしておいてください。</p>
+        <p class="note">このページの内容は、<time>2026年10月31日</time>時点の最新版(最新コミット <code>51d4542</code>)のプログラムをもとにしています。</p>
+      </div>
+      <div class="kv-side">
+        <div class="kv-side-ttl">一言で言うと</div>
+        <p>カメレオン役の1人が足元のマットを踏んで歩き、ほかの来場者がスマホを懐中電灯にして敵を照らし、全員で協力して夜の森から脱出するゲームです。</p>
+        <ul>
+          <li>ゲーム本体は Unity 6 で作り、C# で書いています。</li>
+          <li>マットの状態は、マイコンの ESP32 がUSBシリアル通信でパソコンに送ります。</li>
+          <li>スマホはQRコードを読むだけで参加でき、最大7人まで遊べます。</li>
+        </ul>
+      </div>
+    </div>
 
     <!-- 00 -->
     <section id="start">
@@ -1170,8 +1150,8 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
         <p class="lead">このページの見た目は、次のサイトを参考にしました。</p>
       </div>
       <div class="refs">
-        <a href="https://www.daido-life.co.jp/" target="_blank" rel="noopener"><b>大同生命 公式サイト</b><span>白地に青の配色、上の小さな丸ボタンと「文字サイズ 中/大」、色付きの四角ラベルのお知らせ行、左に見出し・右に青灰色のパネルの案内、丸い矢印アイコンの見出しを参考にしました(ロゴや社名は使っていません)。</span><span class="url">https://www.daido-life.co.jp/</span></a>
-        <a href="https://www.jcom.co.jp/" target="_blank" rel="noopener"><b>J:COM 公式サイト</b><span>カード型の案内ボタンの並べ方を参考にしました(前のデザインの参考)。</span><span class="url">https://www.jcom.co.jp/</span></a>
+        <a href="https://www.daido-life.co.jp/" target="_blank" rel="noopener"><b>大同生命 公式サイト</b><span>白地に青の配色と、丸い矢印アイコン付きの見出しを参考にしました(ロゴや社名は使っていません)。</span><span class="url">https://www.daido-life.co.jp/</span></a>
+        <a href="https://www.jcom.co.jp/" target="_blank" rel="noopener"><b>J:COM 公式サイト</b><span>前のデザインで、案内ボタンの並べ方を参考にしました。</span><span class="url">https://www.jcom.co.jp/</span></a>
         <a href="https://design.digital.go.jp/" target="_blank" rel="noopener"><b>デジタル庁デザインシステム</b><span>日本語を読みやすくする行間や、文字と背景の色の差の考え方を参考にしました。</span><span class="url">https://design.digital.go.jp/</span></a>
       </div>
     </section>
@@ -1181,8 +1161,6 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
     </footer>
   </main>
 </div>
-</div>
-<a class="to-top" href="#top" aria-label="ページの上へ戻る">上へ</a>
 
 <script>
 (function () {
@@ -1351,20 +1329,31 @@ footer { color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); 
 })();
 
 
-// ---- 文字サイズ 中/大(この端末にだけ覚える) ----
+// ---- 目次: 今読んでいる章に印を付ける。スマホの目次は選んだら閉じる ----
 (function () {
-  var mid = document.getElementById('fsMid'), lg = document.getElementById('fsLg');
-  function set(big) {
-    document.documentElement.classList.toggle('lg', big);
-    mid.setAttribute('aria-pressed', String(!big));
-    lg.setAttribute('aria-pressed', String(big));
-    try { localStorage.setItem('guideFontLg', big ? '1' : '0'); } catch (e) {}
+  var links = document.querySelectorAll('.toc-list a');
+  var cur = document.getElementById('tocCurrent');
+  var mobile = document.getElementById('tocMobile');
+  var sections = Array.prototype.map.call(document.querySelectorAll('.toc .toc-list a'), function (a) {
+    return document.getElementById(a.getAttribute('href').slice(1));
+  });
+  function update() {
+    var y = window.innerHeight * 0.3, active = sections[0];
+    sections.forEach(function (sec) { if (sec && sec.getBoundingClientRect().top <= y) active = sec; });
+    var id = active ? active.id : '';
+    Array.prototype.forEach.call(links, function (a) {
+      var on = a.getAttribute('href') === '#' + id;
+      if (on) { a.setAttribute('aria-current', 'true'); if (cur) cur.textContent = a.textContent; }
+      else a.removeAttribute('aria-current');
+    });
   }
-  mid.addEventListener('click', function () { set(false); });
-  lg.addEventListener('click', function () { set(true); });
-  var saved = null;
-  try { saved = localStorage.getItem('guideFontLg'); } catch (e) {}
-  if (saved === '1') set(true);
+  // 章は16個だけなので、スクロールのたびにそのまま調べても軽い
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update);
+  Array.prototype.forEach.call(document.querySelectorAll('#tocMobile a'), function (a) {
+    a.addEventListener('click', function () { mobile.open = false; });
+  });
+  update();
 })();
 </script>
 </body>
