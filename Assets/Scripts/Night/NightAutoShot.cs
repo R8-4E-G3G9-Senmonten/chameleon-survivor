@@ -28,6 +28,7 @@ public class NightAutoShot : MonoBehaviour
         if (System.Array.IndexOf(args, "-nightCamoTest") >= 0) { StartCoroutine(CamoTest()); return; }
         if (System.Array.IndexOf(args, "-nightGaugeTest") >= 0) { StartCoroutine(GaugeTest()); return; }
         if (System.Array.IndexOf(args, "-nightEnemyGallery") >= 0) { StartCoroutine(EnemyGallery()); return; }
+        if (System.Array.IndexOf(args, "-nightPropPhotos") >= 0) { StartCoroutine(PropPhotos()); return; }
         if (System.Array.IndexOf(args, "-nightSpriteTest") >= 0) { StartCoroutine(SpriteTest()); return; }
         if (System.Array.IndexOf(args, "-nightBench") >= 0) { StartCoroutine(Bench()); return; }
         if (System.Array.IndexOf(args, "-nightEndNameTest") >= 0) { StartCoroutine(EndNameTest()); return; }
@@ -335,6 +336,131 @@ public class NightAutoShot : MonoBehaviour
                 if (reach[i] < 0f) Debug.Log("NightAutoShot: sprite map " + id + " stuck#" + i + " pos=" + list[i].Position);
         }
         Application.Quit();
+    }
+
+    // 発表資料用の写真: 花・蛍の石・門・ランタンを1つずつ、背景なし(透明PNG)で撮る。
+    // 写したい物の部品だけを空きレイヤーに移し、そのレイヤーだけを写す撮影用カメラで描く
+    IEnumerator PropPhotos()
+    {
+        yield return new WaitForSeconds(1f);
+        g.SelectMap("A");
+        yield return new WaitForSeconds(0.5f);
+        g.BeginPlay("テスト");
+        yield return new WaitForSeconds(0.5f);
+
+        // 1つ目の石を照らして、蛍が集まった状態にする(触れないので捕まえはしない)
+        var orb = g.World.Orbs[0];
+        Teleport(orb.Position + new Vector3(0, 0, 5f));
+        yield return new WaitForSeconds(1f);
+        yield return AimAt(() => orb.Position, 3f);
+        g.Flashlight.DebugAim = new Vector2(0.9f, 0.1f);
+        yield return new WaitForSeconds(1f);
+        Teleport(new Vector3(NightMap.Exit.x, 0f, NightMap.Exit.y - 6f));
+        yield return new WaitForSeconds(0.3f);
+
+        var sun = new GameObject("PhotoSun").AddComponent<Light>();
+        sun.type = LightType.Directional;
+        sun.intensity = 1.0f;
+        sun.transform.rotation = Quaternion.Euler(35f, 200f, 0f);
+        Vector3 front = new Vector3(0.25f, 0.5f, 1f);
+
+        // 透明な背景と、夜らしい暗い背景(蛍や花の光が分かる)の2通りを撮る
+        var plant = g.World.Plants[0];
+        var orb2 = g.World.Orbs[1];
+        var lamp = g.World.Lamps[0];
+        Vector3 gateView = new Vector3(0.35f, 0.4f, 1f);
+        for (int pass = 0; pass < 2; pass++)
+        {
+            string sfx = pass == 0 ? "" : "_night";
+            Color bg = pass == 0 ? new Color(0f, 0f, 0f, 0f) : new Color(0.06f, 0.09f, 0.15f, 1f);
+            yield return Photo("prop_flower" + sfx, RenderersNear(new Vector3(plant.x, plant.height, plant.z), 1.0f, 1.6f), front, bg);
+            yield return Photo("prop_stone_lit" + sfx, RenderersOf(orb.root), front, bg);
+            yield return Photo("prop_stone_dark" + sfx, RenderersOf(orb2.root), front, bg);
+            yield return Photo("prop_lantern" + sfx, RenderersNear(new Vector3(lamp.x, lamp.height, lamp.z), 0.55f, 2.2f), front, bg);
+            yield return Photo("prop_gate_closed" + sfx, GateParts(), gateView, bg);
+        }
+        g.World.Gate.Open();
+        yield return new WaitForSeconds(2.5f);
+        yield return Photo("prop_gate_open", GateParts(), gateView, new Color(0f, 0f, 0f, 0f));
+        yield return Photo("prop_gate_open_night", GateParts(), gateView, new Color(0.06f, 0.09f, 0.15f, 1f));
+        Application.Quit();
+    }
+
+    // 門が開いたときに出る背の高い光の柱は入れない(写真が縦に伸びてしまうため)
+    System.Collections.Generic.List<Renderer> GateParts()
+    {
+        return RenderersOf(g.World.Gate.root).FindAll(r => r.bounds.size.y < 6f);
+    }
+
+    static System.Collections.Generic.List<Renderer> RenderersOf(Transform root)
+    {
+        return new System.Collections.Generic.List<Renderer>(root.GetComponentsInChildren<Renderer>());
+    }
+
+    // 親を持たない部品(ランタンなど)用: 水平距離 radius 以内・地面からの高さ maxH 以内にある小さな部品を集める
+    static System.Collections.Generic.List<Renderer> RenderersNear(Vector3 p, float radius, float maxH)
+    {
+        var list = new System.Collections.Generic.List<Renderer>();
+        foreach (var r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+        {
+            Vector3 c = r.bounds.center;
+            float dx = c.x - p.x, dz = c.z - p.z;
+            if (dx * dx + dz * dz > radius * radius) continue;
+            if (c.y < p.y - 0.2f || c.y > p.y + maxH) continue;
+            if (r.bounds.size.magnitude > maxH * 1.6f) continue;
+            if (r.GetComponentInParent<NightPlayer>() != null) continue;
+            list.Add(r);
+        }
+        return list;
+    }
+
+    IEnumerator Photo(string name, System.Collections.Generic.List<Renderer> rs, Vector3 viewDir, Color background)
+    {
+        yield return null;
+        foreach (var en in g.Enemies) if (en.go != null) en.go.SetActive(false);
+        const int Layer = 31, Size = 1400;
+        var saved = new int[rs.Count];
+        Bounds b = rs.Count > 0 ? rs[0].bounds : new Bounds(g.PlayerPos, Vector3.one);
+        for (int i = 0; i < rs.Count; i++)
+        {
+            saved[i] = rs[i].gameObject.layer;
+            rs[i].gameObject.layer = Layer;
+            if (!(rs[i] is ParticleSystemRenderer)) b.Encapsulate(rs[i].bounds);
+        }
+        var cam = new GameObject("PhotoCam").AddComponent<Camera>();
+        cam.enabled = false;
+        cam.cullingMask = 1 << Layer;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = background;
+        cam.fieldOfView = 26f;
+        cam.nearClipPlane = 0.05f;
+        cam.farClipPlane = 300f;
+        float dist = b.extents.magnitude * 1.08f / Mathf.Sin(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        cam.transform.position = b.center + viewDir.normalized * dist;
+        cam.transform.LookAt(b.center);
+        var rt = new RenderTexture(Size, Size, 24, RenderTextureFormat.ARGB32) { antiAliasing = 8 };
+        cam.targetTexture = rt;
+
+        bool fog = RenderSettings.fog;
+        Color amb = RenderSettings.ambientLight;
+        RenderSettings.fog = false;
+        RenderSettings.ambientLight = new Color(0.5f, 0.5f, 0.55f);
+        cam.Render();
+        RenderSettings.fog = fog;
+        RenderSettings.ambientLight = amb;
+
+        RenderTexture.active = rt;
+        var tex = new Texture2D(Size, Size, TextureFormat.RGBA32, false);
+        tex.ReadPixels(new Rect(0, 0, Size, Size), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        File.WriteAllBytes(Path.Combine(dir, name + ".png"), tex.EncodeToPNG());
+        Debug.Log("NightAutoShot: photo " + name + " parts=" + rs.Count + " bounds=" + b);
+
+        for (int i = 0; i < rs.Count; i++) if (rs[i] != null) rs[i].gameObject.layer = saved[i];
+        cam.targetTexture = null;
+        Object.Destroy(rt);
+        Object.Destroy(cam.gameObject);
     }
 
     // LockCameraOn と同じく、毎フレーム Update の後にカメラを上書きし直す(位置と注視点を直接指定する版)

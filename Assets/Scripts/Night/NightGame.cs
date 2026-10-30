@@ -694,7 +694,7 @@ public class NightGame : MonoBehaviour
             }
             if (flashHit) en.lightHp -= en.cfg.drain * FlashDamage * FlashLevel * dt;
             if (lantern > 0f) en.lightHp -= lantern * dt;
-            if (!lit) en.lightHp = Mathf.Min(en.lightHpMax, en.lightHp + en.cfg.regen * dt);
+            // 光を外しても敵の体力は戻らない(照らした分はそのまま残る)
             en.ApplyGlow(lit, spotHit && lightsOn >= 2);
             if (lit && FxTick(ref en.fxTimer, dt, 0.12f)) SurvivorBurst.Spawn(en.Position + Vector3.up * en.hitHeight, new Color(1f, 0.15f, 0.08f), 4);
             if (en.lightHp <= 0f) KillEnemy(en);
