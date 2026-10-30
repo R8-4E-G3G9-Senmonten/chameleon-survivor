@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ルール説明スライド</title>
+<link rel="stylesheet" href="common.css">
+<style>
+@page { size: 1280px 720px; margin: 0; }
+body { background: var(--night); color: var(--text); }
+.slide { width: 1280px; height: 720px; position: relative; overflow: hidden; page-break-after: always; padding: 56px 72px 48px;
+  background: radial-gradient(ellipse at 85% -10%, #1d3a5e 0%, transparent 55%), radial-gradient(ellipse at 0% 110%, #16324a 0%, transparent 50%), var(--night); }
+.slide { display: flex; flex-direction: column; }
+.slide > .tag { align-self: flex-start; }
+.slide > h2 + .cols, .slide > h2 + ul { margin-top: auto; margin-bottom: auto; }
+.slide:last-child { page-break-after: auto; }
+.no { position: absolute; right: 36px; bottom: 22px; font-size: 18px; color: var(--text-2); }
+.tag { display: inline-block; font-size: 20px; padding: 4px 16px; border-radius: 999px; background: var(--night-3); color: var(--firefly); margin-bottom: 10px; }
+h2 { font-family: "Pop", sans-serif; font-weight: 400; font-size: 50px; line-height: 1.25; margin-bottom: 26px; }
+p.lead { font-size: 28px; color: var(--text-2); }
+.big { font-size: 30px; line-height: 1.55; }
+.cols { display: grid; gap: 36px; align-items: start; }
+.c2 { grid-template-columns: 1fr 1fr; }
+.shot { width: 100%; border-radius: 16px; border: 2px solid var(--line); }
+.card { background: var(--night-2); border: 2px solid var(--line); border-radius: 20px; padding: 24px 28px; }
+.card h3 { font-family: "Pop", sans-serif; font-weight: 400; font-size: 32px; margin-bottom: 10px; }
+.card p, .card li { font-size: 25px; color: var(--text-2); line-height: 1.55; }
+ul.dot { list-style: none; }
+ul.dot li { position: relative; padding-left: 30px; margin: 8px 0; font-size: 28px; line-height: 1.5; }
+ul.dot li::before { content: ""; position: absolute; left: 4px; top: .55em; width: 14px; height: 14px; border-radius: 50%; background: var(--firefly); box-shadow: 0 0 12px var(--firefly); }
+.step { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.num { flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-family: "Pop", sans-serif; font-size: 28px; background: var(--firefly); color: #2a2200; }
+.note { font-size: 20px; color: var(--text-2); }
+.pill { display: inline-block; padding: 2px 14px; border-radius: 999px; font-size: 22px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- 1 表紙 -->
+<section class="slide" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+  <img src="img/logo.png" style="width:900px;margin-bottom:24px;">
+  <div class="pop" style="font-size:64px;margin-bottom:18px;">ルール説明</div>
+  <p class="lead" style="font-size:30px;">スマホのライトで敵を照らして、<br>カメレオンと夜の森を生き抜け！</p>
+  <div class="no">1</div>
+</section>
+
+<!-- 2 どんなゲーム -->
+<section class="slide">
+  <span class="tag">どんなゲーム？</span>
+  <h2>みんなで協力して、<span class="hl">夜の森</span>から脱出する</h2>
+  <div class="cols c2">
+    <div>
+      <div class="card" style="margin-bottom:20px;border-color:var(--green);">
+        <h3 class="g">カメレオン役 <span style="font-size:24px;">1人</span></h3>
+        <p>足元のマットを<b>踏んで</b>、カメレオンを動かす</p>
+      </div>
+      <div class="card" style="border-color:var(--firefly);">
+        <h3 class="hl">灯り役 <span style="font-size:24px;">最大7人</span></h3>
+        <p>自分の<b>スマホが懐中電灯</b>になる。<br>森を照らして、敵をやっつける</p>
+      </div>
+    </div>
+    <div>
+      <img class="shot" src="img/play.jpg">
+      <p class="note" style="margin-top:10px;">夜の森はまっ暗。照らされた場所しか見えない</p>
+    </div>
+  </div>
+  <div class="no">2</div>
+</section>
+
+<!-- 3 ゴール -->
+<section class="slide">
+  <span class="tag">ゴール</span>
+  <h2>蛍を<span class="hl">2匹</span>集めて、門から脱出！</h2>
+  <div class="cols" style="grid-template-columns:repeat(3,1fr);gap:28px;">
+    <div>
+      <img class="shot" src="img/stone.jpg">
+      <div class="step" style="margin-top:16px;"><div class="num">1</div><div class="big" style="font-size:27px;">石を<b class="hl">照らす</b>と<br>蛍が集まってくる</div></div>
+    </div>
+    <div>
+      <img class="shot" src="img/firefly.jpg">
+      <div class="step" style="margin-top:16px;"><div class="num">2</div><div class="big" style="font-size:27px;">カメレオンが<b class="hl">さわる</b>と<br>蛍をゲット</div></div>
+    </div>
+    <div>
+      <img class="shot" src="img/play.jpg">
+      <div class="step" style="margin-top:16px;"><div class="num">3</div><div class="big" style="font-size:27px;">2匹そろうと<b class="hl">門が開く</b>。<br>スタートの門へ戻る</div></div>
+    </div>
+  </div>
+  <p class="note" style="margin-top:22px;font-size:22px;">石は2か所。1か所につき蛍1匹。</p>
+  <div class="no">3</div>
+</section>
+
+<!-- 4 カメレオン役の操作 -->
+<section class="slide">
+  <span class="tag">カメレオン役</span>
+  <h2>マットを<span class="g">踏んだ方向</span>に進む</h2>
+  <div class="cols" style="grid-template-columns:420px 1fr;gap:56px;align-items:center;">
+    <div style="display:grid;grid-template-columns:repeat(3,120px);grid-template-rows:repeat(3,120px);gap:12px;justify-content:center;">
+      <div></div><div class="card pop" style="display:grid;place-items:center;font-size:30px;padding:0;border-color:var(--green);">前</div><div></div>
+      <div class="card pop" style="display:grid;place-items:center;font-size:30px;padding:0;border-color:var(--green);">左</div>
+      <div style="display:grid;place-items:center;"><img src="img/chameleon.png" style="width:104px;"></div>
+      <div class="card pop" style="display:grid;place-items:center;font-size:30px;padding:0;border-color:var(--green);">右</div>
+      <div></div><div class="card pop" style="display:grid;place-items:center;font-size:30px;padding:0;border-color:var(--green);">後</div><div></div>
+    </div>
+    <ul class="dot">
+      <li>前・後・左・右のマットを踏むと、その向きに歩く</li>
+      <li>2枚いっしょに踏むと、ななめに進む</li>
+      <li><b class="c">止まると「擬態」</b>して隠れられる(次のページ)</li>
+      <li class="note" style="font-size:22px;">頭の上の<b class="g">緑のバー</b>が体力(HP)。0になると終わり</li>
+    </ul>
+  </div>
+  <div class="no">4</div>
+</section>
+
+<!-- 5 擬態 -->
+<section class="slide">
+  <span class="tag">カメレオン役のひみつ技</span>
+  <h2>止まると<span class="c">擬態</span>。敵から消える！</h2>
+  <div class="cols c2" style="align-items:center;">
+    <div>
+      <ul class="dot">
+        <li>1秒止まると、地面と同じ色になる</li>
+        <li>擬態中は<b class="c">ダメージを受けない</b>。<br>敵は見失って「<b class="hl">？</b>」</li>
+        <li>続くのは<b>最大3秒</b>(<span class="c">水色のバー</span>)</li>
+        <li>切れると「<b class="r">！</b>」で見つかる。<br>歩くとバーがまたたまる</li>
+      </ul>
+    </div>
+    <div><img class="shot" src="img/camo.jpg"></div>
+  </div>
+  <div class="no">5</div>
+</section>
+
+<!-- 6 灯り役の操作 -->
+<section class="slide">
+  <span class="tag">灯り役</span>
+  <h2>スマホで<span class="hl">QRコード</span>を読むだけ</h2>
+  <div class="cols" style="grid-template-columns:1fr 330px;gap:56px;align-items:center;">
+    <div>
+      <div class="step"><div class="num">1</div><div class="big">ゲーム画面のQRコードをカメラで読む</div></div>
+      <div class="step"><div class="num">2</div><div class="big">「タップして始める」を押す</div></div>
+      <div class="step"><div class="num">3</div><div class="big">スマホを<b class="hl">傾けて</b>、光の位置を動かす</div></div>
+      <div class="step"><div class="num">4</div><div class="big">「<b class="hl">ライトON</b>」を<b>押している間だけ</b>光る</div></div>
+      <p class="note" style="margin-top:14px;">アプリのインストールは不要 ／ iPhone は「許可」を選ぶ<br>光がずれたら「中心をリセット」</p>
+    </div>
+    <!-- スマホの画面(イメージ) -->
+    <div style="width:300px;height:560px;border-radius:44px;border:10px solid #33476b;background:#0e1a2e;padding:26px 20px;display:flex;flex-direction:column;gap:14px;">
+      <div style="text-align:center;font-size:18px;color:var(--text-2);">灯り役 ・ あなたの光: <b class="hl">●</b></div>
+      <div style="flex:1;border-radius:18px;background:radial-gradient(circle at 55% 45%, #fff3b0 0 18%, #6b5a1c 36%, #101b2c 60%);"></div>
+      <div style="text-align:center;font-size:16px;color:var(--text-2);">傾けて、ゲーム画面の狙いを動かす</div>
+      <div class="pop" style="height:120px;border-radius:24px;background:var(--firefly);color:#2a2200;display:grid;place-items:center;font-size:34px;">ライトON</div>
+    </div>
+  </div>
+  <div class="no">6</div>
+</section>
+
+<!-- 7 敵を倒す -->
+<section class="slide">
+  <span class="tag">灯り役の仕事</span>
+  <h2>敵に光を<span class="hl">当て続けて</span>倒す</h2>
+  <div class="cols c2" style="align-items:center;">
+    <div><img class="shot" src="img/light.jpg"></div>
+    <ul class="dot">
+      <li>光が当たると<b class="r">赤い輪</b>が出て弱る</li>
+      <li>何人かで<b class="hl">光を重ねる</b>と、早く倒せる<br><span class="note">(2人で2倍)</span></li>
+      <li>光を外しても、敵は回復しない</li>
+      <li>倒した敵は、ときどき<b class="g">緑の玉</b>を落とす。<br>カメレオンが拾うと体力が回復</li>
+    </ul>
+  </div>
+  <div class="no">7</div>
+</section>
+
+<!-- 8 敵の種類 -->
+<section class="slide">
+  <span class="tag">敵の種類</span>
+  <h2>森に出てくる<span class="r">4種類</span>のお化け</h2>
+  <div class="cols" style="grid-template-columns:repeat(4,1fr);gap:22px;">
+    <div class="card" style="padding:14px;"><img src="img/enemy_wolf.jpg" style="width:100%;border-radius:12px;margin-bottom:10px;"><h3 style="font-size:26px;">狼</h3><p style="font-size:21px;">小さくて速い。<br>3匹で群れて来る</p></div>
+    <div class="card" style="padding:14px;"><img src="img/enemy_fox.jpg" style="width:100%;border-radius:12px;margin-bottom:10px;"><h3 style="font-size:26px;">狐</h3><p style="font-size:21px;">遠くから<br><b class="r">火の玉</b>を投げてくる</p></div>
+    <div class="card" style="padding:14px;"><img src="img/enemy_bear3d.jpg" style="width:100%;border-radius:12px;margin-bottom:10px;"><h3 style="font-size:26px;">熊</h3><p style="font-size:21px;">大きくて遅い。<br>かたくて、パンチが痛い</p></div>
+    <div class="card" style="padding:14px;"><img src="img/enemy_sprite.jpg" style="width:100%;border-radius:12px;margin-bottom:10px;"><h3 style="font-size:26px;">妖精</h3><p style="font-size:21px;">木や崖を<b>すり抜けて</b><br>まっすぐ来る。弱い</p></div>
+  </div>
+  <div class="no">8</div>
+</section>
+
+<!-- 9 森のしかけ -->
+<section class="slide">
+  <span class="tag">森のしかけ</span>
+  <h2>味方になってくれる<span class="hl">3つ</span>のもの</h2>
+  <div class="cols" style="grid-template-columns:repeat(3,1fr);gap:26px;">
+    <div class="card" style="padding:16px;"><img src="img/flower.jpg" style="width:100%;border-radius:12px;margin-bottom:12px;"><h3 style="font-size:28px;">導きの花</h3><p style="font-size:22px;">照らすと、蛍のいる石まで<b class="hl">光の道</b>が出る。<br>迷ったら花を探そう</p></div>
+    <div class="card" style="padding:16px;"><img src="img/lantern.jpg" style="width:100%;border-radius:12px;margin-bottom:12px;"><h3 style="font-size:28px;">ランタン</h3><p style="font-size:22px;">はじめから灯っている。<br>まわりに来た敵は<b class="hl">弱っていく</b></p></div>
+    <div class="card" style="padding:16px;"><img src="img/flash.jpg" style="width:100%;border-radius:12px;margin-bottom:12px;"><h3 style="font-size:28px;">雷</h3><p style="font-size:22px;">約12秒ごとに「ゴロゴロ」→ 森が光る。<br>近くの敵に<b class="hl">ダメージ</b></p></div>
+  </div>
+  <div class="no">9</div>
+</section>
+
+<!-- 10 気をつけること -->
+<section class="slide">
+  <span class="tag">気をつけること</span>
+  <h2>進むほど、敵が<span class="r">増えていく</span></h2>
+  <div class="cols c2">
+    <div class="card" style="border-color:var(--danger);">
+      <h3 class="r">ゲームオーバー</h3>
+      <p>カメレオンの体力(<span class="g">緑のバー</span>)が0になると終わり。<br>敵にさわられたり、火の玉に当たると減る</p>
+    </div>
+    <div class="card" style="border-color:var(--firefly);">
+      <h3 class="hl">脅威レベル</h3>
+      <p>蛍を捕まえたり、体力を回復したりすると「<b class="r">敵が増えた！</b>」。<br>敵の数が増えて、出てくるのも早くなる</p>
+    </div>
+  </div>
+  <p class="big" style="margin-top:34px;">→ 後半ほど大変。<b class="hl">灯り役のチームワーク</b>が大事！</p>
+  <div class="no">10</div>
+</section>
+
+<!-- 11 マップとスコア -->
+<section class="slide">
+  <span class="tag">マップとスコア</span>
+  <h2>3つのマップ ＋ ランキング</h2>
+  <div class="cols" style="grid-template-columns:1fr 1fr;gap:40px;">
+    <div>
+      <div class="card" style="margin-bottom:14px;padding:16px 24px;"><p style="font-size:26px;"><b style="color:var(--green);">★☆☆ やさしい</b>　A. 森の迷路</p></div>
+      <div class="card" style="margin-bottom:14px;padding:16px 24px;"><p style="font-size:26px;"><b class="hl">★★☆ ふつう</b>　B. 遺跡攻略</p></div>
+      <div class="card" style="padding:16px 24px;"><p style="font-size:26px;"><b class="r">★★★ むずかしい</b>　C. 中央湖の周回</p></div>
+      <p class="note" style="margin-top:12px;">はじめての人は A がおすすめ</p>
+    </div>
+    <div class="card">
+      <h3 class="hl">スコアの決まり方</h3>
+      <p style="margin-bottom:10px;"><b>脱出できたら</b><br>クリアボーナス 5,000点<br>＋ 倒した敵 1体 100点<br>＋ 早く脱出するほどボーナス</p>
+      <p><b>途中で力尽きても</b><br>倒した敵と、生きのびた時間で点数</p>
+      <p class="note" style="margin-top:10px;">マップごとに10位までランキングに載る</p>
+    </div>
+  </div>
+  <div class="no">11</div>
+</section>
+
+<!-- 12 まとめ -->
+<section class="slide">
+  <span class="tag">まとめ</span>
+  <h2>勝つための<span class="hl">3つのコツ</span></h2>
+  <div class="step" style="margin-bottom:22px;"><div class="num">1</div><div class="big" style="font-size:34px;">囲まれそうになったら、<b class="c">止まって擬態</b></div></div>
+  <div class="step" style="margin-bottom:22px;"><div class="num">2</div><div class="big" style="font-size:34px;">灯り役は<b class="hl">同じ敵に光を重ねる</b></div></div>
+  <div class="step" style="margin-bottom:22px;"><div class="num">3</div><div class="big" style="font-size:34px;">道に迷ったら<b class="g">導きの花</b>を照らす</div></div>
+  <p class="pop" style="font-size:52px;text-align:center;margin-top:40px;color:var(--firefly);text-shadow:0 0 24px rgba(255,216,74,.45);">みんなで灯せ、夜の森。</p>
+  <div class="no">12</div>
+</section>
+
+</body>
+</html>

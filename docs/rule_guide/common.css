@@ -1,0 +1,15 @@
+@font-face { font-family: "Pop"; src: url("fonts/MochiyPopOne-Regular.ttf"); }
+:root {
+  --night: #0b1426; --night-2: #13213b; --night-3: #1c2e4f; --line: #2c4166;
+  --text: #f4f7fb; --text-2: #c3cfe2;
+  --firefly: #ffd84a; --green: #5fd47a; --camo: #6fd3ff; --danger: #ff6f6f; --violet: #b99bff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "BIZ UDPGothic", "BIZ UDゴシック", "Meiryo", sans-serif; line-height: 1.6; }
+.pop { font-family: "Pop", "BIZ UDPGothic", sans-serif; font-weight: 400; }
+img { display: block; }
+.hl { color: var(--firefly); }
+.g { color: var(--green); }
+.c { color: var(--camo); }
+.r { color: var(--danger); }

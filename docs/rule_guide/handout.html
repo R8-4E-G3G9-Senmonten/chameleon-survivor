@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ルール説明書</title>
+<link rel="stylesheet" href="common.css">
+<style>
+@page { size: A4; margin: 0; }
+:root { --ink: #1b2433; --ink-2: #4a5568; --paper: #ffffff; --soft: #f3f6fa; --rule: #d7dee8;
+  --firefly-d: #b98900; --green-d: #23864a; --camo-d: #1677a8; --danger-d: #c43c3c; }
+body { background: var(--paper); color: var(--ink); }
+.page { width: 210mm; height: 297mm; padding: 13mm 14mm 11mm; position: relative; page-break-after: always; overflow: hidden; }
+.page:last-child { page-break-after: auto; }
+.foot { position: absolute; left: 14mm; right: 14mm; bottom: 7mm; font-size: 8.5pt; color: var(--ink-2); display: flex; justify-content: space-between; }
+header { display: flex; align-items: center; gap: 6mm; padding: 5mm 6mm; border-radius: 5mm; background: #0b1426; color: #f4f7fb; margin-bottom: 5mm; }
+header img { height: 17mm; }
+header .t { font-family: "Pop", sans-serif; font-size: 19pt; }
+header p { font-size: 10pt; color: #c3cfe2; }
+h2 { font-family: "Pop", sans-serif; font-weight: 400; font-size: 14pt; margin: 4.5mm 0 2.5mm; display: flex; align-items: center; gap: 2.5mm; }
+h2 .n { width: 7.5mm; height: 7.5mm; border-radius: 50%; background: #0b1426; color: #ffd84a; display: grid; place-items: center; font-size: 10.5pt; flex: none; }
+p, li { font-size: 10.5pt; line-height: 1.65; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3.5mm; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
+.box { border: 0.4mm solid var(--rule); border-radius: 3.5mm; padding: 3mm 3.5mm; background: var(--soft); }
+.box h3 { font-size: 11.5pt; margin-bottom: 1mm; }
+.box p, .box li { font-size: 9.8pt; line-height: 1.55; }
+.box img { width: 100%; border-radius: 2mm; margin-bottom: 2mm; }
+ul { padding-left: 4.5mm; }
+li { margin: .6mm 0; }
+.k { color: var(--firefly-d); font-weight: 700; }
+.kg { color: var(--green-d); font-weight: 700; }
+.kc { color: var(--camo-d); font-weight: 700; }
+.kr { color: var(--danger-d); font-weight: 700; }
+.goal { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3.5mm; counter-reset: g; }
+.goal .box { position: relative; padding-top: 3mm; }
+.goal .box::before { counter-increment: g; content: counter(g); position: absolute; top: -2.5mm; left: -2mm; width: 7mm; height: 7mm; border-radius: 50%; background: #ffd84a; color: #2a2200; font-family: "Pop", sans-serif; display: grid; place-items: center; font-size: 10.5pt; }
+table { width: 100%; border-collapse: collapse; font-size: 9.8pt; }
+td, th { border-bottom: 0.3mm solid var(--rule); padding: 1.6mm 2mm; text-align: left; vertical-align: top; }
+th { background: var(--soft); font-weight: 700; }
+.tips { border: 0.6mm solid #ffd84a; background: #fffaf0; border-radius: 4mm; padding: 3.5mm 5mm; }
+.tips li { font-size: 11pt; }
+.grid4 .box img { height: 25mm; object-fit: cover; }
+.p2 .grid3 .box img { height: 25mm; object-fit: cover; }
+.p2 td, .p2 th { padding: 1.2mm 2mm; }
+.p2 h2 { margin: 3.5mm 0 2mm; }
+</style>
+</head>
+<body>
+
+<section class="page">
+  <header>
+    <img src="img/chameleon.png">
+    <div>
+      <div class="t">カメレオンサバイバー　ルール説明書</div>
+      <p>スマホのライトで敵を照らして、カメレオンと夜の森を生き抜け！</p>
+    </div>
+  </header>
+
+  <h2><span class="n">1</span>どんなゲーム？</h2>
+  <p>まっ暗な夜の森から、<b>みんなで協力して脱出する</b>ゲームです。役は2つあります。</p>
+  <div class="grid2" style="margin-top:2.5mm;">
+    <div class="box" style="border-color:#8fd3a5;">
+      <h3 class="kg">カメレオン役(1人)</h3>
+      <ul>
+        <li>足元のマット(前・後・左・右)を<b>踏んだ向き</b>に歩く。2枚踏むとななめ</li>
+        <li>頭の上の<span class="kg">緑のバー</span>が体力。0になると終わり</li>
+        <li><b>止まると擬態</b>して隠れられる(下の「ひみつ技」)</li>
+      </ul>
+    </div>
+    <div class="box" style="border-color:#f0d27a;">
+      <h3 class="k">灯り役(最大7人)</h3>
+      <ul>
+        <li>ゲーム画面の<b>QRコード</b>をスマホで読む(アプリ不要)</li>
+        <li>「タップして始める」→ スマホを<b>傾けて</b>光を動かす</li>
+        <li>「<b>ライトON</b>」を押している間だけ光る</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2><span class="n">2</span>ゴール：蛍を2匹集めて、門から脱出</h2>
+  <div class="goal">
+    <div class="box"><img src="img/stone.jpg"><p>森の<b>石</b>を照らすと、蛍が集まってくる(合計2秒ほど)</p></div>
+    <div class="box"><img src="img/firefly.jpg"><p>カメレオンが石に<b>さわる</b>と、蛍をゲット。石は2か所</p></div>
+    <div class="box"><img src="img/play.jpg"><p>2匹そろうと<b>門が開く</b>。スタート地点の門をくぐれば脱出成功！</p></div>
+  </div>
+
+  <h2><span class="n">3</span>敵の倒し方(灯り役)</h2>
+  <div class="grid2" style="grid-template-columns: 62mm 1fr; align-items:center;">
+    <img src="img/light.jpg" style="width:100%;border-radius:2.5mm;">
+    <ul>
+      <li>敵に光を<b>当て続ける</b>と、<span class="kr">赤い輪</span>が出て弱り、やがて倒れる</li>
+      <li>何人かで<b class="k">光を重ねる</b>と早く倒せる(2人で2倍)</li>
+      <li>光を外しても、敵の体力は戻らない。少しずつ照らしても倒せる</li>
+      <li>倒した敵はときどき<span class="kg">緑の玉</span>を落とす。カメレオンが拾うと体力回復</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">4</span>カメレオン役のひみつ技「擬態」</h2>
+  <div class="grid2" style="grid-template-columns: 1fr 62mm; align-items:center;">
+    <ul>
+      <li><b>1秒止まる</b>と、地面と同じ色になって隠れる</li>
+      <li>擬態中は<b class="kc">ダメージを受けない</b>。敵は見失って「？」を出す</li>
+      <li>続くのは<b>最大3秒</b>(<span class="kc">水色のバー</span>)。切れると「！」で見つかる</li>
+      <li>歩いているとバーがまたたまる</li>
+    </ul>
+    <img src="img/camo.jpg" style="width:100%;border-radius:2.5mm;">
+  </div>
+  <div class="foot"><span>カメレオンサバイバー(夜の森モード)</span><span>1 / 2</span></div>
+</section>
+
+<section class="page p2">
+  <h2 style="margin-top:0;"><span class="n">5</span>出てくる敵(4種類)</h2>
+  <div class="grid4">
+    <div class="box"><img src="img/enemy_wolf.jpg"><h3>狼</h3><p>小さくて速い。3匹で群れて来る</p></div>
+    <div class="box"><img src="img/enemy_fox.jpg"><h3>狐</h3><p>立ち止まって、遠くから<span class="kr">火の玉</span>を投げる</p></div>
+    <div class="box"><img src="img/enemy_bear3d.jpg"><h3>熊</h3><p>大きくて遅い。かたくて、パンチが痛い</p></div>
+    <div class="box"><img src="img/enemy_sprite.jpg"><h3>妖精</h3><p>木や崖を<b>すり抜けて</b>まっすぐ来る。弱い</p></div>
+  </div>
+
+  <h2><span class="n">6</span>森のしかけ(味方になるもの)</h2>
+  <div class="grid3">
+    <div class="box"><img src="img/flower.jpg"><h3>導きの花</h3><p>照らすと、蛍のいる石(全部集めた後は門)まで<b class="k">光の道</b>が出る</p></div>
+    <div class="box"><img src="img/lantern.jpg"><h3>ランタン</h3><p>はじめから灯っている。まわりに来た敵は<b class="k">弱っていく</b></p></div>
+    <div class="box"><img src="img/flash.jpg"><h3>雷</h3><p>約12秒ごとに「ゴロゴロ」と予告 → 森が光り、近くの敵に<b class="k">ダメージ</b></p></div>
+  </div>
+
+  <h2><span class="n">7</span>気をつけること</h2>
+  <ul>
+    <li>カメレオンの体力(<span class="kg">緑のバー</span>)が<b class="kr">0になるとゲームオーバー</b>。敵にさわられたり、火の玉に当たると減る</li>
+    <li>蛍を捕まえたり体力を回復したりすると、<b>脅威レベル</b>が上がり「<span class="kr">敵が増えた！</span>」。後半ほど敵が多く、早く出てくる</li>
+  </ul>
+
+  <h2><span class="n">8</span>マップとスコア</h2>
+  <div class="grid2">
+    <table>
+      <tr><th>マップ</th><th>むずかしさ</th></tr>
+      <tr><td>A. 森の迷路</td><td><span class="kg">★☆☆</span> やさしい(はじめての人に)</td></tr>
+      <tr><td>B. 遺跡攻略</td><td><span class="k">★★☆</span> ふつう</td></tr>
+      <tr><td>C. 中央湖の周回</td><td><span class="kr">★★★</span> むずかしい</td></tr>
+    </table>
+    <table>
+      <tr><th colspan="2">スコアの決まり方</th></tr>
+      <tr><td>脱出できたら</td><td>5,000点 ＋ 倒した敵×100点 ＋ 早さボーナス(10分より1秒早いごとに10点)</td></tr>
+      <tr><td>途中で力尽きたら</td><td>倒した敵×100点 ＋ 生きのびた秒数×5点</td></tr>
+      <tr><td colspan="2">マップごとに10位までランキングに載る</td></tr>
+    </table>
+  </div>
+
+  <h2><span class="n">9</span>勝つための3つのコツ</h2>
+  <div class="tips">
+    <ul>
+      <li>囲まれそうになったら、<b class="kc">止まって擬態</b>(ただし3秒まで)</li>
+      <li>灯り役は声をかけ合って、<b class="k">同じ敵に光を重ねる</b></li>
+      <li>道に迷ったら<b class="kg">導きの花</b>を照らす</li>
+    </ul>
+  </div>
+  <p style="margin-top:3mm;font-size:9pt;color:var(--ink-2);">※ 画面写真は開発中のものです。iPhone は傾きセンサーの確認で「許可」を選んでください。光の位置がずれたら、スマホの「中心をリセット」を押します。</p>
+  <div class="foot"><span>カメレオンサバイバー(夜の森モード)</span><span>2 / 2</span></div>
+</section>
+
+</body>
+</html>
